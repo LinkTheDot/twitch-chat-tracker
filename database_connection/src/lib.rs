@@ -1,7 +1,7 @@
-use crate::app_config::{
-  config::APP_CONFIG, database_protocol::DatabaseProtocol, secret_string::Secret,
+use anyhow::anyhow;
+use app_config::{
+  config::database_protocol::DatabaseProtocol, config::secret_string::Secret, APP_CONFIG,
 };
-use crate::errors::AppError;
 use migration::{Migrator, MigratorTrait, SchemaManager};
 use sea_orm::*;
 use tokio::sync::OnceCell;
@@ -26,7 +26,7 @@ async fn create_database_connection() {
   DATABASE_CONNECTION.set(database_connection).unwrap();
 }
 
-async fn get_connection() -> Result<sea_orm::DatabaseConnection, AppError> {
+async fn get_connection() -> anyhow::Result<sea_orm::DatabaseConnection> {
   let database_connection = Database::connect(database_connection_string(None))
     .await
     .unwrap();
@@ -67,7 +67,7 @@ fn database_connection_string(database_name: Option<&str>) -> String {
   )
 }
 
-async fn run_migration(database: &DatabaseConnection) -> Result<(), AppError> {
+async fn run_migration(database: &DatabaseConnection) -> anyhow::Result<()> {
   let schema_manager = SchemaManager::new(database);
 
   Migrator::up(database, None).await?;
@@ -88,9 +88,12 @@ async fn run_migration(database: &DatabaseConnection) -> Result<(), AppError> {
 async fn check_if_has_table(
   schema_manager: &SchemaManager<'_>,
   table_name: &'static str,
-) -> Result<(), AppError> {
+) -> anyhow::Result<()> {
   if !schema_manager.has_table(table_name).await? {
-    return Err(AppError::MissingDatabaseTable(table_name));
+    return Err(anyhow!(
+      "Failed to migrate the database due to a missing table: `{:?}`",
+      table_name
+    ));
   }
 
   Ok(())

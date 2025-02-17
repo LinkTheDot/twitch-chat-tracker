@@ -1,4 +1,4 @@
-use crate::app_config::config::APP_CONFIG;
+use app_config::config::APP_CONFIG;
 use std::path::PathBuf;
 
 pub fn setup_logging_config() -> Result<(), Box<dyn std::error::Error>> {

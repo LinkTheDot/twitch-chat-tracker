@@ -1,4 +1,4 @@
-use crate::errors::AppError;
+use anyhow::anyhow;
 use std::{path::Path, str::FromStr};
 use tracing_appender::rolling::{self, RollingFileAppender};
 
@@ -23,13 +23,16 @@ impl RollingAppenderRotation {
     self,
     logging_dir: P,
     filename_prefix: P,
-  ) -> Result<RollingFileAppender, AppError> {
+  ) -> anyhow::Result<RollingFileAppender> {
     match self {
       Self::Minutely => Ok(rolling::minutely(logging_dir, filename_prefix)),
       Self::Hourly => Ok(rolling::hourly(logging_dir, filename_prefix)),
       Self::Daily => Ok(rolling::daily(logging_dir, filename_prefix)),
       Self::Never => Ok(rolling::never(logging_dir, filename_prefix)),
-      Self::Unknown(value) => Err(AppError::MisconfiguredRollingFileAppender(value)),
+      Self::Unknown(value) => Err(anyhow!(
+        "Unknown rolling file appender configuration: {:?}",
+        value
+      )),
     }
   }
 }

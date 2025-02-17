@@ -1,14 +1,7 @@
 #[derive(Debug, thiserror::Error)]
 pub enum AppError {
-  #[error("The amount of channels being queried each minute exceeds the limit of 800. channel_count * quieries_per_minute must be <= 800.")]
+  #[error("")]
   ChannelQueriesPerMinuteExceeded,
-
-  #[error("An error occurred when initializing the config: `{}`", .0)]
-  ConfigError(#[from] schematic::ConfigError),
-
-  /// Contains the incorrect value used to configure the [`RollingAppenderRotation`](crate::app_config::rolling_appender::RollingAppenderRotation)
-  #[error("Unknown rolling file appender configuration: {:?}", .0)]
-  MisconfiguredRollingFileAppender(String),
 
   #[error("{}", .0)]
   UrlParseError(#[from] url::ParseError),
@@ -36,13 +29,6 @@ pub enum AppError {
 
   #[error("Received nothing when polling for a message from the IRC client.")]
   NoIRCMessage,
-
-  #[error(
-    "Failed to get a response from {} after {} attempts.",
-    request,
-    attempts
-  )]
-  RanOutOfGetRequestAttempts { request: String, attempts: usize },
 
   #[error("Attempted to repeat a GET request for a request that could not be cloned. Request: `{}`", .0)]
   RequestCouldNotBeCloned(String),
@@ -85,9 +71,6 @@ pub enum AppError {
 
   #[error("Encountered a Tokio IO error: `{:?}`", .0)]
   TokioIOError(#[from] tokio::io::Error),
-
-  #[error("Failed to migrate the database due to a missing table: `{:?}`", .0)]
-  MissingDatabaseTable(&'static str),
 
   #[error("Failed to parse Twitch userID into an integer. userID string: `{:?}`", .0)]
   FailedToParseUserID(String),

@@ -1,6 +1,6 @@
-use crate::database::get_database_connection;
-use crate::entities::emote;
 use crate::errors::AppError;
+use database_connection::get_database_connection;
+use entities::emote;
 use sea_orm::*;
 
 struct EmoteData<'a> {

@@ -1,7 +1,7 @@
-use crate::database::get_database_connection;
-use crate::entities::stream;
-use crate::entities::twitch_user;
 use crate::errors::AppError;
+use database_connection::get_database_connection;
+use entities::stream;
+use entities::twitch_user;
 use sea_orm::*;
 
 pub trait StreamExtensions {

@@ -1,0 +1,13 @@
+[package]
+name = "database_report_generator"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+tokio = { version = "1.41", features = ["full"] }
+sea-orm = { version = "1.1.*", features = ["sqlx-mysql", "runtime-tokio", "macros"] } 
+app_config = { path = "../app_config" }
+database_connection = { path = "../database_connection" }
+tabled = "0.18.*"
+tracing = "0.1.*"
+thiserror = "2.0.*"

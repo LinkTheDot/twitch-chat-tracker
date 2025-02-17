@@ -1,6 +1,6 @@
-use crate::entities::twitch_user;
 use crate::errors::AppError;
 use crate::REQWEST_CLIENT;
+use entities::twitch_user;
 use serde_json::Value;
 use std::collections::HashSet;
 use url::Url;

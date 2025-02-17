@@ -1,6 +1,8 @@
 use crate::channel::channel_identifier::ChannelIdentifier;
+use crate::channel::TrackedChannels;
 use crate::errors::AppError;
-use crate::{channel::TrackedChannels, database::get_database_connection, entities::twitch_user};
+use database_connection::get_database_connection;
+use entities::twitch_user;
 use sea_orm::*;
 
 pub trait TwitchUserExtension {

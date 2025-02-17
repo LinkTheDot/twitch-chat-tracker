@@ -1,9 +1,8 @@
-use crate::app_config::config::APP_CONFIG;
-use crate::app_config::secret_string::Secret;
 use crate::channel::third_party_emote_list_storage::EmoteListStorage;
 use crate::errors::AppError;
-use crate::irc_chat::message::*;
 use crate::irc_chat::message_parser::MessageParser;
+use app_config::config::secret_string::Secret;
+use app_config::config::APP_CONFIG;
 use irc::client::prelude::*;
 use irc::client::ClientStream;
 use irc::proto::CapSubCommand;
@@ -11,9 +10,7 @@ use std::time::Duration;
 use tokio::time::timeout;
 use tokio_stream::StreamExt;
 
-pub mod message;
-mod message_parser;
-pub mod message_tracker;
+pub mod message_parser;
 pub mod sub_tier;
 pub mod tags;
 

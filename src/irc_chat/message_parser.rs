@@ -1,10 +1,4 @@
 use crate::channel::third_party_emote_list_storage::EmoteListStorage;
-use crate::database::get_database_connection;
-use crate::entities::sea_orm_active_enums::EventType;
-use crate::entities::{
-  donation_event, emote, stream_message, stream_message_emote, subscription_event,
-};
-use crate::entities::{stream, twitch_user, user_timeout};
 use crate::entity_extensions::emote::EmoteExtensions;
 use crate::entity_extensions::stream::StreamExtensions;
 use crate::entity_extensions::twitch_user::TwitchUserExtension;
@@ -12,6 +6,10 @@ use crate::errors::AppError;
 use crate::irc_chat::sub_tier::*;
 use crate::irc_chat::tags::Tag;
 use chrono::{DateTime, TimeZone};
+use database_connection::get_database_connection;
+use entities::sea_orm_active_enums::EventType;
+use entities::{donation_event, emote, stream_message, stream_message_emote, subscription_event};
+use entities::{stream, twitch_user, user_timeout};
 use irc::client::prelude::*;
 use sea_orm::*;
 use std::collections::HashMap;

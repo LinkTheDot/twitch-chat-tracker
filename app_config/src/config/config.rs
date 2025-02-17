@@ -1,7 +1,7 @@
-use crate::app_config::log_level_wrapper::*;
-use crate::app_config::rolling_appender_rotation::*;
-use crate::app_config::secret_string::Secret;
-use crate::errors::AppError;
+use crate::config::log_level_wrapper::*;
+use crate::config::rolling_appender_rotation::*;
+use crate::config::secret_string::Secret;
+use anyhow::anyhow;
 use lazy_static::lazy_static;
 use schematic::{Config, ConfigLoader};
 use std::path::PathBuf;
@@ -54,7 +54,7 @@ pub struct AppConfig {
 }
 
 impl AppConfig {
-  fn new() -> Result<Self, AppError> {
+  fn new() -> anyhow::Result<Self> {
     let mut config = ConfigLoader::<AppConfig>::new()
       .file_optional(get_config_path())
       .unwrap()
@@ -68,7 +68,7 @@ impl AppConfig {
     }
 
     if config.channels.len() * config.queries_per_minute > RATE_LIMIT {
-      return Err(AppError::ChannelQueriesPerMinuteExceeded);
+      return Err(anyhow!("The amount of channels being queried each minute exceeds the limit of 800. channel_count * quieries_per_minute must be <= 800."));
     }
 
     Ok(config)

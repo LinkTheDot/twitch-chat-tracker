@@ -1,13 +1,12 @@
-use crate::app_config::config::APP_CONFIG;
-use crate::app_config::secret_string::Secret;
-use crate::database::get_database_connection;
-use crate::entities::{prelude::*, stream, twitch_user};
 use crate::entity_extensions::stream::StreamExtensions;
-use crate::entity_extensions::twitch_user::*;
 use crate::errors::AppError;
 use crate::REQWEST_CLIENT;
+use app_config::config::secret_string::Secret;
+use app_config::config::APP_CONFIG;
 use channel_identifier::ChannelIdentifier;
 use chrono::{DateTime, Utc};
+use database_connection::get_database_connection;
+use entities::{prelude::*, stream, twitch_user};
 use reqwest::RequestBuilder;
 use sea_orm::*;
 use serde_json::Value;
@@ -24,9 +23,9 @@ pub mod third_party_emote_list_storage;
 
 #[derive(Debug)]
 pub struct TrackedChannels {
-  /// [`login_name`](crate::entities::twitch_user::Model::login_name) is used as the key.
+  /// [`login_name`](entities::twitch_user::Model::login_name) is used as the key.
   channels: HashMap<String, twitch_user::Model>,
-  /// A list of known active streams with the [`login_name`](crate::entities::twitch_user::Model::login_name) of the user being the key.
+  /// A list of known active streams with the [`login_name`](entities::twitch_user::Model::login_name) of the user being the key.
   known_active_streams: HashMap<String, stream::Model>,
 }
 

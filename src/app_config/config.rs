@@ -1,0 +1,144 @@
+use crate::app_config::log_level_wrapper::*;
+use crate::app_config::rolling_appender_rotation::*;
+use crate::app_config::secret_string::Secret;
+use crate::errors::AppError;
+use lazy_static::lazy_static;
+use schematic::{Config, ConfigLoader};
+use std::path::PathBuf;
+
+const CONFIG_PATH_ENV_VAR: &str = "CONFIG_PATH";
+const DEFAULT_CONFIG_FILEPATH: &str = "./config/config.yml";
+const MAX_QUERIES_PER_MINUTE: usize = 12;
+const RATE_LIMIT: usize = 500;
+
+lazy_static! {
+  pub static ref APP_CONFIG: AppConfig = AppConfig::new().unwrap();
+}
+
+#[derive(Debug, Config, serde::Serialize, serde::Deserialize)]
+pub struct AppConfig {
+  log_level: LoggingConfigLevel,
+  logging_dir: PathBuf,
+  #[setting(default = "")]
+  logging_filename_prefix: String,
+  #[setting(default = "daily")]
+  logging_roll_appender: RollingAppenderRotation,
+
+  #[setting(default = "./chat_logs")]
+  chat_logging_path: String,
+
+  #[setting(extend, merge = append_vec, validate = min_length(1), validate = max_length(100))]
+  channels: Vec<String>,
+
+  #[setting(default = 0)]
+  queries_per_minute: usize,
+
+  #[setting(required)]
+  twitch_nickname: Option<String>,
+  #[setting(required)]
+  access_token: Option<Secret>,
+  #[setting(required)]
+  client_id: Option<Secret>,
+
+  // database_protocol: DatabaseProtocol,
+  #[setting(required, env = "USER")]
+  database_username: Option<String>,
+  #[setting(default = "localhost:3306")]
+  database_host_address: String,
+  #[setting(default = "twitch_tracker_db")]
+  database: String,
+
+  /// We're not dealing with sensitive data here. So configuring a default is fine.
+  #[setting(default = "password", env = "DATABASE_PASSWORD")]
+  database_password: Secret,
+}
+
+impl AppConfig {
+  fn new() -> Result<Self, AppError> {
+    let mut config = ConfigLoader::<AppConfig>::new()
+      .file_optional(get_config_path())
+      .unwrap()
+      .load()?
+      .config;
+
+    if config.queries_per_minute == 0 {
+      let max_queries_per_minute = (RATE_LIMIT / config.channels.len()).min(MAX_QUERIES_PER_MINUTE);
+
+      config.queries_per_minute = max_queries_per_minute;
+    }
+
+    if config.channels.len() * config.queries_per_minute > RATE_LIMIT {
+      return Err(AppError::ChannelQueriesPerMinuteExceeded);
+    }
+
+    Ok(config)
+  }
+
+  pub fn log_level(&self) -> &LoggingConfigLevel {
+    &self.log_level
+  }
+
+  pub fn logging_dir(&self) -> &PathBuf {
+    &self.logging_dir
+  }
+
+  pub fn logging_filename_prefix(&self) -> &str {
+    &self.logging_filename_prefix
+  }
+
+  pub fn logging_file_roll_appender(&self) -> &RollingAppenderRotation {
+    &self.logging_roll_appender
+  }
+
+  pub fn chat_logging_path(&self) -> &str {
+    &self.chat_logging_path
+  }
+
+  pub fn channels(&self) -> &Vec<String> {
+    &self.channels
+  }
+
+  pub fn queries_per_minute(&self) -> usize {
+    self.queries_per_minute
+  }
+
+  pub fn twitch_nickname(&self) -> &str {
+    self.twitch_nickname.as_ref().unwrap()
+  }
+
+  pub fn access_token(&self) -> &Secret {
+    self.access_token.as_ref().unwrap()
+  }
+
+  pub fn client_id(&self) -> &Secret {
+    self.client_id.as_ref().unwrap()
+  }
+
+  // pub fn database_protocol(&self) -> &DatabaseProtocol {
+  //   &self.database_protocol
+  // }
+
+  pub fn database_username(&self) -> &str {
+    self.database_username.as_ref().unwrap()
+  }
+
+  pub fn database_address(&self) -> &str {
+    &self.database_host_address
+  }
+
+  pub fn database(&self) -> &str {
+    &self.database
+  }
+
+  pub fn database_password(&self) -> &Secret {
+    &self.database_password
+  }
+}
+
+fn get_config_path() -> PathBuf {
+  let Some((_, config_path)) = std::env::vars().find(|(key, _)| key == CONFIG_PATH_ENV_VAR) else {
+    return PathBuf::from(DEFAULT_CONFIG_FILEPATH);
+  };
+
+  PathBuf::from(config_path)
+}

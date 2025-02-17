@@ -1,0 +1,33 @@
+[package]
+name = "twitch-chat-logger"
+version = "0.1.0"
+edition = "2021"
+
+[workspace]
+members = [ "app_config",
+  "migration"
+]
+
+[dependencies]
+tracing = "0.1.*"
+tracing-subscriber = "0.3.*"
+tracing-appender = "0.2.3"
+lazy_static = "1.5"
+schematic = { version = "0.17.*", features = ["yaml", "env"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_yml = "0.0.*"
+serde_json = "1.0.*"
+reqwest = "0.12.9"
+tokio = { version = "1.41", features = ["full"] }
+thiserror = "2.0.*"
+chrono = "0.4.*"
+irc = "1.0.0"
+tokio-stream = "0.1.*"
+axum = "0.8"
+sea-orm = { version = "1.1.*", features = ["sqlx-mysql", "runtime-tokio", "macros"] } 
+secrecy = "0.10.*"
+url = "2.5.4"
+# sea-orm-migration = { version = "1.1.4", features = [] }
+clap = "4.5.*"
+migration = { path = "migration" }
+tabled = "0.18.*"

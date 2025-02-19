@@ -7,8 +7,8 @@ use std::collections::HashMap;
 use tabled::settings::Style;
 use tabled::{Table, Tabled};
 
-pub const USER_TAG_INFO: &str = r#"
-After a user's ranking will be indicators for both if they're subscribed and if they're a first time chatter.
+const EMOTE_DOMINANCE_INFO: &str = "This table has omitted messages where more than {emote_message_threshold}% of the words were Twitch or third party emotes.";
+const USER_TAG_INFO: &str = r#"After a user's ranking will be indicators for both if they're subscribed and if they're a first time chatter.
 * for first time chatter.
 - for if the user isn't subscribed.
 "#;
@@ -43,7 +43,10 @@ pub async fn get_messages_sent_ranking_for_stream(
   filtered_table.with(Style::markdown());
 
   let unfiltered_table = format!("{}\n\n{}", USER_TAG_INFO, unfiltered_table);
-  let filtered_table = format!("{}\n\n{}", USER_TAG_INFO, filtered_table);
+  let filtered_table = format!(
+    "{}\n\n{}\n\n{}",
+    EMOTE_DOMINANCE_INFO, USER_TAG_INFO, filtered_table
+  );
 
   Ok((unfiltered_table, filtered_table))
 }

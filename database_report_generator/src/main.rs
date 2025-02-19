@@ -53,7 +53,7 @@ async fn main() {
       let mut report_file = fs::OpenOptions::new()
         .write(true)
         .truncate(true)
-        .create_new(true)
+        .create(true)
         .open(&file_reports_path)
         .await
         .unwrap();

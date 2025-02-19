@@ -11,8 +11,7 @@ const STATS_FILE_TEMPLATE: &str = r#"
 = Chat statistics =
 First time chatters: {first_time_chatters}
 Total chats: {total_chats}
-(An emote dominant chat is a message with 70% or more of the words being Twitch and/or third party emotes.)
-Total non-emote dominant chats: {non-emote_dominant_chats}
+Total chats with < {emote_message_threshold}% emotes to words: {non-emote_dominant_chats}
 Subscribed|Unsubscribed chats: {subscriber_chat_percentage}|{unsubscribed_chat_percentage}
                                       
 = Donation statistics =

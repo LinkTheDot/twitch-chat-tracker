@@ -24,9 +24,6 @@ pub struct AppConfig {
   #[setting(default = "daily")]
   logging_roll_appender: RollingAppenderRotation,
 
-  #[setting(default = "./chat_logs")]
-  chat_logging_path: String,
-
   #[setting(extend, merge = append_vec, validate = min_length(1), validate = max_length(100))]
   channels: Vec<String>,
 
@@ -50,7 +47,7 @@ pub struct AppConfig {
 
   /// We're not dealing with sensitive data here. So configuring a default is fine.
   #[setting(default = "password", env = "DATABASE_PASSWORD")]
-  database_password: Secret,
+  sql_user_password: Secret,
 
   pastebin_api_key: Option<Secret>,
 }
@@ -92,10 +89,6 @@ impl AppConfig {
     &self.logging_roll_appender
   }
 
-  pub fn chat_logging_path(&self) -> &str {
-    &self.chat_logging_path
-  }
-
   pub fn channels(&self) -> &Vec<String> {
     &self.channels
   }
@@ -132,8 +125,8 @@ impl AppConfig {
     &self.database
   }
 
-  pub fn database_password(&self) -> &Secret {
-    &self.database_password
+  pub fn sql_user_password(&self) -> &Secret {
+    &self.sql_user_password
   }
 
   pub fn pastebin_api_key(&self) -> Option<&Secret> {

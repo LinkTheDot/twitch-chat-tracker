@@ -55,7 +55,7 @@ async fn get_connection() -> anyhow::Result<sea_orm::DatabaseConnection> {
 }
 
 fn database_connection_string(database_name: Option<&str>) -> String {
-  let password = APP_CONFIG.database_password();
+  let password = APP_CONFIG.sql_user_password();
   let protocol = DatabaseProtocol::MySql; // Hard coding MySql, maybe make it agnostic in the future if I care (I don't care).
   let username = APP_CONFIG.database_username();
   let address = APP_CONFIG.database_address();

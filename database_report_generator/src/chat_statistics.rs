@@ -70,6 +70,10 @@ impl ChatStatistics {
     );
     end_pairs.insert("{total_chats}".into(), self.total_chats.to_string());
     end_pairs.insert(
+      "{emote_message_threshold}".into(),
+      ((EMOTE_DOMINANCE * 100.0).floor() as usize).to_string(),
+    );
+    end_pairs.insert(
       "{non-emote_dominant_chats}".into(),
       (self.total_chats - self.emote_dominant_chats).to_string(),
     );

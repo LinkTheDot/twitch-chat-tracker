@@ -9,7 +9,7 @@ include things like Twitch emotes, messages, subscriptions, streams, users etc.
 # Setup
 
 Setting up the app will require you to set a few values under the config.
-Required fields will be listed in a comment above.
+Required fields will be indicated by a \* in a comment above the example.
 
 Any values split by `|` is a list of the possible options.
 
@@ -61,6 +61,15 @@ databaseHostAddress: ""
 # Defaults to `twitch_tracker_db`.
 database = ""
 
-# The password used to connect to mysql
-databasePassword: ""
+# The password used to connect to mysql.
+# Uses the `DATABASE_PASSWORD` environment variable. Otherwise defaults to `password`.
+sqlUserPassword: ""
+
+# The API key obtained from `https://pastebin.com/doc_api`.
+# Used for automatically uploading reports with the `database_report_generator` to Pastebin.
+# The `-f` feature flag can be used to output reports to file instead.
+pastebinApiKey: "Your_Key_Here"
 ```
+
+Once all the required fields are set, you can run the base program which will
+connect to Twitch. Then start parsing messages and logging them to the database.

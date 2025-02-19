@@ -1,0 +1,27 @@
+#!/usr/bin/env zsh
+
+STREAM_ID=$1
+EXPORT_TO_FILE_FLAG=$2
+
+if [ ! $STREAM_ID ]; then
+  echo "Missing stream_id";
+
+  return 1;
+fi
+
+echo "Generating report for stream of ID '$STREAM_ID'"
+
+REPORT_GENERATOR_EXECUTABLE_PATH="$PWD/target/release/database_report_generator";
+
+echo "Compiling report generator app."
+cargo build --release --manifest-path "$PWD/database_report_generator/Cargo.toml";
+
+if [ "$EXPORT_TO_FILE_FLAG" = "-f" ]; then 
+  echo "Writing reports to file.";
+
+  $REPORT_GENERATOR_EXECUTABLE_PATH -r $STREAM_ID -f;
+else
+  echo "Uploading reports to pastebin";
+
+  $REPORT_GENERATOR_EXECUTABLE_PATH -r $STREAM_ID 
+fi

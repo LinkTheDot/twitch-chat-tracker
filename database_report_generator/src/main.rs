@@ -20,11 +20,13 @@ async fn main() {
 
   let report_stream_id = CLAP_ARGS.report_stream_id();
 
-  let stream = stream::Entity::find_by_id(report_stream_id)
+  let Some(stream) = stream::Entity::find_by_id(report_stream_id)
     .one(get_database_connection().await)
     .await
     .unwrap()
-    .unwrap();
+  else {
+    panic!("Stream of ID {} does not exist.", report_stream_id);
+  };
   let stream_start_time = stream.start_timestamp.format("%d-%m-%y").to_string();
 
   let general_stats_report = get_chat_statistics_template_for_stream(report_stream_id)
@@ -45,10 +47,13 @@ async fn main() {
     let report_name = format!("[{stream_start_time}]|{report_name}");
 
     if CLAP_ARGS.generate_file_reports() {
-      let file_reports_dir = PathBuf::from(FILE_REPORTS_DIR);
+      let mut file_reports_dir = PathBuf::from(FILE_REPORTS_DIR);
+      file_reports_dir.push(report_stream_id.to_string());
+
       fs::create_dir_all(&file_reports_dir).await.unwrap();
+
       let mut file_reports_path = file_reports_dir;
-      file_reports_path.push(format!("{}|{}", report_stream_id, report_name));
+      file_reports_path.push(&report_name);
 
       let mut report_file = fs::OpenOptions::new()
         .write(true)

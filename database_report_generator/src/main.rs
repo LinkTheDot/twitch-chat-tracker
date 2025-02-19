@@ -9,6 +9,10 @@ use database_report_generator::{
 };
 use entities::stream;
 use sea_orm::*;
+use std::path::PathBuf;
+use tokio::{fs, io::AsyncWriteExt};
+
+const FILE_REPORTS_DIR: &str = "file_reports";
 
 #[tokio::main]
 async fn main() {
@@ -38,14 +42,43 @@ async fn main() {
   ];
 
   for (report_name, report) in reports {
-    match generate_pastebin(format!("{report_name}[{stream_start_time}]"), report).await {
-      Ok(pastebin_url) => println!("{}: {}", report_name, pastebin_url),
-      Err(error) => {
+    let report_name = format!("[{stream_start_time}]|{report_name}");
+
+    if CLAP_ARGS.generate_file_reports() {
+      let file_reports_dir = PathBuf::from(FILE_REPORTS_DIR);
+      fs::create_dir_all(&file_reports_dir).await.unwrap();
+      let mut file_reports_path = file_reports_dir;
+      file_reports_path.push(format!("{}|{}", report_stream_id, report_name));
+
+      let mut report_file = fs::OpenOptions::new()
+        .write(true)
+        .truncate(true)
+        .create_new(true)
+        .open(&file_reports_path)
+        .await
+        .unwrap();
+
+      if let Err(error) = report_file.write(report.as_bytes()).await {
         tracing::error!(
-          "Failed to generate pastebin for {}. Reason: {:?}",
+          "Failed to write report {} into a file. Reason: {:?}",
           report_name,
           error
         );
+      }
+    } else {
+      match generate_pastebin(&report_name, &report).await {
+        Ok(pastebin_url) => println!("{}: {}", report_name, pastebin_url),
+        Err(error) => {
+          tracing::error!(
+            "Failed to generate pastebin for {}. Reason: {:?}",
+            report_name,
+            error
+          );
+          println!(
+            "Failed to generate pastebin for {}. Reason: {:?}",
+            report_name, error
+          );
+        }
       }
     }
   }

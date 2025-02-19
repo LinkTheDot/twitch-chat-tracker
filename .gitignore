@@ -4,3 +4,4 @@ migration/target
 /config
 /app_log
 /database_backup.*
+/file_reports

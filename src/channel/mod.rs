@@ -1,8 +1,8 @@
 use crate::entity_extensions::stream::StreamExtensions;
 use crate::errors::AppError;
 use crate::REQWEST_CLIENT;
-use app_config::config::secret_string::Secret;
-use app_config::config::APP_CONFIG;
+use app_config::secret_string::Secret;
+use app_config::APP_CONFIG;
 use channel_identifier::ChannelIdentifier;
 use chrono::{DateTime, Utc};
 use database_connection::get_database_connection;

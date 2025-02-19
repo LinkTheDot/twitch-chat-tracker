@@ -727,11 +727,17 @@ version = "0.1.0"
 dependencies = [
  "app_config",
  "database_connection",
+ "entities",
+ "human-time",
+ "lazy_static",
+ "reqwest",
  "sea-orm",
+ "serde_json",
  "tabled",
  "thiserror 2.0.11",
  "tokio",
  "tracing",
+ "tracing-subscriber",
 ]
 
 [[package]]
@@ -1327,6 +1333,25 @@ name = "httparse"
 version = "1.10.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f2d708df4e7140240a16cd6ab0ab65c972d7433ab77819ea693fde9c43811e2a"
+
+[[package]]
+name = "human-time"
+version = "0.1.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "259822ea527bd0d5ebf3108d84e98ac4f20769e2e8b2f3ab76e1dd6e21de7f3c"
+dependencies = [
+ "human-time-macros",
+]
+
+[[package]]
+name = "human-time-macros"
+version = "0.1.8"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a04129f85bfd960234ed3fa53212a4904881e024322e804ac5a48da239e44a09"
+dependencies = [
+ "quote",
+ "syn 1.0.109",
+]
 
 [[package]]
 name = "hyper"

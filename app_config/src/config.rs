@@ -1,6 +1,6 @@
-use crate::config::log_level_wrapper::*;
-use crate::config::rolling_appender_rotation::*;
-use crate::config::secret_string::Secret;
+use crate::log_level_wrapper::*;
+use crate::rolling_appender_rotation::*;
+use crate::secret_string::Secret;
 use anyhow::anyhow;
 use lazy_static::lazy_static;
 use schematic::{Config, ConfigLoader};
@@ -51,6 +51,8 @@ pub struct AppConfig {
   /// We're not dealing with sensitive data here. So configuring a default is fine.
   #[setting(default = "password", env = "DATABASE_PASSWORD")]
   database_password: Secret,
+
+  pastebin_api_key: Option<Secret>,
 }
 
 impl AppConfig {
@@ -132,6 +134,10 @@ impl AppConfig {
 
   pub fn database_password(&self) -> &Secret {
     &self.database_password
+  }
+
+  pub fn pastebin_api_key(&self) -> Option<&Secret> {
+    self.pastebin_api_key.as_ref()
   }
 }
 

@@ -8,6 +8,12 @@ tokio = { version = "1.41", features = ["full"] }
 sea-orm = { version = "1.1.*", features = ["sqlx-mysql", "runtime-tokio", "macros"] } 
 app_config = { path = "../app_config" }
 database_connection = { path = "../database_connection" }
+entities = { path = "../entities" }
 tabled = "0.18.*"
 tracing = "0.1.*"
+tracing-subscriber = "0.3.*"
 thiserror = "2.0.*"
+human-time = "0.1.6"
+serde_json = "1.0.*"
+reqwest = "0.12.*"
+lazy_static = "1.5.*"

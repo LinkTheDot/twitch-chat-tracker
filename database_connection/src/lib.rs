@@ -1,7 +1,7 @@
 use anyhow::anyhow;
-use app_config::{
-  config::database_protocol::DatabaseProtocol, config::secret_string::Secret, APP_CONFIG,
-};
+use app_config::database_protocol::DatabaseProtocol;
+use app_config::secret_string::Secret;
+use app_config::APP_CONFIG;
 use migration::{Migrator, MigratorTrait, SchemaManager};
 use sea_orm::*;
 use tokio::sync::OnceCell;
@@ -76,7 +76,6 @@ async fn run_migration(database: &DatabaseConnection) -> anyhow::Result<()> {
   check_if_has_table(&schema_manager, "stream").await?;
   check_if_has_table(&schema_manager, "stream_message").await?;
   check_if_has_table(&schema_manager, "emote").await?;
-  check_if_has_table(&schema_manager, "stream_message_emote").await?;
   check_if_has_table(&schema_manager, "stream_name").await?;
   check_if_has_table(&schema_manager, "donation_event").await?;
   check_if_has_table(&schema_manager, "subscription_event").await?;

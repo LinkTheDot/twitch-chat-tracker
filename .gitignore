@@ -3,3 +3,4 @@ migration/target
 /tokens
 /config
 /app_log
+/database_backup.*

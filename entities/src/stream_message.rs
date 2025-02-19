@@ -17,6 +17,8 @@ pub struct Model {
   #[sea_orm(column_type = "Text", nullable)]
   pub third_party_emotes_used: Option<String>,
   pub is_subscriber: i8,
+  #[sea_orm(column_type = "Text", nullable)]
+  pub twitch_emote_usage: Option<String>,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
@@ -29,8 +31,6 @@ pub enum Relation {
     on_delete = "Cascade"
   )]
   Stream,
-  #[sea_orm(has_many = "super::stream_message_emote::Entity")]
-  StreamMessageEmote,
   #[sea_orm(
     belongs_to = "super::twitch_user::Entity",
     from = "Column::ChannelId",
@@ -52,12 +52,6 @@ pub enum Relation {
 impl Related<super::stream::Entity> for Entity {
   fn to() -> RelationDef {
     Relation::Stream.def()
-  }
-}
-
-impl Related<super::stream_message_emote::Entity> for Entity {
-  fn to() -> RelationDef {
-    Relation::StreamMessageEmote.def()
   }
 }
 

@@ -8,7 +8,7 @@ use crate::irc_chat::tags::Tag;
 use chrono::{DateTime, TimeZone};
 use database_connection::get_database_connection;
 use entities::sea_orm_active_enums::EventType;
-use entities::{donation_event, emote, stream_message, stream_message_emote, subscription_event};
+use entities::{donation_event, emote, stream_message, subscription_event};
 use entities::{stream, twitch_user, user_timeout};
 use irc::client::prelude::*;
 use sea_orm::*;
@@ -380,7 +380,18 @@ impl<'a, 'b> MessageParser<'a, 'b> {
     let third_party_emotes_used_serialized = (!third_party_emotes_used.is_empty())
       .then_some(serde_json::to_string(&third_party_emotes_used).ok())
       .flatten();
+
     let database_connection = get_database_connection().await;
+    let emote_list = emote::Model::get_or_set_list(message_contents, emotes).await?;
+    let mut twitch_emotes_used: HashMap<i32, i32> = HashMap::new();
+
+    for (emote, positions) in emote_list {
+      let entry = twitch_emotes_used.entry(emote.id).or_default();
+      *entry += positions.len() as i32;
+    }
+
+    let twitch_emotes_used =
+      (!twitch_emotes_used.is_empty()).then_some(serde_json::to_string(&twitch_emotes_used)?);
 
     let message = stream_message::ActiveModel {
       is_first_message: ActiveValue::Set(self.is_first_message as i8),
@@ -392,34 +403,11 @@ impl<'a, 'b> MessageParser<'a, 'b> {
       stream_id: ActiveValue::Set(stream.map(|stream| stream.id)),
       third_party_emotes_used: ActiveValue::Set(third_party_emotes_used_serialized),
       is_subscriber: ActiveValue::Set(self.is_subscriber as i8),
+      twitch_emote_usage: ActiveValue::Set(twitch_emotes_used),
       ..Default::default()
     };
 
-    let message = message.insert(database_connection).await?;
-
-    let emote_list = emote::Model::get_or_set_list(message_contents, emotes).await?;
-
-    for (emote, positions) in emote_list {
-      let positions = match serde_json::to_string(&positions) {
-        Ok(positions) => positions,
-        Err(error) => {
-          tracing::error!(
-            "Failed to parse json for the list of emote positions in a message. Reason: `{:?}`",
-            error
-          );
-          continue;
-        }
-      };
-
-      let stream_emote_message = stream_message_emote::ActiveModel {
-        positions: ActiveValue::Set(positions),
-        message_id: ActiveValue::Set(message.id),
-        emote_id: ActiveValue::Set(Some(emote.id)),
-        ..Default::default()
-      };
-
-      stream_emote_message.insert(database_connection).await?;
-    }
+    message.insert(database_connection).await?;
 
     Ok(true)
   }
@@ -443,34 +431,5 @@ impl<'a, 'b> MessageParser<'a, 'b> {
 
         emote_and_frequency
       })
-  }
-}
-
-#[cfg(test)]
-mod tests {
-  use super::*;
-  use irc::proto::message::Tag;
-
-  #[tokio::test]
-  async fn manual_testing() {
-    let message = irc::proto::Message {
-      tags: Some(vec![
-        Tag("msg-id".into(), Some("submysterygift".into())),
-        Tag("msg-param-mass-gift-count".into(), Some("5".into())),
-        Tag("tmi-sent-ts".into(), Some("1739746424348".into())),
-        Tag("msg-param-sub-plan".into(), Some("1000".into())),
-        Tag("display-name".into(), Some("italiansubmike".into())),
-        Tag("login".into(), Some("italiansubmike".into())),
-      ]),
-      prefix: Some(Prefix::ServerName("tmi.twitch.tv".into())),
-      command: Command::Raw("USERNOTICE".into(), vec!["#fallenshadow".into()]),
-    };
-    let connected_channels = EmoteListStorage::new().await.unwrap();
-
-    let parser = MessageParser::new(&message, &connected_channels)
-      .unwrap()
-      .unwrap();
-
-    parser.parse().await.unwrap();
   }
 }

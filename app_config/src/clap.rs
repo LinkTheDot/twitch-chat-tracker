@@ -10,7 +10,7 @@ pub struct ClapArgs {
 }
 
 impl ClapArgs {
-  const RUN_MIGRATION: &'static str = "run_migration";
+  const STREAM_REPORT_ID: &'static str = "stream_report_id";
 
   pub fn new() -> Self {
     let args = Self::setup_args();
@@ -18,18 +18,20 @@ impl ClapArgs {
     Self { args }
   }
 
-  pub fn run_database_migration_flag(&self) -> bool {
-    self.args.get_flag(Self::RUN_MIGRATION)
+  pub fn report_stream_id(&self) -> i32 {
+    let value = self.args.get_one::<String>(Self::STREAM_REPORT_ID).unwrap();
+
+    value.parse::<i32>().unwrap()
   }
 
   fn setup_args() -> clap::ArgMatches {
     Command::new("Twitch Chat Parser")
       .arg(
-        Arg::new(Self::RUN_MIGRATION)
-          .short('m')
-          .long("migrate")
-          .action(clap::ArgAction::SetTrue)
-          .help("Runs the database migration upon startup of the program."),
+        Arg::new(Self::STREAM_REPORT_ID)
+          .short('r')
+          .long("report")
+          .action(clap::ArgAction::Set)
+          .help("Assigns which stream ID from the database to generate a report with."),
       )
       .get_matches()
   }

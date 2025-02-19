@@ -1,8 +1,8 @@
 use crate::channel::third_party_emote_list_storage::EmoteListStorage;
 use crate::errors::AppError;
 use crate::irc_chat::message_parser::MessageParser;
-use app_config::config::secret_string::Secret;
-use app_config::config::APP_CONFIG;
+use app_config::secret_string::Secret;
+use app_config::APP_CONFIG;
 use irc::client::prelude::*;
 use irc::client::ClientStream;
 use irc::proto::CapSubCommand;
@@ -145,6 +145,11 @@ impl TwitchIrc {
       Command::Raw(command, _) if &command == "USERSTATE" => return Ok(()),
       Command::Raw(command, _) if &command == "ROOMSTATE" => return Ok(()),
       Command::CAP(_, _, _, _) => return Ok(()),
+      Command::PONG(ref url, _) => {
+        println!("Recieved a pong confirmation from {:?}", url);
+
+        return Ok(());
+      }
       Command::PING(ref url, _) => {
         self
           .get_mut_irc_client()?

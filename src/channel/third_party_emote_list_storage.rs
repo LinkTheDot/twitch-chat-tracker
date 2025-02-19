@@ -1,7 +1,7 @@
 use crate::channel::third_party_emote_list::EmoteList;
 use crate::entity_extensions::twitch_user::*;
 use crate::errors::AppError;
-use app_config::config::APP_CONFIG;
+use app_config::APP_CONFIG;
 use entities::twitch_user;
 use std::cell::RefCell;
 use std::collections::HashMap;

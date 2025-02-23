@@ -34,8 +34,7 @@ impl TwitchUserExtension for twitch_user::Model {
       return Err(AppError::UserDoesNotExist(login_name.to_owned()));
     };
 
-    println!("Using login: {:?}", login_name);
-    println!("HELIX OBTAINED CHANNEL: {:#?}", channel);
+    tracing::info!("Found a new channel from Helix: {:#?}", channel);
 
     channel
       .insert(database_connection)

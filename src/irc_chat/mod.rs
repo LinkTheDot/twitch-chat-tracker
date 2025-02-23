@@ -37,7 +37,6 @@ impl TwitchIrc {
   }
 
   pub async fn reconnect(&mut self) -> Result<(), AppError> {
-    println!("Reconnecting the IRC client.");
     tracing::warn!("Reconnecting the IRC client.");
 
     self.irc_client_stream = None;
@@ -134,7 +133,6 @@ impl TwitchIrc {
     .await;
     let Ok(Some(message_result)) = message_result else {
       tracing::debug!("Did not recieve a message.");
-      println!("Did not recieve a message.");
       return Ok(());
     };
     let message = message_result?;
@@ -146,7 +144,7 @@ impl TwitchIrc {
       Command::Raw(command, _) if &command == "ROOMSTATE" => return Ok(()),
       Command::CAP(_, _, _, _) => return Ok(()),
       Command::PONG(ref url, _) => {
-        println!("Recieved a pong confirmation from {:?}", url);
+        tracing::warn!("Recieved a pong confirmation from {:?}", url);
 
         return Ok(());
       }
@@ -160,10 +158,7 @@ impl TwitchIrc {
       _ => (),
     }
 
-    println!("Got a message {:?}", message);
-
     let Some(message_parser) = MessageParser::new(&message, &self.third_party_emote_lists)? else {
-      println!("Couldn't build message parser.");
       return Ok(());
     };
 

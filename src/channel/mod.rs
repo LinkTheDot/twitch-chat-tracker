@@ -31,9 +31,7 @@ pub struct TrackedChannels {
 
 impl TrackedChannels {
   pub async fn new() -> Result<Self, AppError> {
-    println!("Getting tracked channels.");
     let connected_channels = Self::get_channels_from_list(APP_CONFIG.channels()).await?;
-    println!("Got channels.");
 
     let mut tracked_channels = TrackedChannels {
       channels: connected_channels,
@@ -66,6 +64,7 @@ impl TrackedChannels {
         && self.known_active_streams.contains_key(channel_name)
       {
         tracing::info!("{:?} has stopped streaming", channel_name);
+
         if let Some(latest_stream) = stream::Model::get_most_recent_stream_for_user(channel).await?
         {
           if latest_stream.is_live() {
@@ -91,17 +90,12 @@ impl TrackedChannels {
         && !self.known_active_streams.contains_key(channel_name)
       {
         tracing::info!("{:?} has started streaming", channel_name);
-        println!("{:?} has started streaming", channel_name);
         let Some((start_time, stream_id)) = current_live_channels.get(channel_name) else {
           continue;
         };
         let stream_twitch_id = match stream_id.parse::<u64>() {
           Ok(stream_id) => stream_id,
           Err(error) => {
-            println!(
-              "Failed to parse a stream ID. Streamer: {:?} Reason: {:?}",
-              channel_name, error
-            );
             tracing::error!(
               "Failed to parse a stream ID. Streamer: {:?} Reason: {:?}",
               channel_name,
@@ -121,9 +115,10 @@ impl TrackedChannels {
 
           continue;
         } else {
-          println!(
+          tracing::info!(
             "Couldn't find an existing database entry for {:?} - {:?}",
-            stream_twitch_id, channel_name
+            stream_twitch_id,
+            channel_name
           );
         }
 

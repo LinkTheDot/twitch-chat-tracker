@@ -54,31 +54,26 @@ impl<'a, 'b> MessageParser<'a, 'b> {
   }
 
   pub async fn parse(self) -> Result<(), AppError> {
-    println!("Checking if timeout.");
     tracing::debug!("Checking if timeout.");
     if self.check_for_timeout().await? {
       return Ok(());
     }
 
-    println!("Checking if gift sub.");
     tracing::debug!("Checking if gift sub.");
     if self.check_subs_and_gift_subs().await? {
       return Ok(());
     }
 
-    println!("Checking if bits.");
     tracing::debug!("Checking if bits.");
     if self.check_for_bits().await? {
       return Ok(());
     }
 
-    println!("Checking if streamlabs donation.");
     tracing::debug!("Checking if streamlabs donation.");
     if self.check_for_streamlabs_donation().await? {
       return Ok(());
     }
 
-    println!("Checking if user message.");
     tracing::debug!("Checking if user message.");
     if self.check_for_user_message().await? {
       return Ok(());

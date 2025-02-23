@@ -1,8 +1,17 @@
 use app_config::APP_CONFIG;
+use chrono::*;
+use database_connection::get_database_connection;
+use entities::{stream_message, twitch_user};
+use sea_orm::*;
+use std::collections::{HashMap, HashSet};
 use std::time::Duration;
+use tokio::fs;
+use tokio::io::AsyncWriteExt;
 use twitch_chat_logger::channel::TrackedChannels;
 use twitch_chat_logger::errors::AppError;
 use twitch_chat_logger::irc_chat::TwitchIrc;
+
+mod manual_migrations;
 
 // Glorp ass: https://discord.com/channels/938867634328469596/938876493503819807/1333993607647985806
 // Other Glorp ass: https://cdn.discordapp.com/emojis/1333507652591947847.webp?size=44&animated=true
@@ -23,14 +32,9 @@ async fn main() {
 
       if error_string == AppError::IrcError(irc::error::Error::PingTimeout).to_string() {
         tracing::error!("=== PING TIMEOUT ERROR ===");
-        println!("=== PING TIMEOUT ERROR ===");
 
         if let Err(error) = irc_client.reconnect().await {
           tracing::error!(
-            "Failed to reconnected the IRC client. Reason: `{:?}`",
-            error
-          );
-          println!(
             "Failed to reconnected the IRC client. Reason: `{:?}`",
             error
           );
@@ -43,10 +47,6 @@ async fn main() {
         "Failed to parse a message from the IRC client: `{}`",
         error_string
       );
-      println!(
-        "Failed to parse a message from the IRC client: `{}`",
-        error_string
-      );
     }
   }
 }
@@ -55,7 +55,7 @@ async fn update_channel_status(mut connected_channels: TrackedChannels) {
   let query_wait_duration = Duration::from_secs((60 / APP_CONFIG.queries_per_minute()) as u64);
 
   loop {
-    println!("Updating live status.");
+    tracing::debug!("Updating live status.");
 
     if let Err(error) = connected_channels.update_active_livestreams().await {
       tracing::error!(
@@ -64,71 +64,50 @@ async fn update_channel_status(mut connected_channels: TrackedChannels) {
       );
     }
 
-    println!("Live statuses updated.");
+    tracing::debug!("Live statuses updated.");
 
     tokio::time::sleep(query_wait_duration).await;
   }
 }
 
-// async fn adjust_database_tables() {
-//   let database_connection = get_database_connection().await;
-//   let stream_messages = stream_message::Entity::find()
-//     .all(database_connection)
-//     .await
-//     .unwrap();
-//
-//   for message in stream_messages {
-//     let stream_message_emotes_result = stream_message_emote::Entity::find()
-//       .filter(stream_message_emote::Column::MessageId.eq(message.id))
-//       .all(database_connection)
-//       .await;
-//     let stream_message_emotes = match stream_message_emotes_result {
-//       Ok(stream_messages) if !stream_messages.is_empty() => stream_messages,
-//       Err(error) => {
-//         println!(
-//           "Failed to get emotes for message {}. Reason: {:?}",
-//           message.id, error
-//         );
-//         continue;
-//       }
-//       _ => continue,
-//     };
-//
-//     let mut emote_uses: HashMap<i32, i32> = HashMap::new();
-//
-//     for emote_usage in stream_message_emotes {
-//       if let Some(emote_id) = emote_usage.emote_id {
-//         let emote_positions_result =
-//           serde_json::from_str::<Vec<(usize, usize)>>(&emote_usage.positions);
-//         match emote_positions_result {
-//           Ok(emote_positions) => {
-//             let entry = emote_uses.entry(emote_id).or_default();
-//             *entry += emote_positions.len() as i32;
-//           }
-//           Err(error) => {
-//             println!(
-//               "Failed to parse the uses for stream_message_emote {}. Reason: {:?}",
-//               emote_usage.id, error
-//             );
-//           }
-//         }
-//       } else {
-//         println!("Emote usage {} emote_id is null", emote_usage.id);
-//       }
-//     }
-//
-//     let emote_usage_string = serde_json::to_string(&emote_uses).unwrap();
-//
-//     let message_id = message.id;
-//     let mut message_active_model = message.into_active_model();
-//
-//     message_active_model.twitch_emote_usage = ActiveValue::Set(Some(emote_usage_string));
-//
-//     if let Err(error) = message_active_model.update(database_connection).await {
-//       println!(
-//         "Failed to update message {}. Reason: {:?}",
-//         message_id, error
-//       );
-//     }
-//   }
-// }
+#[allow(dead_code)]
+async fn write_chatterino_style_report(stream_id: i32) {
+  let database_connection = get_database_connection().await;
+  let messages = stream_message::Entity::find()
+    .filter(stream_message::Column::StreamId.eq(stream_id))
+    // .filter(stream_message::Column::TwitchUserId.eq(3))
+    .all(database_connection)
+    .await
+    .unwrap();
+
+  let mut message_list = String::new();
+  let mut known_users: HashMap<i32, twitch_user::Model> = HashMap::new();
+
+  for message in messages {
+    let time: DateTime<Local> = message.timestamp.into();
+    let time = time.format("%H:%M:%S");
+
+    let user = known_users.entry(message.twitch_user_id).or_insert(
+      twitch_user::Entity::find_by_id(message.twitch_user_id)
+        .one(database_connection)
+        .await
+        .unwrap()
+        .unwrap(),
+    );
+
+    message_list.push_str(&format!(
+      "[{}] {}: {}\n",
+      time, user.login_name, message.contents
+    ));
+  }
+
+  let mut file = fs::OpenOptions::new()
+    .write(true)
+    .truncate(true)
+    .create(true)
+    .open("data.dat")
+    .await
+    .unwrap();
+
+  file.write_all(message_list.as_bytes()).await.unwrap();
+}

@@ -16,7 +16,7 @@ pub trait StreamExtensions {
 
 impl StreamExtensions for stream::Model {
   fn is_live(&self) -> bool {
-    self.end_timestamp.is_some()
+    self.end_timestamp.is_none()
   }
 
   async fn get_most_recent_stream_for_user(

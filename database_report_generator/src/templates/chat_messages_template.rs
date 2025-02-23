@@ -45,7 +45,12 @@ pub async fn get_messages_sent_ranking_for_stream(
   let unfiltered_table = format!("{}\n\n{}", USER_TAG_INFO, unfiltered_table);
   let filtered_table = format!(
     "{}\n\n{}\n\n{}",
-    EMOTE_DOMINANCE_INFO, USER_TAG_INFO, filtered_table
+    EMOTE_DOMINANCE_INFO.replace(
+      "{emote_message_threshold}",
+      &((EMOTE_DOMINANCE * 100.0).floor() as usize).to_string(),
+    ),
+    USER_TAG_INFO,
+    filtered_table
   );
 
   Ok((unfiltered_table, filtered_table))

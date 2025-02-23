@@ -3,7 +3,6 @@
 use lazy_static::lazy_static;
 
 pub mod channel;
-// pub mod entities;
 pub mod entity_extensions;
 pub mod errors;
 pub mod irc_chat;

@@ -31,5 +31,5 @@ pub async fn generate_pastebin<S: AsRef<str>>(name: S, data: S) -> Result<String
     return Err(AppError::IncorrectPastebinResponse(response));
   }
 
-  Ok(format!("{}: {}", name.as_ref(), response))
+  Ok(response)
 }

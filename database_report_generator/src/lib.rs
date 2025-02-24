@@ -3,6 +3,7 @@ pub mod errors;
 pub mod logging;
 pub mod pastebin;
 pub mod templates;
+pub mod upload_reports;
 
 /// Message containing this percentage of emotes per word is emote dominant.
 pub const EMOTE_DOMINANCE: f32 = 0.7;

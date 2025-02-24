@@ -95,4 +95,7 @@ pub enum AppError {
 
   #[error("Failed to get the Twitch ID for user at: {:?}", .0)]
   FailedToGetTwitchID(&'static str),
+
+  #[error("Failed to parse raid size. Reason: {:?}", .0)]
+  FailedToParseRaidSize(String),
 }

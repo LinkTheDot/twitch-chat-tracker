@@ -1,0 +1,5 @@
+#!/usr/bin/env zsh
+
+DIRECTION=$1
+
+DATABASE_URL="mysql://$USER:$DATABASE_PASSWORD@localhost:3306/twitch_tracker_db" sea-orm-cli migrate $DIRECTION;

@@ -1,0 +1,5 @@
+#!/usr/bin/env zsh
+
+sea-orm-cli generate entity \
+  -u mysql://$USER:$DATABASE_PASSWORD@localhost:3306/twitch_tracker_db \
+  -o $PWD/entities/src/;

@@ -8,8 +8,7 @@ use crate::irc_chat::tags::Tag;
 use chrono::{DateTime, TimeZone};
 use database_connection::get_database_connection;
 use entities::sea_orm_active_enums::EventType;
-use entities::{donation_event, emote, stream_message, subscription_event};
-use entities::{stream, twitch_user, user_timeout};
+use entities::*;
 use irc::client::prelude::*;
 use sea_orm::*;
 use std::collections::HashMap;
@@ -54,30 +53,12 @@ impl<'a, 'b> MessageParser<'a, 'b> {
   }
 
   pub async fn parse(self) -> Result<(), AppError> {
-    tracing::debug!("Checking if timeout.");
-    if self.check_for_timeout().await? {
-      return Ok(());
-    }
-
-    tracing::debug!("Checking if gift sub.");
-    if self.check_subs_and_gift_subs().await? {
-      return Ok(());
-    }
-
-    tracing::debug!("Checking if bits.");
-    if self.check_for_bits().await? {
-      return Ok(());
-    }
-
-    tracing::debug!("Checking if streamlabs donation.");
-    if self.check_for_streamlabs_donation().await? {
-      return Ok(());
-    }
-
-    tracing::debug!("Checking if user message.");
-    if self.check_for_user_message().await? {
-      return Ok(());
-    }
+    let _ = self.check_for_timeout().await?
+      || self.check_subs_and_gift_subs().await?
+      || self.check_for_bits().await?
+      || self.check_for_streamlabs_donation().await?
+      || self.check_for_user_message().await?
+      || self.check_for_raid().await?;
 
     Ok(())
   }
@@ -125,6 +106,8 @@ impl<'a, 'b> MessageParser<'a, 'b> {
   }
 
   pub async fn check_for_timeout(&self) -> Result<bool, AppError> {
+    tracing::debug!("Checking if timeout.");
+
     let Command::Raw(command, command_tags) = &self.message.command else {
       return Ok(false);
     };
@@ -168,10 +151,11 @@ impl<'a, 'b> MessageParser<'a, 'b> {
   }
 
   pub async fn check_subs_and_gift_subs(&self) -> Result<bool, AppError> {
-    if let Some(&"sub" | &"resub" | &"submysterygift") = self.tags_of_interest.get(Tag::MESSAGE_ID)
-    {
-    } else {
-      return Ok(false);
+    tracing::debug!("Checking if gift sub.");
+
+    match self.tags_of_interest.get(Tag::MESSAGE_ID) {
+      Some(&"sub" | &"resub" | &"submysterygift") => (),
+      _ => return Ok(false),
     }
 
     let Command::Raw(_, donation_receiver) = &self.message.command else {
@@ -244,6 +228,8 @@ impl<'a, 'b> MessageParser<'a, 'b> {
   }
 
   pub async fn check_for_bits(&self) -> Result<bool, AppError> {
+    tracing::debug!("Checking if bits.");
+
     let Some(bit_quantity) = self.tags_of_interest.get(Tag::BITS) else {
       return Ok(false);
     };
@@ -281,6 +267,8 @@ impl<'a, 'b> MessageParser<'a, 'b> {
   }
 
   pub async fn check_for_streamlabs_donation(&self) -> Result<bool, AppError> {
+    tracing::debug!("Checking if streamlabs donation.");
+
     let Some(user) = self.tags_of_interest.get(Tag::DISPLAY_NAME) else {
       return Ok(false);
     };
@@ -338,6 +326,8 @@ impl<'a, 'b> MessageParser<'a, 'b> {
   }
 
   pub async fn check_for_user_message(&self) -> Result<bool, AppError> {
+    tracing::debug!("Checking if user message.");
+
     let Some(sender_login_name) = self.tags_of_interest.get(Tag::DISPLAY_NAME) else {
       return Err(AppError::FailedToGetUserName);
     };
@@ -426,5 +416,60 @@ impl<'a, 'b> MessageParser<'a, 'b> {
 
         emote_and_frequency
       })
+  }
+
+  async fn check_for_raid(&self) -> Result<bool, AppError> {
+    tracing::debug!("Checking if raid.");
+
+    match self.tags_of_interest.get(Tag::MESSAGE_ID) {
+      Some(&"raid") => (),
+      _ => return Ok(false),
+    }
+
+    let Some(raid_size) = self.tags_of_interest.get(Tag::RAID_VIEWER_COUNT) else {
+      tracing::error!("Failed to get the raid size from a raid message.");
+      return Ok(true);
+    };
+    let raid_size = match raid_size.parse::<i32>() {
+      Ok(raid_size) => raid_size,
+      Err(error) => {
+        return Err(AppError::FailedToParseRaidSize(error.to_string()));
+      }
+    };
+
+    let Some(raider_twitch_id) = self.tags_of_interest.get(Tag::USER_ID) else {
+      tracing::error!("Failed to retrieve the ID of a raider.");
+      return Ok(true);
+    };
+    let Some(streamer_twitch_id) = self.tags_of_interest.get(Tag::ROOM_ID) else {
+      tracing::error!(
+        "Failed to get the room ID of a streamer from a raid. Raider twitch ID: {}",
+        raider_twitch_id
+      );
+      return Ok(true);
+    };
+
+    let raider_twitch_user_model =
+      twitch_user::Model::get_or_set_by_twitch_id(raider_twitch_id).await?;
+    let streamer_twitch_user_model =
+      twitch_user::Model::get_or_set_by_twitch_id(streamer_twitch_id).await?;
+
+    let stream =
+      stream::Model::get_most_recent_stream_for_user(&streamer_twitch_user_model).await?;
+
+    let raid_active_model = raid::ActiveModel {
+      timestamp: ActiveValue::Set(self.timestamp),
+      size: ActiveValue::Set(raid_size),
+      stream_id: ActiveValue::Set(stream.map(|stream| stream.id)),
+      twitch_user_id: ActiveValue::Set(streamer_twitch_user_model.id),
+      raider_twitch_user_id: ActiveValue::Set(Some(raider_twitch_user_model.id)),
+      ..Default::default()
+    };
+
+    raid_active_model
+      .insert(get_database_connection().await)
+      .await?;
+
+    Ok(true)
   }
 }

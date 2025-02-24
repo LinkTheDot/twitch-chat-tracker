@@ -19,7 +19,7 @@ impl Tag {
     Self::ROOM_ID,
     Self::MONTHS_SUBSCRIBED,
     Self::SUBSCRIPTION_PLAN,
-    // Self::RAID_VIEWER_COUNT
+    Self::RAID_VIEWER_COUNT,
   ];
 
   pub const LOGIN: &str = "login";

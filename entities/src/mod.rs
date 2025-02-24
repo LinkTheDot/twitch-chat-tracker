@@ -4,6 +4,7 @@ pub mod prelude;
 
 pub mod donation_event;
 pub mod emote;
+pub mod raid;
 pub mod sea_orm_active_enums;
 pub mod stream;
 pub mod stream_message;

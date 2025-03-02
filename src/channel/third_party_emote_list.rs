@@ -53,6 +53,8 @@ impl EmoteList {
     let response_body = response.text().await?;
 
     let Value::Object(data) = serde_json::from_str(&response_body)? else {
+      tracing::error!("Unkown response: {:?}", response_body);
+
       return Err(AppError::UnknownResponseBody(
         "global data from 7tv response body.",
       ));
@@ -68,6 +70,8 @@ impl EmoteList {
     }
 
     let Some(Value::Array(emote_set)) = data.get("emotes") else {
+      tracing::error!("Unkown response: {:?}", response_body);
+
       return Err(AppError::UnknownResponseBody(
         "global emote set from 7tv response body.",
       ));
@@ -100,6 +104,8 @@ impl EmoteList {
     let response_body = response.text().await?;
 
     let Value::Object(data) = serde_json::from_str(&response_body)? else {
+      tracing::error!("Unkown response: {:?}", response_body);
+
       return Err(AppError::UnknownResponseBody(
         "data from 7tv response body.",
       ));
@@ -112,11 +118,15 @@ impl EmoteList {
     }
 
     let Some(Value::Object(emote_set)) = data.get("emote_set") else {
+      tracing::error!("Unkown response: {:?}", response_body);
+
       return Err(AppError::UnknownResponseBody(
         "emote set from 7tv response body.",
       ));
     };
     let Some(Value::Array(emote_set)) = emote_set.get("emotes") else {
+      tracing::error!("Unkown response: {:?}", response_body);
+
       return Err(AppError::UnknownResponseBody(
         "emote array from 7tv response body.",
       ));

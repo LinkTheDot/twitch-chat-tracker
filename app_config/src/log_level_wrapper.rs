@@ -25,25 +25,37 @@ impl From<LoggingConfigLevel> for tracing::Level {
   }
 }
 
-impl<S> From<S> for LoggingConfigLevel
-where
-  S: AsRef<str>,
-{
-  fn from(log_value: S) -> Self {
-    match log_value.as_ref().to_lowercase().trim() {
-      "error" => LoggingConfigLevel::Error,
-      "warn" => LoggingConfigLevel::Warn,
-      "debug" => LoggingConfigLevel::Debug,
-      "trace" => LoggingConfigLevel::Trace,
-      _ => LoggingConfigLevel::Info,
+// impl<S> From<S> for LoggingConfigLevel
+// where
+//   S: AsRef<str>,
+// {
+//   fn from(log_value: S) -> Self {
+//     match log_value.as_ref().to_lowercase().trim() {
+//       "error" => LoggingConfigLevel::Error,
+//       "warn" => LoggingConfigLevel::Warn,
+//       "debug" => LoggingConfigLevel::Debug,
+//       "trace" => LoggingConfigLevel::Trace,
+//       _ => LoggingConfigLevel::Info,
+//     }
+//   }
+// }
+//
+// impl FromStr for LoggingConfigLevel {
+//   type Err = Box<dyn std::error::Error>;
+//
+//   fn from_str(s: &str) -> Result<Self, Self::Err> {
+//     Ok(Self::from(s))
+//   }
+// }
+
+impl AsRef<str> for LoggingConfigLevel {
+  fn as_ref(&self) -> &str {
+    match self {
+      LoggingConfigLevel::Error => "error",
+      LoggingConfigLevel::Warn => "warn",
+      LoggingConfigLevel::Debug => "debug",
+      LoggingConfigLevel::Trace => "trace",
+      LoggingConfigLevel::Info => "info",
     }
-  }
-}
-
-impl FromStr for LoggingConfigLevel {
-  type Err = Box<dyn std::error::Error>;
-
-  fn from_str(s: &str) -> Result<Self, Self::Err> {
-    Ok(Self::from(s))
   }
 }

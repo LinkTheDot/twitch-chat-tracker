@@ -1,0 +1,41 @@
+# envsubst < deploy-twitch-chat-logger.yaml | kubectl apply -f -
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: twitch-chat-logger
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: twitch-chat-logger
+  template:
+    metadata:
+      labels:
+        app: twitch-chat-logger
+    spec:
+      containers:
+      - name: twitch-chat-logger
+        image: $HOMELAB_ADDRESS:5000/twitch-chat-logger-app:latest
+        imagePullPolicy: IfNotPresent
+      volumes:
+        - name: TWITCH_ACCESS_TOKEN
+          valueFrom: 
+            secretKeyRef:
+              name: twitch-chat-logger
+              key: twitchAccessToken
+        - name: TWITCH_CLIENT_ID
+          valueFrom: 
+            secretKeyRef:
+              name: twitch-chat-logger
+              key: twitchClientId
+        - name: PASTEBIN_API_KEY
+          valueFrom: 
+            secretKeyRef:
+              name: twitch-chat-logger
+              key: pastebinApiKey
+        - name: DATABASE_PASSWORD
+          valueFrom: 
+            secretKeyRef:
+              name: mysql
+              key: MYSQL_ROOT_PASSWORD

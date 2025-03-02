@@ -12,9 +12,9 @@ const FILE_REPORTS_DIR: &str = "file_reports";
 ///
 /// Takes (report_name, report_string) and uploads them to pastebin or if the `-f` flag is passed in.
 /// Writes the reports to files instead.the reports to files instead.
-pub async fn upload_reports<S: AsRef<str>>(
+pub async fn upload_reports<S1: AsRef<str>, S2: AsRef<str>>(
   report_stream_id: i32,
-  reports: Vec<(S, S)>,
+  reports: Vec<(S1, S2)>,
 ) -> Result<(), AppError> {
   let Some(stream) = stream::Entity::find_by_id(report_stream_id)
     .one(get_database_connection().await)

@@ -26,7 +26,7 @@ chrono = "0.4.*"
 irc = "1.0.0"
 sea-orm = { version = "1.1.*", features = ["sqlx-mysql", "runtime-tokio", "macros"] } 
 url = "2.5.4"
-schematic = { version = "0.17.*", features = ["yaml", "env"] }
+schematic = { version = "0.18.*", features = ["yaml", "env"] }
 database_connection = { path = "database_connection" }
 app_config = { path = "app_config" }
 entities = { path = "entities" }

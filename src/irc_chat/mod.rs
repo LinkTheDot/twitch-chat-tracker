@@ -133,6 +133,7 @@ impl TwitchIrc {
     .await;
     let Ok(Some(message_result)) = message_result else {
       tracing::debug!("Did not recieve a message.");
+
       return Ok(());
     };
     let message = message_result?;
@@ -144,11 +145,13 @@ impl TwitchIrc {
       Command::Raw(command, _) if &command == "ROOMSTATE" => return Ok(()),
       Command::CAP(_, _, _, _) => return Ok(()),
       Command::PONG(ref url, _) => {
-        tracing::warn!("Recieved a pong confirmation from {:?}", url);
+        tracing::info!("Recieved a pong confirmation from {:?}", url);
 
         return Ok(());
       }
       Command::PING(ref url, _) => {
+        tracing::info!("Recieved a ping from {:?}", url);
+
         self
           .get_mut_irc_client()?
           .send(Command::PONG(url.to_string(), None))?;
@@ -158,10 +161,21 @@ impl TwitchIrc {
       _ => (),
     }
 
+    tracing::debug!("Got a message: {:?}", message);
+
     let Some(message_parser) = MessageParser::new(&message, &self.third_party_emote_lists)? else {
       return Ok(());
     };
 
-    message_parser.parse().await
+    let result = message_parser.parse().await;
+
+    if result.is_err() {
+      tracing::error!(
+        "Failed to process a message. Dumping contents to log.\n{:?}",
+        message
+      );
+    }
+
+    result
   }
 }

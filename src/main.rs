@@ -3,7 +3,8 @@ use chrono::*;
 use database_connection::get_database_connection;
 use entities::{stream_message, twitch_user};
 use sea_orm::*;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
+use std::io::{self, Write};
 use std::time::Duration;
 use tokio::fs;
 use tokio::io::AsyncWriteExt;
@@ -24,6 +25,7 @@ async fn main() {
   let connected_channels = TrackedChannels::new().await.unwrap();
   let mut irc_client = TwitchIrc::new().await.unwrap();
 
+  tokio::spawn(running_animation());
   tokio::spawn(update_channel_status(connected_channels));
 
   loop {
@@ -110,4 +112,24 @@ async fn write_chatterino_style_report(stream_id: i32) {
     .unwrap();
 
   file.write_all(message_list.as_bytes()).await.unwrap();
+}
+
+#[allow(dead_code)]
+async fn running_animation() {
+  fn move_cursor_left() {
+    print!("\x1B[1D")
+  }
+
+  println!("Program is running.");
+
+  let animation = ['-', '\\', '|', '/'];
+
+  for animation_character in animation.iter().cycle() {
+    print!("{}", animation_character);
+    let _ = io::stdout().flush();
+
+    tokio::time::sleep(Duration::from_millis(200)).await;
+
+    move_cursor_left();
+  }
 }

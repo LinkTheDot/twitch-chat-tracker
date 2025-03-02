@@ -5,3 +5,4 @@ migration/target
 /app_log
 /database_backup.*
 /file_reports
+secrets.*

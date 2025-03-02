@@ -240,11 +240,15 @@ impl TrackedChannels {
     let response_body = response.text().await?;
 
     let Value::Object(response_value) = serde_json::from_str::<Value>(&response_body)? else {
+      tracing::error!("Unkown response: {:?}", response_body);
+
       return Err(AppError::UnknownResponseBody(
         "query channel list response body.",
       ));
     };
     let Some(Value::Array(channel_list)) = response_value.get("data") else {
+      tracing::error!("Unkown response: {:?}", response_body);
+
       return Err(AppError::UnknownResponseBody(
         "query channel list internal list.",
       ));
@@ -258,6 +262,8 @@ impl TrackedChannels {
       };
 
       let Some(Value::String(login_name)) = channel.get("login") else {
+        tracing::error!("Unkown response: {:?}", channel);
+
         tracing::error!(
           "{:?}",
           AppError::UnknownResponseBody("channel list login name.")
@@ -333,11 +339,15 @@ impl TrackedChannels {
 
     let response_body = response.text().await?;
     let Value::Object(response_value): Value = serde_json::from_str(&response_body)? else {
+      tracing::error!("Unkown response: {:?}", response_body);
+
       return Err(AppError::UnknownResponseBody(
         "update live status response body.",
       ));
     };
     let Some(Value::Array(live_streams)) = response_value.get("data") else {
+      tracing::error!("Unkown response: {:?}", response_body);
+
       return Err(AppError::UnknownResponseBody(
         "update live status live stream list.",
       ));

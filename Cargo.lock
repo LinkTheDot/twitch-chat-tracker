@@ -127,7 +127,7 @@ dependencies = [
  "anyhow",
  "clap",
  "lazy_static",
- "schematic",
+ "schematic 0.17.11",
  "secrecy",
  "serde",
  "tracing",
@@ -2604,12 +2604,30 @@ checksum = "365f270caf8e8539eaad997c3800bfe0159e664eab1da87ca8043f527234539e"
 dependencies = [
  "garde",
  "miette",
- "schematic_macros",
- "schematic_types",
+ "schematic_macros 0.17.8",
+ "schematic_types 0.9.7",
  "serde",
  "serde_path_to_error",
  "serde_yaml",
- "starbase_styles",
+ "starbase_styles 0.4.14",
+ "thiserror 2.0.11",
+ "tracing",
+]
+
+[[package]]
+name = "schematic"
+version = "0.18.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f2cd46243573e374e586e9e72450c14f5da88a19f0118ffc0ea95e6fe0c1d6a7"
+dependencies = [
+ "garde",
+ "miette",
+ "schematic_macros 0.18.0",
+ "schematic_types 0.10.0",
+ "serde",
+ "serde_path_to_error",
+ "serde_yaml",
+ "starbase_styles 0.5.0",
  "thiserror 2.0.11",
  "tracing",
 ]
@@ -2628,10 +2646,33 @@ dependencies = [
 ]
 
 [[package]]
+name = "schematic_macros"
+version = "0.18.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fff7e059a5ee4c5bb3e32fa4ee074b4413d84434cad51fc903956499487dcd5c"
+dependencies = [
+ "convert_case",
+ "darling",
+ "proc-macro2",
+ "quote",
+ "syn 2.0.98",
+]
+
+[[package]]
 name = "schematic_types"
 version = "0.9.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "15254cba352d302f26c0e427bf2634e513dff936f8a86c6df4f94843818fa4e3"
+dependencies = [
+ "indexmap",
+ "serde_yaml",
+]
+
+[[package]]
+name = "schematic_types"
+version = "0.10.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2d080c1da871374064ad558756d13a101b0040babcacc5b047ed7c1449586103"
 dependencies = [
  "indexmap",
  "serde_yaml",
@@ -3249,6 +3290,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "starbase_styles"
+version = "0.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b2eaf276f88990ad31740689546564c450caf2acbb9cd60e5cd517931783fd32"
+dependencies = [
+ "dirs",
+ "owo-colors",
+ "supports-color",
+]
+
+[[package]]
 name = "static_assertions"
 version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3740,7 +3792,7 @@ dependencies = [
  "irc",
  "lazy_static",
  "reqwest",
- "schematic",
+ "schematic 0.18.0",
  "sea-orm",
  "serde",
  "serde_json",

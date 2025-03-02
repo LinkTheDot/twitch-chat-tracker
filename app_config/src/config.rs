@@ -32,9 +32,9 @@ pub struct AppConfig {
 
   #[setting(required)]
   twitch_nickname: Option<String>,
-  #[setting(required)]
+  #[setting(required, env = "TWITCH_ACCESS_TOKEN")]
   access_token: Option<Secret>,
-  #[setting(required)]
+  #[setting(required, env = "TWITCH_CLIENT_ID")]
   client_id: Option<Secret>,
 
   // database_protocol: DatabaseProtocol,
@@ -49,6 +49,7 @@ pub struct AppConfig {
   #[setting(default = "password", env = "DATABASE_PASSWORD")]
   sql_user_password: Secret,
 
+  #[setting(env = "PASTEBIN_API_KEY")]
   pastebin_api_key: Option<Secret>,
 }
 

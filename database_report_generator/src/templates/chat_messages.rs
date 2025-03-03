@@ -19,6 +19,7 @@ struct RankingEntry {
   name: String,
   messages_sent: usize,
   chat_percentage: String,
+  avg_words_per_message: String,
 }
 
 /// Returns the (Leaderboard, Non-emote_dominant_leaderboard) for a given stream.
@@ -106,6 +107,11 @@ async fn get_rankings(
     let first_message_sent_this_stream = user_messages
       .iter()
       .any(|user_message| user_message.is_first_message == 1);
+    let avg_words_per_message = user_messages
+      .iter()
+      .map(|message| message.contents.split(' ').count())
+      .sum::<usize>() as f32
+      / user_messages.len() as f32;
 
     let mut place = place.to_string();
 
@@ -123,6 +129,7 @@ async fn get_rankings(
       name: twitch_user_login_name,
       messages_sent,
       chat_percentage: format!("{:.4}", chat_percentage),
+      avg_words_per_message: format!("{:.2}", avg_words_per_message),
     };
 
     rankings.push(ranking);

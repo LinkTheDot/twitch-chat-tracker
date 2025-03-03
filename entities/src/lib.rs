@@ -12,3 +12,5 @@ pub mod stream_name;
 pub mod subscription_event;
 pub mod twitch_user;
 pub mod user_timeout;
+
+pub mod extensions;

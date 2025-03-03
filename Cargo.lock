@@ -726,6 +726,7 @@ name = "database_report_generator"
 version = "0.1.0"
 dependencies = [
  "app_config",
+ "chrono",
  "database_connection",
  "entities",
  "human-time",
@@ -897,7 +898,11 @@ dependencies = [
 name = "entities"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
+ "database_connection",
  "sea-orm",
+ "serde_json",
+ "tracing",
 ]
 
 [[package]]

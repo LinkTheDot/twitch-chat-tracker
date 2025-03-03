@@ -49,8 +49,13 @@ pub struct AppConfig {
   #[setting(default = "password", env = "DATABASE_PASSWORD")]
   sql_user_password: Secret,
 
+  /// Obtained from https://pastebin.com/doc_api#1
   #[setting(env = "PASTEBIN_API_KEY")]
   pastebin_api_key: Option<Secret>,
+
+  /// Obtained from https://app.exchangerate-api.com
+  #[setting(env = "EXCHANGE_RATE_API_KEY")]
+  exchange_rate_api_key: Option<Secret>,
 }
 
 impl AppConfig {
@@ -130,8 +135,14 @@ impl AppConfig {
     &self.sql_user_password
   }
 
+  /// Obtained from https://pastebin.com/doc_api#1
   pub fn pastebin_api_key(&self) -> Option<&Secret> {
     self.pastebin_api_key.as_ref()
+  }
+
+  /// Obtained from https://app.exchangerate-api.com
+  pub fn exchange_rate_api_key(&self) -> Option<&Secret> {
+    self.exchange_rate_api_key.as_ref()
   }
 }
 

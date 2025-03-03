@@ -14,6 +14,7 @@ pub struct ChatStatistics {
   pub first_time_chatters: i32,
   pub total_chats: i32,
   pub emote_dominant_chats: i32,
+  pub average_word_length: f32,
   /// 0-100
   pub subscribed_chat_percentage: f32,
   pub raw_donations: f32,
@@ -42,6 +43,7 @@ impl ChatStatistics {
       first_time_chatters: Self::first_time_chatters(&stream_messages),
       total_chats,
       emote_dominant_chats: Self::emote_dominant_chats(&stream_messages).await?,
+      average_word_length: Self::average_word_length(&stream_messages),
       subscribed_chat_percentage: Self::subscribed_chat_percentage(&stream_messages),
       raw_donations: Self::get_donation_event_total_amount(
         stream_id,
@@ -84,6 +86,10 @@ impl ChatStatistics {
     end_pairs.insert(
       "{unsubscribed_chat_percentage}".into(),
       format!("{:.2}", 100.0 - self.subscribed_chat_percentage),
+    );
+    end_pairs.insert(
+      "{average_message_length}".into(),
+      format!("{:.2}", self.average_word_length),
     );
     end_pairs.insert("{raw_donations}".into(), self.raw_donations.to_string());
     end_pairs.insert("{bits}".into(), self.bits.to_string());
@@ -172,6 +178,14 @@ impl ChatStatistics {
     }
 
     Ok(emote_dominant_chats)
+  }
+
+  fn average_word_length(messages: &[stream_message::Model]) -> f32 {
+    messages
+      .iter()
+      .map(|message| message.contents.split(' ').count())
+      .sum::<usize>() as f32
+      / messages.len() as f32
   }
 
   async fn get_donation_event_total_amount(

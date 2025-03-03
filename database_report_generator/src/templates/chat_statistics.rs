@@ -1,10 +1,13 @@
 #![allow(unused_assignments)]
 
-use crate::{chat_statistics::ChatStatistics, errors::AppError};
+use crate::chat_statistics::ChatStatistics;
+use crate::errors::AppError;
 use database_connection::get_database_connection;
+use entities::extensions::prelude::*;
 use entities::*;
 use human_time::ToHumanTimeString;
 use sea_orm::*;
+use std::collections::HashMap;
 use std::time::Duration;
 
 const STATS_FILE_TEMPLATE: &str = r#"
@@ -13,7 +16,8 @@ First time chatters: {first_time_chatters}
 Total chats: {total_chats}
 Total chats with < {emote_message_threshold}% emotes to words: {non-emote_dominant_chats}
 Subscribed|Unsubscribed chats: {subscriber_chat_percentage}|{unsubscribed_chat_percentage}
-                                      
+Average word count in messages: {average_message_length}
+
 = Donation statistics =
 Donations: £{raw_donations}
 Bits: {bits} 
@@ -29,6 +33,7 @@ pub async fn get_chat_statistics_template_for_stream(stream_id: i32) -> Result<S
   let chat_statistics = ChatStatistics::new(stream_id).await?;
   let (mut user_bans, user_timeouts) = get_timeouts(stream_id, database_connection).await?;
   let raids = get_raids(stream_id, database_connection).await?;
+  let top_10_emotes = get_top_10_emotes(stream_id, database_connection).await?;
   let mut statistics_template = String::from(STATS_FILE_TEMPLATE);
   let mut statistics_string = String::new();
 
@@ -48,6 +53,10 @@ pub async fn get_chat_statistics_template_for_stream(stream_id: i32) -> Result<S
 
   if !raids.is_empty() {
     insert_raid_table(&mut statistics_string, raids, database_connection).await?;
+  }
+
+  if !top_10_emotes.is_empty() {
+    insert_emote_ranking_table(&mut statistics_string, top_10_emotes);
   }
 
   for (key, value) in chat_statistics.to_key_value_pairs() {
@@ -85,6 +94,43 @@ async fn get_raids(
     .all(database_connection)
     .await
     .map_err(Into::into)
+}
+
+/// Returns the list of (emote_name, use_count) for a given stream.
+async fn get_top_10_emotes(
+  stream_id: i32,
+  database_connection: &DatabaseConnection,
+) -> Result<Vec<(String, usize)>, AppError> {
+  // Yes I know I'm querying for all messages twice here. No I don't care.
+  let stream_messages = stream_message::Entity::find()
+    .filter(stream_message::Column::StreamId.eq(Some(stream_id)))
+    .all(database_connection)
+    .await?;
+  let twitch_emotes_used = stream::Model::get_all_twitch_emotes_used_from_id(stream_id).await?;
+
+  let mut emote_uses: HashMap<String, usize> = HashMap::new();
+
+  for message in stream_messages {
+    let third_party_emotes_used = message.get_third_party_emotes_used();
+
+    for (third_party_emote_name, usage) in third_party_emotes_used {
+      let entry = emote_uses.entry(third_party_emote_name).or_default();
+
+      *entry += usage;
+    }
+  }
+
+  for (emote, usage) in twitch_emotes_used {
+    let entry = emote_uses.entry(emote.name).or_default();
+
+    *entry += usage;
+  }
+
+  let mut emote_uses: Vec<(String, usize)> = emote_uses.into_iter().collect();
+  emote_uses.sort_by_key(|(_, uses)| *uses);
+  emote_uses.reverse();
+
+  Ok(emote_uses.into_iter().take(10).collect())
 }
 
 async fn insert_timeout_table(
@@ -191,4 +237,30 @@ async fn insert_raid_table(
   statistics_string.push('\n');
 
   Ok(())
+}
+
+fn insert_emote_ranking_table(
+  statistics_string: &mut String,
+  emote_rankings: Vec<(String, usize)>,
+) {
+  let longest_emote_name = emote_rankings
+    .iter()
+    .map(|(emote_name, _)| emote_name.chars().count())
+    .max()
+    .unwrap();
+
+  statistics_string.push_str("= Top 10 Emotes Used =\n");
+
+  for (rank, (emote_name, use_count)) in emote_rankings.iter().enumerate() {
+    let rank = rank + 1;
+    let emote_name_length = emote_name.chars().count();
+    let usage_padding = " ".repeat(longest_emote_name - emote_name_length);
+    let rank_padding = if rank < 10 { " " } else { "" };
+
+    let row = format!("{rank}:{rank_padding} {emote_name}{usage_padding} - {use_count}\n");
+
+    statistics_string.push_str(&row);
+  }
+
+  statistics_string.push('\n');
 }

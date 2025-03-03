@@ -4,9 +4,11 @@ use app_config::secret_string::Secret;
 use app_config::APP_CONFIG;
 use std::collections::HashMap;
 
+/// Takes the name and data for a report and uploads it to pastebin.
+/// Returns the URL of the pastebin created.
 pub async fn generate_pastebin<S: AsRef<str>>(name: S, data: S) -> Result<String, AppError> {
   let Some(api_key) = APP_CONFIG.pastebin_api_key() else {
-    unreachable!()
+    return Err(AppError::MissingPastebinApiKey);
   };
 
   let parameters = HashMap::from([

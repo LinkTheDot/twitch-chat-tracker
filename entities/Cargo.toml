@@ -5,4 +5,7 @@ edition = "2021"
 
 [dependencies]
 sea-orm = { version = "1.1.*", features = ["sqlx-mysql", "runtime-tokio", "macros"] } 
-
+serde_json = "1.0.*"
+tracing = "0.1.*"
+anyhow = "1.0.*"
+database_connection = { path = "../database_connection" }

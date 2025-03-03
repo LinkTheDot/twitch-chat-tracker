@@ -1,8 +1,13 @@
-use crate::templates::chat_messages_template::get_messages_sent_ranking_for_stream;
-use crate::templates::chat_statistics_template::get_chat_statistics_template_for_stream;
+use crate::templates::chat_messages::get_messages_sent_ranking_for_stream;
+use crate::templates::chat_statistics::get_chat_statistics_template_for_stream;
+use database_connection::get_database_connection;
+use entities::stream;
 use errors::AppError;
+use sea_orm::*;
+use templates::donation_rankings::get_donation_rankings_for_streamer_and_month;
 
 pub mod chat_statistics;
+pub mod currency_exchangerate;
 pub mod errors;
 pub mod logging;
 pub mod pastebin;
@@ -21,6 +26,13 @@ lazy_static::lazy_static! {
 pub async fn generate_reports(
   report_stream_id: i32,
 ) -> Result<Vec<(&'static str, String)>, AppError> {
+  let Some(stream) = stream::Entity::find_by_id(report_stream_id)
+    .one(get_database_connection().await)
+    .await?
+  else {
+    return Err(AppError::FailedToFindStream(report_stream_id));
+  };
+
   let general_stats_report = get_chat_statistics_template_for_stream(report_stream_id)
     .await
     .unwrap();
@@ -28,11 +40,14 @@ pub async fn generate_reports(
     get_messages_sent_ranking_for_stream(report_stream_id)
       .await
       .unwrap();
+  let donator_monthly_rankings =
+    get_donation_rankings_for_streamer_and_month(stream.twitch_user_id, None, None).await?;
 
   let reports = vec![
     ("general_stats", general_stats_report),
     ("unfiltered_chat_rankings", unfiltered_chat_report),
     ("filtered_chat_rankings", emote_filtered_chat_report),
+    ("donator_monthly_rankings", donator_monthly_rankings),
   ];
 
   Ok(reports)

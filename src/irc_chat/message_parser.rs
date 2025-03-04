@@ -57,8 +57,8 @@ impl<'a, 'b> MessageParser<'a, 'b> {
       || self.check_subs_and_gift_subs().await?
       || self.check_for_bits().await?
       || self.check_for_streamlabs_donation().await?
-      || self.check_for_user_message().await?
-      || self.check_for_raid().await?;
+      || self.check_for_raid().await?
+      || self.check_for_user_message().await?;
 
     Ok(())
   }

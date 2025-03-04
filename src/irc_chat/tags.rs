@@ -34,8 +34,8 @@ impl Tag {
   pub const MESSAGE_ID: &str = "msg-id";
   pub const SUBSCRIPTION_PLAN: &str = "msg-param-sub-plan";
   pub const BAN_DURATION: &str = "ban-duration";
-  pub const RAID_VIEWER_COUNT: &str = "msg-param-viwerCount";
-  pub const USER_ID: &str = "target-user-id";
+  pub const RAID_VIEWER_COUNT: &str = "msg-param-viewerCount";
+  pub const USER_ID: &str = "user-id";
   pub const ROOM_ID: &str = "room-id";
   pub const MONTHS_SUBSCRIBED: &str = "msg-param-cumulative-months";
 }

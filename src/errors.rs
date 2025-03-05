@@ -12,6 +12,9 @@ pub enum AppError {
   #[error("{}", .0)]
   SerdeError(#[from] serde_json::Error),
 
+  #[error("{}", .0)]
+  EntityExtensionError(#[from] entities::extensions::ExtensionError),
+
   #[error("Remaining Helix API requests is 0.")]
   ApiRatelimitReached,
 

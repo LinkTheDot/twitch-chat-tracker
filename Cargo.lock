@@ -899,10 +899,15 @@ name = "entities"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "app_config",
+ "chrono",
  "database_connection",
+ "lazy_static",
+ "reqwest",
  "sea-orm",
  "serde_json",
  "tracing",
+ "url",
 ]
 
 [[package]]

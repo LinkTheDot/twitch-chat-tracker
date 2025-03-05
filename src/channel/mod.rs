@@ -1,22 +1,13 @@
-use crate::entity_extensions::stream::StreamExtensions;
 use crate::errors::AppError;
-use crate::REQWEST_CLIENT;
-use app_config::secret_string::Secret;
 use app_config::APP_CONFIG;
-use channel_identifier::ChannelIdentifier;
-use chrono::{DateTime, Utc};
+use chrono::Utc;
 use database_connection::get_database_connection;
+use entities::extensions::prelude::*;
+use entities::extensions::twitch_user::*;
 use entities::{prelude::*, stream, twitch_user};
-use reqwest::RequestBuilder;
 use sea_orm::*;
-use serde_json::Value;
 use std::collections::HashMap;
-use url::Url;
 
-const HELIX_STREAM_QUERY_URL: &str = "https://api.twitch.tv/helix/streams";
-const HELIX_USER_QUERY_URL: &str = "https://api.twitch.tv/helix/users";
-
-pub mod channel_identifier;
 pub mod live_status;
 pub mod third_party_emote_list;
 pub mod third_party_emote_list_storage;
@@ -56,7 +47,8 @@ impl TrackedChannels {
 
   pub async fn update_active_livestreams(&mut self) -> Result<(), AppError> {
     let database_connection = get_database_connection().await;
-    let current_live_channels = self.active_livestream_list().await?;
+    let channels: Vec<&twitch_user::Model> = self.channels.values().collect();
+    let current_live_channels = stream::Model::get_active_livestreams(channels).await?;
     let mut offline_streams_list: Vec<&str> = vec![];
 
     for (channel_name, channel) in self.channels.iter() {
@@ -174,7 +166,8 @@ impl TrackedChannels {
     );
 
     let channels_missing_from_database_active_models =
-      Self::query_helix_for_channels_from_list(&channels_missing_from_database).await?;
+      twitch_user::Model::query_helix_for_channels_from_list(&channels_missing_from_database)
+        .await?;
     let _insert_result = TwitchUser::insert_many(channels_missing_from_database_active_models)
       .exec(database_connection)
       .await?;
@@ -196,206 +189,5 @@ impl TrackedChannels {
         .chain(missing_channels_from_database)
         .collect(),
     )
-  }
-
-  pub async fn query_helix_for_channels_from_list<S: AsRef<str>>(
-    channels: &Vec<ChannelIdentifier<S>>,
-  ) -> Result<Vec<twitch_user::ActiveModel>, AppError> {
-    if channels.is_empty() {
-      return Ok(vec![]);
-    }
-
-    let mut query_url = Url::parse(HELIX_USER_QUERY_URL)?;
-
-    {
-      let mut query_pairs = query_url.query_pairs_mut();
-
-      for channel_name in channels {
-        match channel_name {
-          ChannelIdentifier::Login(channel_name) => {
-            query_pairs.append_pair("login", channel_name.as_ref());
-          }
-          ChannelIdentifier::TwitchID(twitch_id) => {
-            query_pairs.append_pair("id", twitch_id.as_ref());
-          }
-        }
-      }
-    }
-
-    let request = REQWEST_CLIENT
-      .get(query_url)
-      .header(
-        "Authorization",
-        format!(
-          "Bearer {}",
-          Secret::read_secret_string(APP_CONFIG.access_token().read_value())
-        ),
-      )
-      .header(
-        "Client-Id",
-        Secret::read_secret_string(APP_CONFIG.client_id().read_value()),
-      );
-
-    let response = request.send().await?;
-    let response_body = response.text().await?;
-
-    let Value::Object(response_value) = serde_json::from_str::<Value>(&response_body)? else {
-      tracing::error!("Unkown response: {:?}", response_body);
-
-      return Err(AppError::UnknownResponseBody(
-        "query channel list response body.",
-      ));
-    };
-    let Some(Value::Array(channel_list)) = response_value.get("data") else {
-      tracing::error!("Unkown response: {:?}", response_body);
-
-      return Err(AppError::UnknownResponseBody(
-        "query channel list internal list.",
-      ));
-    };
-
-    let mut user_list = vec![];
-
-    for channel in channel_list {
-      let Value::Object(channel) = channel else {
-        continue;
-      };
-
-      let Some(Value::String(login_name)) = channel.get("login") else {
-        tracing::error!("Unkown response: {:?}", channel);
-
-        tracing::error!(
-          "{:?}",
-          AppError::UnknownResponseBody("channel list login name.")
-        );
-        continue;
-      };
-      let Some(Value::String(display_name)) = channel.get("display_name") else {
-        continue;
-      };
-      let Some(Value::String(user_id)) = channel.get("id") else {
-        continue;
-      };
-      let Ok(user_id) = user_id.parse::<i32>() else {
-        return Err(AppError::FailedToParseUserID(user_id.to_owned()));
-      };
-
-      let user = twitch_user::ActiveModel {
-        twitch_id: ActiveValue::Set(user_id),
-        login_name: ActiveValue::Set(login_name.to_owned()),
-        display_name: ActiveValue::Set(display_name.to_owned()),
-        ..Default::default()
-      };
-
-      user_list.push(user);
-    }
-
-    Ok(user_list)
-  }
-
-  /// Takes the list of channels and builds the request for querying streams.
-  async fn build_get_streams_request(&self) -> Result<RequestBuilder, AppError> {
-    let mut query_url = Url::parse(HELIX_STREAM_QUERY_URL)?;
-
-    query_url.query_pairs_mut().append_pair("first", "100");
-
-    for channel_data in self.channels.values() {
-      query_url
-        .query_pairs_mut()
-        .append_pair("user_login", &channel_data.login_name);
-    }
-
-    Ok(
-      REQWEST_CLIENT
-        .get(query_url)
-        .header(
-          "Authorization",
-          format!(
-            "Bearer {}",
-            Secret::read_secret_string(APP_CONFIG.access_token().read_value())
-          ),
-        )
-        .header(
-          "Client-Id",
-          Secret::read_secret_string(APP_CONFIG.client_id().read_value()),
-        ),
-    )
-  }
-
-  /// Queries Helix for the list of livestreams based on the names of the tracked channels.
-  /// Returns a map of `<login_name, (stream_start_timestamp, twitch_stream_id)>`.
-  async fn active_livestream_list(
-    &self,
-  ) -> Result<HashMap<String, (DateTime<Utc>, String)>, AppError> {
-    let request = self.build_get_streams_request().await?;
-    let response = request.send().await?;
-
-    if let Some(remaining_requests) = response.headers().get("ratelimit-remaining") {
-      if remaining_requests == "0" {
-        tracing::warn!("Exceeded max requests per minute.");
-        return Err(AppError::ApiRatelimitReached);
-      }
-    }
-
-    let response_body = response.text().await?;
-    let Value::Object(response_value): Value = serde_json::from_str(&response_body)? else {
-      tracing::error!("Unkown response: {:?}", response_body);
-
-      return Err(AppError::UnknownResponseBody(
-        "update live status response body.",
-      ));
-    };
-    let Some(Value::Array(live_streams)) = response_value.get("data") else {
-      tracing::error!("Unkown response: {:?}", response_body);
-
-      return Err(AppError::UnknownResponseBody(
-        "update live status live stream list.",
-      ));
-    };
-
-    let mut live_channels: HashMap<String, (DateTime<Utc>, String)> = HashMap::new();
-
-    for live_stream in live_streams {
-      let Value::Object(live_stream) = live_stream else {
-        continue;
-      };
-
-      let Some(Value::String(streamer_login_name)) = live_stream.get("user_login") else {
-        continue;
-      };
-      let Some(Value::String(live_status)) = live_stream.get("type") else {
-        continue;
-      };
-      let Some(Value::String(stream_start)) = live_stream.get("started_at") else {
-        continue;
-      };
-      let stream_start = match stream_start.parse::<DateTime<Utc>>() {
-        Ok(stream_start) => stream_start,
-        Err(error) => {
-          tracing::error!(
-            "Failed to parse the date time for streamer {:?}. Reason: {:?}",
-            streamer_login_name,
-            error
-          );
-          continue;
-        }
-      };
-      let Some(Value::String(stream_id)) = live_stream.get("id") else {
-        tracing::error!(
-          "Failed to get livestream ID for channel `{:?}`",
-          streamer_login_name
-        );
-        continue;
-      };
-
-      if live_status == "live" {
-        live_channels.insert(
-          streamer_login_name.to_owned(),
-          (stream_start, stream_id.to_owned()),
-        );
-      }
-    }
-
-    Ok(live_channels)
   }
 }

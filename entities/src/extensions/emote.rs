@@ -1,6 +1,5 @@
-use crate::errors::AppError;
+use crate::emote;
 use database_connection::get_database_connection;
-use entities::emote;
 use sea_orm::*;
 
 struct EmoteData<'a> {
@@ -18,14 +17,14 @@ pub trait EmoteExtensions {
   async fn get_or_set_list(
     message_contents: &str,
     emote_list: &str,
-  ) -> Result<Vec<(emote::Model, Vec<(usize, usize)>)>, AppError>;
+  ) -> Result<Vec<(emote::Model, Vec<(usize, usize)>)>, DbErr>;
 }
 
 impl EmoteExtensions for emote::Model {
   async fn get_or_set_list(
     message_contents: &str,
     emote_list: &str,
-  ) -> Result<Vec<(emote::Model, Vec<(usize, usize)>)>, AppError> {
+  ) -> Result<Vec<(emote::Model, Vec<(usize, usize)>)>, DbErr> {
     if emote_list.is_empty() {
       return Ok(vec![]);
     }

@@ -1,12 +1,10 @@
 use crate::channel::third_party_emote_list_storage::EmoteListStorage;
-use crate::entity_extensions::emote::EmoteExtensions;
-use crate::entity_extensions::stream::StreamExtensions;
-use crate::entity_extensions::twitch_user::TwitchUserExtension;
 use crate::errors::AppError;
 use crate::irc_chat::sub_tier::*;
 use crate::irc_chat::tags::Tag;
 use chrono::{DateTime, TimeZone};
 use database_connection::get_database_connection;
+use entities::extensions::prelude::*;
 use entities::sea_orm_active_enums::EventType;
 use entities::*;
 use irc::client::prelude::*;

@@ -69,7 +69,7 @@ impl TopDonators {
       rankings.push((donator.login_name.clone(), *donation_amount));
     }
 
-    rankings.sort_by_key(|rank| (rank.1 * 100.0) as isize);
+    rankings.sort_by_key(|(_, rank)| (rank * 100.0) as isize);
     rankings.reverse(); // Sort to lowest in front.
 
     let rankings: Vec<TopDonatorsEntry> = rankings
@@ -98,7 +98,7 @@ impl TopDonators {
       rankings.push((donator.login_name.clone(), *donation_amount));
     }
 
-    rankings.sort_by_key(|rank| rank.1 as isize);
+    rankings.sort_by_key(|(_, rank)| *rank as isize);
     rankings.reverse(); // Sort to lowest in front.
 
     let rankings: Vec<TopDonatorsEntry> = rankings
@@ -127,7 +127,7 @@ impl TopDonators {
       rankings.push((donator.login_name.clone(), *donation_amount));
     }
 
-    rankings.sort_by_key(|rank| Self::gift_subs_to_value(&rank.1) as usize);
+    rankings.sort_by_key(|(_, rank)| Self::gift_subs_to_value(rank) as usize);
     rankings.reverse(); // Sort to lowest in front.
 
     let rankings: Vec<TopDonatorsEntry> = rankings

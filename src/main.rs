@@ -22,10 +22,11 @@ mod manual_migrations;
 async fn main() {
   twitch_chat_logger::logging::setup_logging_config().unwrap();
 
+  tokio::spawn(running_animation());
+
   let connected_channels = TrackedChannels::new().await.unwrap();
   let mut irc_client = TwitchIrc::new().await.unwrap();
 
-  tokio::spawn(running_animation());
   tokio::spawn(update_channel_status(connected_channels));
 
   loop {
@@ -73,6 +74,26 @@ async fn update_channel_status(mut connected_channels: TrackedChannels) {
 }
 
 #[allow(dead_code)]
+async fn running_animation() {
+  fn move_cursor_left() {
+    print!("\x1B[1D")
+  }
+
+  println!("Program is running.");
+
+  let animation = ['-', '\\', '|', '/'];
+
+  for animation_character in animation.iter().cycle() {
+    print!("{}", animation_character);
+    let _ = io::stdout().flush();
+
+    tokio::time::sleep(Duration::from_millis(200)).await;
+
+    move_cursor_left();
+  }
+}
+
+#[allow(dead_code)]
 async fn write_chatterino_style_report(stream_id: i32) {
   let database_connection = get_database_connection().await;
   let messages = stream_message::Entity::find()
@@ -112,24 +133,4 @@ async fn write_chatterino_style_report(stream_id: i32) {
     .unwrap();
 
   file.write_all(message_list.as_bytes()).await.unwrap();
-}
-
-#[allow(dead_code)]
-async fn running_animation() {
-  fn move_cursor_left() {
-    print!("\x1B[1D")
-  }
-
-  println!("Program is running.");
-
-  let animation = ['-', '\\', '|', '/'];
-
-  for animation_character in animation.iter().cycle() {
-    print!("{}", animation_character);
-    let _ = io::stdout().flush();
-
-    tokio::time::sleep(Duration::from_millis(200)).await;
-
-    move_cursor_left();
-  }
 }

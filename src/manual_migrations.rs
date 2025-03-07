@@ -1,10 +1,11 @@
 #![allow(dead_code)]
 
 use database_connection::get_database_connection;
-use entities::{donation_event, stream, stream_message, subscription_event};
+use entities::*;
 use sea_orm::prelude::DateTimeUtc;
 use sea_orm::*;
 use std::collections::{HashMap, HashSet};
+use twitch_chat_logger::channel::third_party_emote_list_storage::EmoteListStorage;
 
 /// Removes duplicate messages in a stream for whenever there might be multiple instances
 /// of the program running.
@@ -126,6 +127,65 @@ pub async fn fix_giftsub_duplicates() {
     } else {
       let _ = known_list.insert(donator_id, vec![donation_event.timestamp]);
     }
+  }
+}
+
+pub async fn fix_global_third_party_emote_tracking() {
+  let database_connection = get_database_connection().await;
+  let emote_list = EmoteListStorage::new().await.unwrap();
+
+  let messages = stream_message::Entity::find()
+    .all(database_connection)
+    .await
+    .unwrap();
+  let mut known_channels: HashMap<i32, twitch_user::Model> = HashMap::new();
+
+  for message in messages {
+    let channel = if let Some(channel) = known_channels.get(&message.channel_id) {
+      channel
+    } else {
+      let channel = twitch_user::Entity::find_by_id(message.channel_id)
+        .one(database_connection)
+        .await
+        .unwrap()
+        .unwrap();
+
+      known_channels.insert(message.channel_id, channel);
+
+      known_channels.get(&message.channel_id).unwrap()
+    };
+
+    let third_party_emotes_used: HashMap<String, usize> = message
+      .contents
+      .split(' ')
+      .filter_map(|word| {
+        emote_list
+          .channel_has_emote(channel, word)
+          .then_some(word.to_string())
+      })
+      .fold(HashMap::new(), |mut emote_and_frequency, emote_name| {
+        let entry = emote_and_frequency.entry(emote_name).or_default();
+        *entry += 1;
+
+        emote_and_frequency
+      });
+
+    if third_party_emotes_used.is_empty() {
+      continue;
+    }
+
+    let third_party_emotes_used_serialized = (!third_party_emotes_used.is_empty())
+      .then_some(serde_json::to_string(&third_party_emotes_used).ok())
+      .flatten();
+    let mut message_active_model = message.into_active_model();
+
+    message_active_model.third_party_emotes_used =
+      ActiveValue::Set(third_party_emotes_used_serialized);
+
+    message_active_model
+      .update(database_connection)
+      .await
+      .unwrap();
   }
 }
 

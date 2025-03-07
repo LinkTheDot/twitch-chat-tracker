@@ -3,12 +3,11 @@ use crate::errors::AppError;
 use app_config::APP_CONFIG;
 use entities::extensions::prelude::*;
 use entities::twitch_user;
-use std::cell::RefCell;
 use std::collections::HashMap;
 
 #[derive(Debug)]
 pub struct EmoteListStorage {
-  third_party_emote_lists: RefCell<HashMap<String, EmoteList>>,
+  third_party_emote_lists: HashMap<String, EmoteList>,
 }
 
 impl EmoteListStorage {
@@ -27,22 +26,25 @@ impl EmoteListStorage {
     }
 
     Ok(Self {
-      third_party_emote_lists: RefCell::new(third_party_emote_lists),
+      third_party_emote_lists,
     })
   }
 
   pub fn channel_has_emote(&self, channel: &twitch_user::Model, emote_name: &str) -> bool {
-    let emote_list = self.third_party_emote_lists.borrow();
-    let Some(channel_list) = emote_list.get(&channel.login_name) else {
+    let Some(channel_emote_list) = self.third_party_emote_lists.get(&channel.login_name) else {
       return false;
     };
+    let global_emote_list = self
+      .third_party_emote_lists
+      .get(EmoteList::GLOBAL_NAME)
+      .expect("Global emotes aren't being set for EmoteListStorage.");
 
-    channel_list.contains(emote_name)
+    channel_emote_list.contains(emote_name) || global_emote_list.contains(emote_name)
   }
 
   pub fn contains_channel(&self, channel: &twitch_user::Model) -> bool {
-    let emote_list = self.third_party_emote_lists.borrow();
-
-    emote_list.contains_key(&channel.login_name)
+    self
+      .third_party_emote_lists
+      .contains_key(&channel.login_name)
   }
 }

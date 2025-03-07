@@ -1,5 +1,6 @@
 use crate::templates::chat_messages::get_messages_sent_ranking_for_stream;
 use crate::templates::chat_statistics::get_chat_statistics_template_for_stream;
+use app_config::CLAP_ARGS;
 use database_connection::get_database_connection;
 use entities::stream;
 use errors::AppError;
@@ -40,8 +41,12 @@ pub async fn generate_reports(
     get_messages_sent_ranking_for_stream(report_stream_id)
       .await
       .unwrap();
-  let donator_monthly_rankings =
-    get_donation_rankings_for_streamer_and_month(stream.twitch_user_id, None, None).await?;
+  let donator_monthly_rankings = get_donation_rankings_for_streamer_and_month(
+    stream.twitch_user_id,
+    CLAP_ARGS.get_year(),
+    CLAP_ARGS.get_month(),
+  )
+  .await?;
 
   let reports = vec![
     ("general_stats", general_stats_report),

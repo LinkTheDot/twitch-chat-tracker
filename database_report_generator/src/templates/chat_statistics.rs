@@ -33,7 +33,7 @@ pub async fn get_chat_statistics_template_for_stream(stream_id: i32) -> Result<S
   let chat_statistics = ChatStatistics::new(stream_id).await?;
   let (mut user_bans, user_timeouts) = get_timeouts(stream_id, database_connection).await?;
   let raids = get_raids(stream_id, database_connection).await?;
-  let top_10_emotes = get_top_10_emotes(stream_id, database_connection).await?;
+  let top_emotes = get_top_n_emotes(stream_id, database_connection, Some(15)).await?;
   let mut statistics_template = String::from(STATS_FILE_TEMPLATE);
   let mut statistics_string = String::new();
 
@@ -55,8 +55,8 @@ pub async fn get_chat_statistics_template_for_stream(stream_id: i32) -> Result<S
     insert_raid_table(&mut statistics_string, raids, database_connection).await?;
   }
 
-  if !top_10_emotes.is_empty() {
-    insert_emote_ranking_table(&mut statistics_string, top_10_emotes);
+  if !top_emotes.is_empty() {
+    insert_emote_ranking_table(&mut statistics_string, top_emotes);
   }
 
   for (key, value) in chat_statistics.to_key_value_pairs() {
@@ -97,9 +97,12 @@ async fn get_raids(
 }
 
 /// Returns the list of (emote_name, use_count) for a given stream.
-async fn get_top_10_emotes(
+///
+/// If the amount desired is None, then all entries are returned.
+async fn get_top_n_emotes(
   stream_id: i32,
   database_connection: &DatabaseConnection,
+  amount: Option<usize>,
 ) -> Result<Vec<(String, usize)>, AppError> {
   // Yes I know I'm querying for all messages twice here. No I don't care.
   let stream_messages = stream_message::Entity::find()
@@ -130,7 +133,9 @@ async fn get_top_10_emotes(
   emote_uses.sort_by_key(|(_, uses)| *uses);
   emote_uses.reverse();
 
-  Ok(emote_uses.into_iter().take(10).collect())
+  let amount = amount.unwrap_or(emote_uses.len());
+
+  Ok(emote_uses.into_iter().take(amount).collect())
 }
 
 async fn insert_timeout_table(
@@ -249,13 +254,16 @@ fn insert_emote_ranking_table(
     .max()
     .unwrap();
 
-  statistics_string.push_str("= Top 10 Emotes Used =\n");
+  let title = format!("= Top {} Emotes Used =\n", emote_rankings.len());
+  statistics_string.push_str(&title);
+
+  let emote_rankings_max_digits = number_of_digits(emote_rankings.len());
 
   for (rank, (emote_name, use_count)) in emote_rankings.iter().enumerate() {
     let rank = rank + 1;
     let emote_name_length = emote_name.chars().count();
     let usage_padding = " ".repeat(longest_emote_name - emote_name_length);
-    let rank_padding = if rank < 10 { " " } else { "" };
+    let rank_padding = " ".repeat(emote_rankings_max_digits - number_of_digits(rank));
 
     let row = format!("{rank}:{rank_padding} {emote_name}{usage_padding} - {use_count}\n");
 
@@ -263,4 +271,12 @@ fn insert_emote_ranking_table(
   }
 
   statistics_string.push('\n');
+}
+
+fn number_of_digits(n: usize) -> usize {
+  if n == 0 {
+    1
+  } else {
+    (n.ilog10() + 1) as usize
+  }
 }

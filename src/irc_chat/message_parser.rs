@@ -152,7 +152,7 @@ impl<'a, 'b> MessageParser<'a, 'b> {
     tracing::debug!("Checking if gift sub.");
 
     match self.tags_of_interest.get(Tag::MESSAGE_ID) {
-      Some(&"sub" | &"resub" | &"submysterygift") => (),
+      Some(&"sub" | &"resub" | &"submysterygift" | &"giftpaidupgrade") => (),
       _ => return Ok(false),
     }
 
@@ -192,7 +192,7 @@ impl<'a, 'b> MessageParser<'a, 'b> {
         event_type: ActiveValue::Set(EventType::GiftSubs),
         amount: ActiveValue::Set(gift_amount),
         timestamp: ActiveValue::Set(self.timestamp),
-        donator_twitch_user_id: ActiveValue::Set(donator.id),
+        donator_twitch_user_id: ActiveValue::Set(Some(donator.id)),
         donation_receiver_twitch_user_id: ActiveValue::Set(donation_receiver.id),
         stream_id: ActiveValue::Set(stream.map(|stream| stream.id)),
         subscription_tier: ActiveValue::Set(Some(tier.into())),
@@ -251,7 +251,7 @@ impl<'a, 'b> MessageParser<'a, 'b> {
       event_type: ActiveValue::Set(EventType::Bits),
       amount: ActiveValue::Set(bit_quantity),
       timestamp: ActiveValue::Set(self.timestamp),
-      donator_twitch_user_id: ActiveValue::Set(donator.id),
+      donator_twitch_user_id: ActiveValue::Set(Some(donator.id)),
       donation_receiver_twitch_user_id: ActiveValue::Set(donation_receiver.id),
       stream_id: ActiveValue::Set(stream.map(|stream| stream.id)),
       ..Default::default()
@@ -285,13 +285,24 @@ impl<'a, 'b> MessageParser<'a, 'b> {
       channel_name.remove(0);
     }
 
-    let donation_receiver = twitch_user::Model::get_or_set_by_name(&channel_name).await?;
+    let donation_receiver = twitch_user::Model::get_or_set_by_name(&channel_name).await;
 
     let Some(donator_display_name) = contents.split(" ").next() else {
       return Ok(false);
     };
     let donator_login_name = donator_display_name.to_lowercase();
-    let donator = twitch_user::Model::get_or_set_by_name(&donator_login_name).await?;
+    let donator = match twitch_user::Model::get_or_set_by_name(&donator_login_name).await {
+      Ok(donator) => Some(donator),
+      Err(error) => {
+        tracing::warn!("Failed to get donator from a streamlabs donation. Reason: {:?}. Attempting guess based on known users.", error);
+
+        twitch_user::Model::guess_login_name(&donator_login_name).await?
+      }
+    };
+
+    let unknown_user = donator
+      .is_none()
+      .then_some(unknown_user::Model::get_or_set_by_name(&donator_login_name).await?);
 
     let Some(mut quantity) = contents.split(" ").nth(3).map(str::to_string) else {
       return Ok(false);
@@ -302,21 +313,23 @@ impl<'a, 'b> MessageParser<'a, 'b> {
       return Ok(false);
     };
 
-    let stream = stream::Model::get_most_recent_stream_for_user(&donation_receiver)
-      .await?
-      .filter(stream::Model::is_live);
+    let stream =
+      stream::Model::get_most_recent_stream_for_user(donation_receiver.as_ref().unwrap())
+        .await?
+        .filter(stream::Model::is_live);
 
-    let donation_event = donation_event::ActiveModel {
+    let donation_event_active_model = donation_event::ActiveModel {
       event_type: ActiveValue::Set(EventType::StreamlabsDonation),
       amount: ActiveValue::Set(quantity),
       timestamp: ActiveValue::Set(self.timestamp),
-      donator_twitch_user_id: ActiveValue::Set(donator.id),
-      donation_receiver_twitch_user_id: ActiveValue::Set(donation_receiver.id),
+      donator_twitch_user_id: ActiveValue::Set(donator.map(|donator| donator.id)),
+      unknown_user_id: ActiveValue::Set(unknown_user.map(|user| user.id)),
+      donation_receiver_twitch_user_id: ActiveValue::Set(donation_receiver.unwrap().id),
       stream_id: ActiveValue::Set(stream.map(|stream| stream.id)),
       ..Default::default()
     };
 
-    donation_event
+    donation_event_active_model
       .insert(get_database_connection().await)
       .await?;
 

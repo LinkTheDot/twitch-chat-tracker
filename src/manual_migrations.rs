@@ -109,7 +109,9 @@ pub async fn fix_giftsub_duplicates() {
     .unwrap();
 
   for donation_event in donations {
-    let donator_id = donation_event.donator_twitch_user_id;
+    let Some(donator_id) = donation_event.donator_twitch_user_id else {
+      continue;
+    };
     let donation_event_id = donation_event.id;
 
     if let Some(donator_list) = known_list.get_mut(&donator_id) {

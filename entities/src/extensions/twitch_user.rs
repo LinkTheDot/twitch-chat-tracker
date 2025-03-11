@@ -1,14 +1,17 @@
+use crate::extensions::prelude::*;
 use crate::extensions::REQWEST_CLIENT;
-use crate::twitch_user;
+use crate::{twitch_user, twitch_user_unknown_user_association, unknown_user};
 use anyhow::anyhow;
 use app_config::secret_string::Secret;
 use app_config::APP_CONFIG;
 use database_connection::get_database_connection;
 use sea_orm::*;
 use serde_json::Value;
+use strsim::jaro_winkler;
 use url::Url;
 
 const HELIX_USER_QUERY_URL: &str = "https://api.twitch.tv/helix/users";
+const JARO_NAME_SIMILARITY_THRESHOLD: f64 = 0.85;
 
 #[derive(Debug)]
 pub enum ChannelIdentifier<S: AsRef<str>> {
@@ -31,6 +34,11 @@ pub trait TwitchUserExtensions {
   async fn query_helix_for_channels_from_list<S: AsRef<str>>(
     channels: &[ChannelIdentifier<S>],
   ) -> anyhow::Result<Vec<twitch_user::ActiveModel>>;
+
+  /// Takes a login name that might be within the database, and guesses the user using a levenshtein distance.
+  ///
+  /// Use this if [`get_or_set_by_name`](TwitchUserExtensions::get_or_set_by_name) fails on a name you expect to exist.
+  async fn guess_login_name(guess_name: &str) -> anyhow::Result<Option<twitch_user::Model>>;
 }
 
 impl TwitchUserExtensions for twitch_user::Model {
@@ -182,5 +190,36 @@ impl TwitchUserExtensions for twitch_user::Model {
     }
 
     Ok(user_list)
+  }
+
+  /// Takes a guessed name and compares it against all login names in the database.
+  ///
+  /// If the name matches close enough to one in the database, the model for it is returned.
+  /// Otherwise None is returned.
+  async fn guess_login_name(guess_name: &str) -> anyhow::Result<Option<twitch_user::Model>> {
+    let database_connection = get_database_connection().await;
+
+    let unknown_user = unknown_user::Model::get_or_set_by_name(guess_name).await?;
+    let maybe_association = unknown_user.get_associated_twich_user().await?;
+
+    if let Some(associated_user) = maybe_association {
+      return Ok(Some(associated_user));
+    }
+
+    let all_users = twitch_user::Entity::find().all(database_connection).await?;
+
+    let maybe_user_match = all_users
+      .into_iter()
+      .find(|user| jaro_winkler(&user.login_name, guess_name) >= JARO_NAME_SIMILARITY_THRESHOLD);
+
+    if let Some(matched_user) = &maybe_user_match {
+      let _ = twitch_user_unknown_user_association::Model::get_or_set_connection(
+        &unknown_user,
+        matched_user,
+      )
+      .await?;
+    }
+
+    Ok(maybe_user_match)
   }
 }

@@ -183,10 +183,7 @@ impl TwitchIrc {
 #[cfg(test)]
 mod tests {
   use super::*;
-  use database_connection::get_database_connection;
-  use entities::raid;
-  // use irc::proto::message::Tag;
-  use sea_orm::*;
+  use irc::proto::message::Tag;
 
   /// Used to manually configure IRC messages from Twitch to
   /// check if the parser is working as intended.
@@ -194,14 +191,19 @@ mod tests {
   async fn manual_message_testing() {
     let message = Message {
       tags: Some(vec![
-        // Tag("msg-id".into(), Some("raid".into())),
-        // Tag("tmi-sent-ts".into(), Some("1738439601122".into())),
-        // Tag("msg-param-viewerCount".into(), Some("50".into())),
-        // Tag("user-id".into(), Some("605418870".into())),
-        // Tag("room-id".into(), Some("578762718".into())),
+        Tag("display-name".into(), Some("StreamElements".into())),
+        // Tag("tmi-sent-ts".into(), Some("1741375580248".into())),
       ]),
-      prefix: Some(Prefix::ServerName("tmi.twitch.tv".into())),
-      command: Command::Raw("USERNOTICE".into(), vec!["#fallenshadow".into()]),
+      prefix: Some(Prefix::Nickname(
+        "streamelements".into(),
+        "streamelements".into(),
+        "streamelements.tmi.twitch.tv".into(),
+      )),
+      command: Command::PRIVMSG(
+        "#fallenshadow".into(),
+        "".into(),
+        // "Zman2024 just tipped £50.00!".into(),
+      ),
     };
     let third_party_emote_lists = EmoteListStorage::new().await.unwrap();
 
@@ -211,15 +213,5 @@ mod tests {
       .parse()
       .await
       .unwrap();
-
-    let database_connection = get_database_connection().await;
-
-    let raid = raid::Entity::find()
-      .filter(raid::Column::Size.eq(50))
-      .one(database_connection)
-      .await
-      .unwrap();
-
-    assert!(raid.is_some())
   }
 }

@@ -3,27 +3,25 @@
 use sea_orm::entity::prelude::*;
 
 #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Eq)]
-#[sea_orm(table_name = "twitch_user")]
+#[sea_orm(table_name = "unknown_user")]
 pub struct Model {
   #[sea_orm(primary_key)]
   pub id: i32,
-  #[sea_orm(unique)]
-  pub twitch_id: i32,
-  pub display_name: String,
-  pub login_name: String,
+  pub name: String,
+  pub created_at: DateTimeUtc,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
 pub enum Relation {
-  #[sea_orm(has_many = "super::stream::Entity")]
-  Stream,
+  #[sea_orm(has_many = "super::donation_event::Entity")]
+  DonationEvent,
   #[sea_orm(has_many = "super::twitch_user_unknown_user_association::Entity")]
   TwitchUserUnknownUserAssociation,
 }
 
-impl Related<super::stream::Entity> for Entity {
+impl Related<super::donation_event::Entity> for Entity {
   fn to() -> RelationDef {
-    Relation::Stream.def()
+    Relation::DonationEvent.def()
   }
 }
 
@@ -33,13 +31,13 @@ impl Related<super::twitch_user_unknown_user_association::Entity> for Entity {
   }
 }
 
-impl Related<super::unknown_user::Entity> for Entity {
+impl Related<super::twitch_user::Entity> for Entity {
   fn to() -> RelationDef {
-    super::twitch_user_unknown_user_association::Relation::UnknownUser.def()
+    super::twitch_user_unknown_user_association::Relation::TwitchUser.def()
   }
   fn via() -> Option<RelationDef> {
     Some(
-      super::twitch_user_unknown_user_association::Relation::TwitchUser
+      super::twitch_user_unknown_user_association::Relation::UnknownUser
         .def()
         .rev(),
     )

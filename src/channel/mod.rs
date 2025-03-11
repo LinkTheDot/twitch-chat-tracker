@@ -130,6 +130,10 @@ impl TrackedChannels {
       }
     }
 
+    for channel_name in offline_streams_list {
+      let _ = self.known_active_streams.remove(channel_name);
+    }
+
     Ok(())
   }
 

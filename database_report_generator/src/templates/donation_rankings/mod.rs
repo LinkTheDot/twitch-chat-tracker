@@ -1,6 +1,7 @@
 use crate::errors::AppError;
 use chrono::{Datelike, Local, NaiveDate};
 use database_connection::get_database_connection;
+use donator_identifier::DonatorIdentifier;
 use entities::*;
 use sea_orm::*;
 use sea_orm_active_enums::EventType;
@@ -8,6 +9,7 @@ use top_donators::*;
 use top_donators_entry::*;
 use top_donators_tables::*;
 
+mod donator_identifier;
 mod top_donators;
 mod top_donators_entry;
 mod top_donators_tables;
@@ -69,25 +71,20 @@ async fn get_top_donators(
     return Ok(None);
   }
 
-  // A user and the value of how much they donated in GBP.
   let mut donators = TopDonators::default();
 
   for donation in donations {
+    let donator_identifier = DonatorIdentifier::from_donation_event(&donation);
+
     match donation.event_type {
       EventType::Bits => {
-        let amount = donators
-          .bits
-          .entry(donation.donator_twitch_user_id)
-          .or_default();
+        let amount = donators.bits.entry(donator_identifier).or_default();
 
         *amount += donation.amount;
       }
 
       EventType::GiftSubs => {
-        let amount = donators
-          .gift_subs
-          .entry(donation.donator_twitch_user_id)
-          .or_default();
+        let amount = donators.gift_subs.entry(donator_identifier).or_default();
 
         let Some(subscription_tier) = donation.subscription_tier else {
           tracing::error!(
@@ -115,7 +112,7 @@ async fn get_top_donators(
       EventType::StreamlabsDonation => {
         let amount = donators
           .streamlabs_donations
-          .entry(donation.donator_twitch_user_id)
+          .entry(donator_identifier)
           .or_default();
 
         *amount += donation.amount;

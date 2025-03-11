@@ -16,6 +16,8 @@ mod m20250213_193501_update_stream_message_table_stream_id_to_be_nullable;
 mod m20250215_052013_add_is_subscriber_column_to_stream_message_table;
 mod m20250218_202933_add_twitch_emote_usage_column_to_stream_message_table;
 mod m20250224_065519_add_raid_table;
+mod m20250309_012925_update_donation_event_to_have_optional_name_field;
+mod m20250310_202954_create_twitch_user_unknown_user_association_table;
 
 pub struct Migrator;
 
@@ -39,6 +41,8 @@ impl MigratorTrait for Migrator {
             Box::new(m20250215_052013_add_is_subscriber_column_to_stream_message_table::Migration),
             Box::new(m20250218_202933_add_twitch_emote_usage_column_to_stream_message_table::Migration),
             Box::new(m20250224_065519_add_raid_table::Migration),
+            Box::new(m20250309_012925_update_donation_event_to_have_optional_name_field::Migration),
+            Box::new(m20250310_202954_create_twitch_user_unknown_user_association_table::Migration),
         ]
   }
 }

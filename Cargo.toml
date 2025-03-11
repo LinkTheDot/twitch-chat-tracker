@@ -30,3 +30,4 @@ schematic = { version = "0.18.*", features = ["yaml", "env"] }
 database_connection = { path = "database_connection" }
 app_config = { path = "app_config" }
 entities = { path = "entities" }
+strsim = "0.11.1"

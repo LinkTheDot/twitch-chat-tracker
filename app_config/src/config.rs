@@ -30,7 +30,7 @@ pub struct AppConfig {
   #[setting(default = 0)]
   queries_per_minute: usize,
 
-  #[setting(required)]
+  #[setting(required, env = "TWITCH_NICKNAME")]
   twitch_nickname: Option<String>,
   #[setting(required, env = "TWITCH_ACCESS_TOKEN")]
   access_token: Option<Secret>,
@@ -38,8 +38,8 @@ pub struct AppConfig {
   client_id: Option<Secret>,
 
   // database_protocol: DatabaseProtocol,
-  #[setting(required, env = "USER")]
-  database_username: Option<String>,
+  #[setting(default = "root", env = "DATABASE_USERNAME")]
+  database_username: String,
   #[setting(default = "localhost:3306")]
   database_host_address: String,
   #[setting(default = "twitch_tracker_db")]
@@ -120,7 +120,7 @@ impl AppConfig {
   // }
 
   pub fn database_username(&self) -> &str {
-    self.database_username.as_ref().unwrap()
+    &self.database_username
   }
 
   pub fn database_address(&self) -> &str {

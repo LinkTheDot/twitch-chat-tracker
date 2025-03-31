@@ -10,5 +10,5 @@ secrecy = "0.10.*"
 anyhow = "1.0.*"
 serde = { version = "1.0", features = ["derive"] }
 lazy_static = "1.5"
-schematic = { version = "0.17.*", features = ["yaml", "env"] }
+schematic = { version = "0.18.2", features = ["yaml", "env"] }
 clap = "4.5.*"

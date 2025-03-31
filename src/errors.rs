@@ -101,4 +101,8 @@ pub enum AppError {
 
   #[error("Failed to parse raid size. Reason: {:?}", .0)]
   FailedToParseRaidSize(String),
+
+  /// Contains the error code.
+  #[error("Attempted to query 7TV for a user's emote list, but got an error code back. {:?}", .0)]
+  FailedToQuery7TVForEmoteList(String),
 }

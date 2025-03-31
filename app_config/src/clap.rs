@@ -15,6 +15,7 @@ impl ClapArgs {
   const DONATION_RANKING_REPORT_YEAR: &'static str = "donation_ranking_report_year";
   const DONATION_RANKING_REPORT_MONTH: &'static str = "donation_ranking_report_month";
   const STREAM_REPORT_TIME: &'static str = "stream_report_time";
+  const CREATE_REPORT_TOTALS: &'static str = "create_report_totals";
 
   pub fn new() -> Self {
     let args = Self::setup_args();
@@ -50,6 +51,13 @@ impl ClapArgs {
 
   pub fn stream_report_time(&self) -> Option<&String> {
     self.args.get_one::<String>(Self::STREAM_REPORT_TIME)
+  }
+
+  pub fn generate_report_totals(&self) -> bool {
+    *self
+      .args
+      .get_one::<bool>(Self::CREATE_REPORT_TOTALS)
+      .unwrap()
   }
 
   fn setup_args() -> clap::ArgMatches {
@@ -88,6 +96,12 @@ impl ClapArgs {
           .long("report_time")
           .action(clap::ArgAction::Set)
             .help("Sets how long in a stream to generate a report for. Takes a duration like `1:30:00` for 1.5 hours into a stream to gather the data in a report to. (WIP. Doesn't do anything at the moment.)"),
+      )
+      .arg(
+        Arg::new(Self::CREATE_REPORT_TOTALS)
+          .long("total")
+          .action(clap::ArgAction::SetTrue)
+            .help("Creates additional files that reports on all data in the database."),
       )
       .get_matches()
   }

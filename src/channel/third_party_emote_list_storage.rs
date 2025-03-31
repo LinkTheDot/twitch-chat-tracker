@@ -11,17 +11,52 @@ pub struct EmoteListStorage {
 }
 
 impl EmoteListStorage {
+  /// Generates the list of emotes for each channel in the app config.
+  /// Global emotes are under the name [`GLOBAL`](EmoteList::GLOBAL_NAME).
+  ///
+  /// If the emote list couldn't be retrieved for whatever reason, the name is still stored but with an empty list.
   pub async fn new() -> Result<Self, AppError> {
-    let global_emote_list = EmoteList::get_global_emote_list().await?;
-    let mut third_party_emote_lists =
-      HashMap::from([(EmoteList::GLOBAL_NAME.to_string(), global_emote_list)]);
+    let mut third_party_emote_lists = HashMap::new();
+
+    match EmoteList::get_global_emote_list().await {
+      Ok(global_emote_list) => {
+        third_party_emote_lists.insert(
+          global_emote_list.channel_name().to_string(),
+          global_emote_list,
+        );
+      }
+      Err(error) => {
+        tracing::error!(
+          "Failed to retrieve the global third party emote list. Reason: {:?}",
+          error
+        );
+      }
+    }
 
     for channel_login_name in APP_CONFIG.channels() {
       let channel = twitch_user::Model::get_or_set_by_name(channel_login_name).await?;
 
+      let channel_emote_list = match EmoteList::get_list(&channel).await {
+        Ok(emote_list) => emote_list,
+        Err(error) => {
+          tracing::error!(
+            "Failed to retrieve third party emote list for channel {}. Reason: {:?}",
+            channel_login_name,
+            error
+          );
+
+          third_party_emote_lists.insert(
+            channel_login_name.clone(),
+            EmoteList::get_empty(channel_login_name.to_owned()),
+          );
+
+          continue;
+        }
+      };
+
       third_party_emote_lists.insert(
-        channel_login_name.to_owned(),
-        EmoteList::get_list(&channel).await?,
+        channel_emote_list.channel_name().to_owned(),
+        channel_emote_list,
       );
     }
 

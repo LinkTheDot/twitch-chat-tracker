@@ -144,14 +144,8 @@ impl TwitchIrc {
       Command::Raw(command, _) if &command == "USERSTATE" => return Ok(()),
       Command::Raw(command, _) if &command == "ROOMSTATE" => return Ok(()),
       Command::CAP(_, _, _, _) => return Ok(()),
-      Command::PONG(ref url, _) => {
-        tracing::info!("Recieved a pong confirmation from {:?}", url);
-
-        return Ok(());
-      }
+      Command::PONG(ref _url, _) => return Ok(()),
       Command::PING(ref url, _) => {
-        tracing::info!("Recieved a ping from {:?}", url);
-
         self
           .get_mut_irc_client()?
           .send(Command::PONG(url.to_string(), None))?;

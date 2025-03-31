@@ -24,13 +24,19 @@ struct RankingEntry {
 
 /// Returns the (Leaderboard, Non-emote_dominant_leaderboard) for a given stream.
 pub async fn get_messages_sent_ranking_for_stream(
-  stream_id: i32,
+  stream_id: Option<i32>,
 ) -> Result<(String, String), AppError> {
   let database_connection = get_database_connection().await;
-  let messages = stream_message::Entity::find()
-    .filter(stream_message::Column::StreamId.eq(stream_id))
-    .all(database_connection)
-    .await?;
+  let messages = if let Some(stream_id) = stream_id {
+    stream_message::Entity::find()
+      .filter(stream_message::Column::StreamId.eq(stream_id))
+      .all(database_connection)
+      .await?
+  } else {
+    stream_message::Entity::find()
+      .all(database_connection)
+      .await?
+  };
   let messages: Vec<&stream_message::Model> = messages.iter().collect();
   let emote_filtered_messages = emote_filtered_messages(messages.clone());
 

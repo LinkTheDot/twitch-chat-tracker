@@ -25,6 +25,13 @@ pub struct EmoteList {
 impl EmoteList {
   pub const GLOBAL_NAME: &str = "GLOBAL";
 
+  pub fn get_empty(channel_name: String) -> Self {
+    Self {
+      channel_name,
+      emote_list: HashSet::default(),
+    }
+  }
+
   pub async fn get_list(channel: &twitch_user::Model) -> Result<Self, AppError> {
     tracing::info!("Getting 7tv emote list for channel {:?}", channel);
     let _7tv = Self::get_7tv_list(channel).await?;
@@ -44,6 +51,7 @@ impl EmoteList {
     Self::_7tv_emote_list(user_query_url).await
   }
 
+  // The global response body is formatted different from the regular users, so it lives in a separate method.
   pub async fn get_global_emote_list() -> Result<Self, AppError> {
     let mut _7tv_query_url = Url::parse(_7TV_API_URL)?;
     _7tv_query_url = _7tv_query_url.join("emote-sets/global")?;
@@ -51,6 +59,10 @@ impl EmoteList {
 
     let response = REQWEST_CLIENT.get(_7tv_query_url).send().await?;
     let response_body = response.text().await?;
+
+    if response_body.contains("error code: ") {
+      return Err(AppError::FailedToQuery7TVForEmoteList(response_body));
+    }
 
     let Value::Object(data) = serde_json::from_str(&response_body)? else {
       tracing::error!("Unkown response: {:?}", response_body);
@@ -102,6 +114,10 @@ impl EmoteList {
     tracing::info!("querying emote set for url: {:?}", query_url);
     let response = REQWEST_CLIENT.get(query_url).send().await?;
     let response_body = response.text().await?;
+
+    if response_body.contains("error code: ") {
+      return Err(AppError::FailedToQuery7TVForEmoteList(response_body));
+    }
 
     let Value::Object(data) = serde_json::from_str(&response_body)? else {
       tracing::error!("Unkown response: {:?}", response_body);

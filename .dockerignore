@@ -1,7 +1,8 @@
 target/
-migration/target/
 .git/
 Cargo.lock
 app_log/
 config/config.yml
 secrets.*
+docs/
+/*\.sql

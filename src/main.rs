@@ -1,6 +1,6 @@
 use app_config::APP_CONFIG;
 use chrono::*;
-use database_connection::get_database_connection;
+use database_connection::*;
 use entities::{stream_message, twitch_user};
 use sea_orm::*;
 use std::collections::HashMap;
@@ -21,6 +21,12 @@ mod manual_migrations;
 #[tokio::main]
 async fn main() {
   twitch_chat_logger::logging::setup_logging_config().unwrap();
+
+  if APP_CONFIG.channels().is_empty() {
+    println!("No channels to track.");
+
+    std::process::exit(0);
+  }
 
   tokio::spawn(running_animation());
 

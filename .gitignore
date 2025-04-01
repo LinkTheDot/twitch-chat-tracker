@@ -3,6 +3,7 @@ migration/target
 /tokens
 /config
 /app_log
-/database_backup.*
+/*\.sql
 /file_reports
 secrets.*
+/docs

@@ -17,8 +17,8 @@ lazy_static! {
 
 #[derive(Debug, Config, serde::Serialize, serde::Deserialize)]
 pub struct AppConfig {
-  log_level: LoggingConfigLevel,
-  logging_dir: PathBuf,
+  log_level: Option<LoggingConfigLevel>,
+  logging_dir: Option<PathBuf>,
   #[setting(default = "")]
   logging_filename_prefix: String,
   #[setting(default = "daily")]
@@ -30,7 +30,7 @@ pub struct AppConfig {
   #[setting(default = 0)]
   queries_per_minute: usize,
 
-  #[setting(required, env = "TWITCH_NICKNAME")]
+  #[setting(required)]
   twitch_nickname: Option<String>,
   #[setting(required, env = "TWITCH_ACCESS_TOKEN")]
   access_token: Option<Secret>,
@@ -40,7 +40,7 @@ pub struct AppConfig {
   // database_protocol: DatabaseProtocol,
   #[setting(default = "root", env = "DATABASE_USERNAME")]
   database_username: String,
-  #[setting(default = "localhost:3306")]
+  #[setting(default = "localhost:3306", env = "DATABASE_HOST_ADDRESS")]
   database_host_address: String,
   #[setting(default = "twitch_tracker_db")]
   database: String,
@@ -67,7 +67,8 @@ impl AppConfig {
       .config;
 
     if config.queries_per_minute == 0 {
-      let max_queries_per_minute = (RATE_LIMIT / config.channels.len()).min(MAX_QUERIES_PER_MINUTE);
+      let max_queries_per_minute =
+        (RATE_LIMIT / config.channels.len().max(1)).min(MAX_QUERIES_PER_MINUTE);
 
       config.queries_per_minute = max_queries_per_minute;
     }
@@ -79,12 +80,12 @@ impl AppConfig {
     Ok(config)
   }
 
-  pub fn log_level(&self) -> &LoggingConfigLevel {
-    &self.log_level
+  pub fn log_level(&self) -> Option<&LoggingConfigLevel> {
+    self.log_level.as_ref()
   }
 
-  pub fn logging_dir(&self) -> &PathBuf {
-    &self.logging_dir
+  pub fn logging_dir(&self) -> Option<&PathBuf> {
+    self.logging_dir.as_ref()
   }
 
   pub fn logging_filename_prefix(&self) -> &str {
@@ -114,10 +115,6 @@ impl AppConfig {
   pub fn client_id(&self) -> &Secret {
     self.client_id.as_ref().unwrap()
   }
-
-  // pub fn database_protocol(&self) -> &DatabaseProtocol {
-  //   &self.database_protocol
-  // }
 
   pub fn database_username(&self) -> &str {
     &self.database_username

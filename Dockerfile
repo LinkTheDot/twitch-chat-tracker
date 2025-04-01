@@ -1,44 +1,25 @@
-FROM rust:latest as builder
+FROM rust:1.85.1-slim-bookworm AS builder
 
-WORKDIR /workspace
+WORKDIR /app
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+  pkg-config \
+  libssl-dev
 
 COPY . .
 
-RUN cargo build --release;
-RUN mkdir /workspace/app_log
+RUN cargo build --release --target x86_64-unknown-linux-gnu
 
-VOLUME ./workspace/app_log
-CMD ["./target/release/twitch-chat-logger"]
+FROM debian:bookworm-slim AS runtime
+RUN apt-get update && apt-get install -y --no-install-recommends \
+  libssl-dev \
+  pkg-config \
+  ca-certificates \
+  && rm -rf /var/lib/apt/lists/*
 
-# # COPY app_config/ app/app_config
-# # COPY database_connection/ app/database_connection
-# # COPY entities/ app/entities
-# # COPY src/ app/src
-# # COPY Cargo.toml app/Cargo.toml
-#
-# # Builder
-# WORKDIR /workspace/app
-#
-# RUN ls -R;
-# RUN cargo build --release;
-#
-# # Runtime
-# FROM debian:bookworm-slim
-#
-# WORKDIR /workspace/app
-#
-# RUN ls -R && sleep infinity;
-# COPY --from=builder target/release/twitch-chat-logger .
-#
-# CMD ["./target/release/app"]
-#
-#------------------------------------------------------------------------------
-#
-# FROM debian:bullseye-slim
-#
-# RUN apt-get update && apt-get install -y extra-runtime-dependencies && rm -rf /var/lib/apt/lists/*
-#
-# COPY --from=builder /usr/local/cargo/bin/app /usr/local/bin/app
-#
-# CMD ["app"]
-#
+COPY --from=builder /app/target/x86_64-unknown-linux-gnu/release/twitch-chat-logger /app/
+COPY --from=builder /app/config/deploy_config.yml /app/config/deploy_config.yml
+
+WORKDIR /app
+
+CMD ["./twitch-chat-logger"]

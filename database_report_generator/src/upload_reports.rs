@@ -23,6 +23,8 @@ pub async fn upload_reports<S1: AsRef<str>, S2: AsRef<str>>(
     panic!("Stream of ID {} does not exist.", report_stream_id);
   };
 
+  println!("\n\n");
+
   let stream_start_time = stream.start_timestamp.format("%d-%m-%y").to_string();
   for (report_name, report) in reports {
     let (report_name, report) = (report_name.as_ref(), report.as_ref());
@@ -51,6 +53,8 @@ pub async fn upload_reports<S1: AsRef<str>, S2: AsRef<str>>(
           error
         );
       }
+
+      println!("Report {:?} generated.", report_name);
     } else {
       match generate_pastebin(report_date_and_name.as_str(), report).await {
         Ok(pastebin_url) => println!("{}:\n  {}", report_name, pastebin_url),
@@ -59,10 +63,6 @@ pub async fn upload_reports<S1: AsRef<str>, S2: AsRef<str>>(
             "Failed to generate pastebin for {}. Reason: {:?}",
             report_date_and_name,
             error
-          );
-          println!(
-            "Failed to generate pastebin for {}. Reason: {:?}",
-            report_date_and_name, error
           );
         }
       }

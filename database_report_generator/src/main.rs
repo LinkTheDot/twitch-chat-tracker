@@ -11,12 +11,10 @@ async fn main() {
     Ok(reports) => {
       if let Err(error) = upload_reports(report_stream_id, reports).await {
         tracing::error!("Failed to upload the reports. Reason: {:?}", error);
-        println!("Failed to upload the reports. Reason: {:?}", error);
       }
     }
     Err(error) => {
       tracing::error!("Failed to generate a report. Reason: {:?}", error);
-      println!("Failed to generate a report. Reason: {:?}", error);
     }
   }
 }

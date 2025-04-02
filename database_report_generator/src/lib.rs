@@ -41,19 +41,26 @@ pub async fn generate_reports(
     get_messages_sent_ranking_for_stream(Some(report_stream_id))
       .await
       .unwrap();
-  let donator_monthly_rankings = get_donation_rankings_for_streamer_and_month(
-    stream.twitch_user_id,
-    CLAP_ARGS.get_year(),
-    CLAP_ARGS.get_month(),
-  )
-  .await?;
 
   let mut reports = vec![
     ("general_stats", general_stats_report),
     ("unfiltered_chat_rankings", unfiltered_chat_report),
     ("filtered_chat_rankings", emote_filtered_chat_report),
-    ("donator_monthly_rankings", donator_monthly_rankings),
   ];
+
+  let donator_monthly_rankings_result = get_donation_rankings_for_streamer_and_month(
+    stream.twitch_user_id,
+    CLAP_ARGS.get_year(),
+    CLAP_ARGS.get_month(),
+  )
+  .await;
+
+  match donator_monthly_rankings_result {
+    Ok(donator_monthly_rankings) => {
+      reports.push(("donator_monthly_rankings", donator_monthly_rankings))
+    }
+    Err(error) => tracing::error!("Failed to generate monthly donation rankings. Reason: {:?}", error),
+  }
 
   if CLAP_ARGS.generate_report_totals() {
     let (total_unfiltered_chat_report, total_emote_filtered_chat_report) =

@@ -8,8 +8,6 @@ pub fn setup_logging_config() -> Result<(), Box<dyn std::error::Error>> {
 
     return Ok(());
   };
-  let filename_prefix = PathBuf::from(APP_CONFIG.logging_filename_prefix());
-  let logging_file = APP_CONFIG.logging_file_roll_appender().clone();
 
   let subscriber_builder = tracing_subscriber::fmt()
     .with_env_filter(EnvFilter::new(log_level))
@@ -18,6 +16,9 @@ pub fn setup_logging_config() -> Result<(), Box<dyn std::error::Error>> {
 
   if let Some(logging_dir) = APP_CONFIG.logging_dir() {
     println!("Logging to file");
+
+    let filename_prefix = PathBuf::from(APP_CONFIG.logging_filename_prefix());
+    let logging_file = APP_CONFIG.logging_file_roll_appender().clone();
 
     subscriber_builder
       .with_writer(logging_file.to_file_appender(logging_dir, &filename_prefix)?)

@@ -17,6 +17,8 @@ pub struct Model {
 pub enum Relation {
   #[sea_orm(has_many = "super::stream::Entity")]
   Stream,
+  #[sea_orm(has_many = "super::twitch_user_name_change::Entity")]
+  TwitchUserNameChange,
   #[sea_orm(has_many = "super::twitch_user_unknown_user_association::Entity")]
   TwitchUserUnknownUserAssociation,
 }
@@ -24,6 +26,12 @@ pub enum Relation {
 impl Related<super::stream::Entity> for Entity {
   fn to() -> RelationDef {
     Relation::Stream.def()
+  }
+}
+
+impl Related<super::twitch_user_name_change::Entity> for Entity {
+  fn to() -> RelationDef {
+    Relation::TwitchUserNameChange.def()
   }
 }
 

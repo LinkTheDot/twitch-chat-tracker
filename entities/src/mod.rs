@@ -11,6 +11,7 @@ pub mod stream_message;
 pub mod stream_name;
 pub mod subscription_event;
 pub mod twitch_user;
+pub mod twitch_user_name_change;
 pub mod twitch_user_unknown_user_association;
 pub mod unknown_user;
 pub mod user_timeout;

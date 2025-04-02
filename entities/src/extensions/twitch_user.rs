@@ -1,5 +1,6 @@
 use crate::extensions::prelude::*;
 use crate::extensions::REQWEST_CLIENT;
+use crate::twitch_user_name_change;
 use crate::{twitch_user, twitch_user_unknown_user_association, unknown_user};
 use anyhow::anyhow;
 use app_config::secret_string::Secret;
@@ -44,6 +45,8 @@ pub trait TwitchUserExtensions {
 impl TwitchUserExtensions for twitch_user::Model {
   /// Retrieves the user model from the database if it exists.
   /// Otherwise creates the user entry for the database and returns the resulting model.                 
+  ///
+  /// Also updates the user's name if it was changed since last check.
   async fn get_or_set_by_name(login_name: &str) -> anyhow::Result<twitch_user::Model> {
     let database_connection = get_database_connection().await;
 
@@ -56,23 +59,44 @@ impl TwitchUserExtensions for twitch_user::Model {
       return Ok(user_model);
     }
 
-    let channel =
+    let helix_channel =
       Self::query_helix_for_channels_from_list(&[ChannelIdentifier::Login(login_name)]).await?;
-    let Some(channel) = channel.first().cloned() else {
+    let Some(helix_channel) = helix_channel.first().cloned() else {
       return Err(anyhow!(
         "Failed to query helix data for the user {:?}",
         login_name
       ));
     };
 
-    tracing::info!("Found a new channel from Helix: {:#?}", channel);
+    let ActiveValue::Set(twitch_id) = helix_channel.twitch_id else {
+      return Err(anyhow!(
+        "Failed to get twitch_id from a queried user {}.",
+        login_name
+      ));
+    };
+    let maybe_model = twitch_user::Entity::find()
+      .filter(twitch_user::Column::TwitchId.eq(twitch_id))
+      .one(database_connection)
+      .await?;
 
-    channel
-      .insert(database_connection)
-      .await
-      .map_err(Into::into)
+    if let Some(existing_model) = maybe_model {
+      let user_model = check_for_name_change(existing_model, helix_channel).await?;
+
+      return Ok(user_model);
+    } else {
+      tracing::info!("Found a new channel from Helix: {:#?}", helix_channel);
+
+      return helix_channel
+        .insert(database_connection)
+        .await
+        .map_err(Into::into);
+    }
   }
 
+  /// Retrieves the user model from the database if it exists.
+  /// Otherwise creates the user entry for the database and returns the resulting model.                 
+  ///
+  /// Also updates the user's name if it was changed since last check.
   async fn get_or_set_by_twitch_id(twitch_id: &str) -> anyhow::Result<twitch_user::Model> {
     let database_connection = get_database_connection().await;
 
@@ -81,20 +105,22 @@ impl TwitchUserExtensions for twitch_user::Model {
       .one(database_connection)
       .await?;
 
-    if let Some(user_model) = user_model {
-      return Ok(user_model);
-    }
-
-    let channel =
+    let helix_channel =
       Self::query_helix_for_channels_from_list(&[ChannelIdentifier::TwitchID(twitch_id)]).await?;
-    let Some(channel) = channel.first().cloned() else {
+    let Some(helix_channel) = helix_channel.first().cloned() else {
       return Err(anyhow!(
         "Failed to query helix data for the user {:?}",
         twitch_id
       ));
     };
 
-    channel
+    if let Some(user_model) = user_model {
+      let user_model = check_for_name_change(user_model, helix_channel).await?;
+
+      return Ok(user_model);
+    }
+
+    helix_channel
       .insert(database_connection)
       .await
       .map_err(Into::into)
@@ -222,4 +248,48 @@ impl TwitchUserExtensions for twitch_user::Model {
 
     Ok(maybe_user_match)
   }
+}
+
+/// Checks if the user changed their name or not. Adding a [`twitch_user_name_change`](crate::twitch_user_name_change::Model) and updating the existing entry.
+///
+/// Returns the user after updating.
+///
+/// If there was no change returnx the existing user back.
+async fn check_for_name_change(
+  existing_twitch_user: twitch_user::Model,
+  helix_twitch_user: twitch_user::ActiveModel,
+) -> anyhow::Result<twitch_user::Model> {
+  tracing::info!(
+    "Updating user name change from {} to {:?}",
+    existing_twitch_user.login_name,
+    helix_twitch_user.login_name
+  );
+
+  if existing_twitch_user.login_name == *helix_twitch_user.login_name.as_ref() {
+    return Ok(existing_twitch_user);
+  }
+
+  let database_connection = get_database_connection().await;
+
+  let name_change = twitch_user_name_change::ActiveModel {
+    twitch_user_id: ActiveValue::Set(existing_twitch_user.id),
+    previous_login_name: ActiveValue::Set(Some(existing_twitch_user.login_name.clone())),
+    previous_display_name: ActiveValue::Set(Some(existing_twitch_user.display_name.clone())),
+    new_login_name: helix_twitch_user.login_name.clone().into(),
+    new_display_name: helix_twitch_user.display_name.clone().into(),
+    ..Default::default()
+  };
+
+  let updated_twitch_user = twitch_user::ActiveModel {
+    login_name: helix_twitch_user.login_name,
+    display_name: helix_twitch_user.display_name,
+    ..existing_twitch_user.into_active_model()
+  };
+
+  name_change.insert(database_connection).await?;
+
+  updated_twitch_user
+    .update(database_connection)
+    .await
+    .map_err(Into::into)
 }

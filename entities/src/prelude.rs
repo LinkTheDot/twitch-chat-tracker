@@ -8,6 +8,7 @@ pub use super::stream_message::Entity as StreamMessage;
 pub use super::stream_name::Entity as StreamName;
 pub use super::subscription_event::Entity as SubscriptionEvent;
 pub use super::twitch_user::Entity as TwitchUser;
+pub use super::twitch_user_name_change::Entity as TwitchUserNameChange;
 pub use super::twitch_user_unknown_user_association::Entity as TwitchUserUnknownUserAssociation;
 pub use super::unknown_user::Entity as UnknownUser;
 pub use super::user_timeout::Entity as UserTimeout;

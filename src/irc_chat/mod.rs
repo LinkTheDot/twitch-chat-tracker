@@ -185,18 +185,22 @@ mod tests {
   async fn manual_message_testing() {
     let message = Message {
       tags: Some(vec![
-        Tag("display-name".into(), Some("StreamElements".into())),
-        // Tag("tmi-sent-ts".into(), Some("1741375580248".into())),
+        Tag("display-name".into(), Some("Day_Mi_In".into())),
+        Tag("first-msg".into(), Some("0".into())),
+        Tag("emote-only".into(), Some("0".into())),
+        Tag("room-id".into(), Some("578762718".into())),
+        Tag("subscriber".into(), Some("0".into())),
+        Tag("tmi-sent-ts".into(), Some("1743616116564".into())),
+        Tag("user-id".into(), Some("766207899".into())),
       ]),
       prefix: Some(Prefix::Nickname(
-        "streamelements".into(),
-        "streamelements".into(),
-        "streamelements.tmi.twitch.tv".into(),
+        "day_mi_in".into(),
+        "day_mi_in".into(),
+        "day_mi_in.tmi.twitch.tv".into(),
       )),
       command: Command::PRIVMSG(
         "#fallenshadow".into(),
-        "".into(),
-        // "Zman2024 just tipped £50.00!".into(),
+        "syadouShumo ... syadouKuru... syadouINSANESHUMO... syadouPANIK syadouPattheshadow".into(),
       ),
     };
     let third_party_emote_lists = EmoteListStorage::new().await.unwrap();

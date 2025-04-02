@@ -1,4 +1,3 @@
-use super::m20250210_025922_twitch_user_table::TwitchUser;
 use sea_orm_migration::prelude::*;
 
 #[derive(DeriveMigrationName)]
@@ -52,11 +51,20 @@ impl MigrationTrait for Migration {
 }
 
 #[derive(Iden)]
-pub enum Stream {
+enum Stream {
   Table,
   Id,
   TwitchUserId,
   TwitchStreamId,
   StartTimestamp,
   EndTimestamp,
+}
+
+#[derive(Iden)]
+enum TwitchUser {
+  Table,
+  Id,
+  _TwitchId,
+  _DisplayName,
+  _LoginName,
 }

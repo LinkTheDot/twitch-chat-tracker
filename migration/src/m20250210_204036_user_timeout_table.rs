@@ -1,5 +1,3 @@
-use super::m20250210_025922_twitch_user_table::TwitchUser;
-use super::m20250210_030348_stream_table::Stream;
 use sea_orm_migration::prelude::*;
 
 #[derive(DeriveMigrationName)]
@@ -81,4 +79,23 @@ enum UserTimeout {
   Duration,
   IsPermanent,
   Timestamp,
+}
+
+#[derive(Iden)]
+enum TwitchUser {
+  Table,
+  Id,
+  _TwitchId,
+  _DisplayName,
+  _LoginName,
+}
+
+#[derive(Iden)]
+enum Stream {
+  Table,
+  Id,
+  _TwitchUserId,
+  _TwitchStreamId,
+  _StartTimestamp,
+  _EndTimestamp,
 }

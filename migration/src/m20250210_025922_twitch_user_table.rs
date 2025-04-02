@@ -39,7 +39,7 @@ impl MigrationTrait for Migration {
 }
 
 #[derive(Iden)]
-pub enum TwitchUser {
+enum TwitchUser {
   Table,
   Id,
   TwitchId,

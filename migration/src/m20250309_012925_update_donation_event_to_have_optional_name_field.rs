@@ -1,8 +1,4 @@
-use crate::m20250210_035251_donation_event_table::DonationEvent;
 use sea_orm_migration::prelude::*;
-
-pub const DONATION_EVENT_OPTIONAL_UNKNOWN_USER_COLUMN_NAME: &str = "unknown_user_id";
-pub const UNKNOWN_USER_FOREIGN_KEY_ID_NAME: &str = "fk-donation_event-unknown_user_id";
 
 #[derive(DeriveMigrationName)]
 pub struct Migration;
@@ -38,7 +34,7 @@ impl MigrationTrait for Migration {
         Table::alter()
           .table(DonationEvent::Table)
           .add_column(
-            ColumnDef::new(Alias::new(DONATION_EVENT_OPTIONAL_UNKNOWN_USER_COLUMN_NAME))
+            ColumnDef::new(DonationEvent::UnknownUserId)
               .integer()
               .null(),
           )
@@ -49,9 +45,9 @@ impl MigrationTrait for Migration {
           )
           .add_foreign_key(
             TableForeignKey::new()
-              .name(UNKNOWN_USER_FOREIGN_KEY_ID_NAME)
+              .name("fk-donation_event-unknown_user_id")
               .from_tbl(DonationEvent::Table)
-              .from_col(Alias::new(DONATION_EVENT_OPTIONAL_UNKNOWN_USER_COLUMN_NAME))
+              .from_col(DonationEvent::UnknownUserId)
               .to_tbl(UnknownUser::Table)
               .to_col(UnknownUser::Id)
               .on_delete(ForeignKeyAction::SetNull),
@@ -66,8 +62,8 @@ impl MigrationTrait for Migration {
       .alter_table(
         Table::alter()
           .table(DonationEvent::Table)
-          .drop_foreign_key(Alias::new(UNKNOWN_USER_FOREIGN_KEY_ID_NAME))
-          .drop_column(Alias::new(DONATION_EVENT_OPTIONAL_UNKNOWN_USER_COLUMN_NAME))
+          .drop_foreign_key(Alias::new("fk-donation_event-unknown_user_id"))
+          .drop_column(DonationEvent::UnknownUserId)
           .to_owned(),
       )
       .await?;
@@ -84,4 +80,18 @@ enum UnknownUser {
   Id,
   Name,
   CreatedAt,
+}
+
+#[derive(Iden)]
+enum DonationEvent {
+  Table,
+  _Id,
+  DonatorTwitchUserId,
+  _DonationReceiverTwitchUserId,
+  _StreamId,
+  _EventType,
+  _Amount,
+  _Timestamp,
+  _SubscriptionTier,
+  UnknownUserId,
 }

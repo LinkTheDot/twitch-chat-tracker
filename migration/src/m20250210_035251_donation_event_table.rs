@@ -1,5 +1,3 @@
-use super::m20250210_025922_twitch_user_table::TwitchUser;
-use super::m20250210_030348_stream_table::Stream;
 use sea_orm::{DeriveActiveEnum, DeriveDisplay, EnumIter};
 use sea_orm_migration::prelude::*;
 
@@ -88,7 +86,7 @@ impl MigrationTrait for Migration {
 }
 
 #[derive(Iden)]
-pub enum DonationEvent {
+enum DonationEvent {
   Table,
   Id,
   DonatorTwitchUserId,
@@ -108,4 +106,23 @@ enum DonationTypeEnum {
   GiftSubs,
   #[sea_orm(string_value = "StreamlabsDonation")]
   StreamlabsDonation,
+}
+
+#[derive(Iden)]
+enum TwitchUser {
+  Table,
+  Id,
+  _TwitchId,
+  _DisplayName,
+  _LoginName,
+}
+
+#[derive(Iden)]
+enum Stream {
+  Table,
+  Id,
+  _TwitchUserId,
+  _TwitchStreamId,
+  _StartTimestamp,
+  _EndTimestamp,
 }

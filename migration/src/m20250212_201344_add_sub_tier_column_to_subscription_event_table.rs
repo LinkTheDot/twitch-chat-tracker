@@ -1,5 +1,3 @@
-use crate::m20250210_043325_subscription_event_table::SubscriptionEvent;
-use crate::m20250212_180158_add_sub_tier_column_to_donation_event_table::SUBSCRIPTION_TIER_COLUMN_NAME;
 use sea_orm_migration::prelude::*;
 
 #[derive(DeriveMigrationName)]
@@ -13,7 +11,7 @@ impl MigrationTrait for Migration {
         Table::alter()
           .table(SubscriptionEvent::Table)
           .add_column(
-            ColumnDef::new(Alias::new(SUBSCRIPTION_TIER_COLUMN_NAME))
+            ColumnDef::new(SubscriptionEvent::SubscriptionTier)
               .integer()
               .null(),
           )
@@ -27,9 +25,21 @@ impl MigrationTrait for Migration {
       .alter_table(
         Table::alter()
           .table(SubscriptionEvent::Table)
-          .drop_column(Alias::new(SUBSCRIPTION_TIER_COLUMN_NAME))
+          .drop_column(SubscriptionEvent::SubscriptionTier)
           .to_owned(),
       )
       .await
   }
+}
+
+#[derive(Iden)]
+enum SubscriptionEvent {
+  Table,
+  _Id,
+  _ChannelId,
+  _StreamId,
+  _SubscriberTwitchUserId,
+  _MonthsSubscribed,
+  _Timestamp,
+  SubscriptionTier
 }

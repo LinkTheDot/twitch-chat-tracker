@@ -33,7 +33,7 @@ impl MigrationTrait for Migration {
 }
 
 #[derive(Iden)]
-pub enum Emote {
+enum Emote {
   Table,
   Id,
   TwitchId,

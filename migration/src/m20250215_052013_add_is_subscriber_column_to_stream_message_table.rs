@@ -1,7 +1,4 @@
-use crate::m20250210_030628_stream_message_table::StreamMessage;
 use sea_orm_migration::prelude::*;
-
-pub const IS_SUBSCRIBER_COLUMN_NAME: &str = "is_subscriber";
 
 #[derive(DeriveMigrationName)]
 pub struct Migration;
@@ -14,7 +11,7 @@ impl MigrationTrait for Migration {
         Table::alter()
           .table(StreamMessage::Table)
           .add_column(
-            ColumnDef::new(Alias::new(IS_SUBSCRIBER_COLUMN_NAME))
+            ColumnDef::new(StreamMessage::IsSubscriber)
               .boolean()
               .not_null(),
           )
@@ -28,9 +25,25 @@ impl MigrationTrait for Migration {
       .alter_table(
         Table::alter()
           .table(StreamMessage::Table)
-          .drop_column(Alias::new(IS_SUBSCRIBER_COLUMN_NAME))
+          .drop_column(StreamMessage::IsSubscriber)
           .to_owned(),
       )
       .await
   }
+}
+
+#[derive(Iden)]
+enum StreamMessage {
+  Table,
+  _Id,
+  _TwitchUserId,
+  _ChannelId,
+  _StreamId,
+  #[allow(clippy::enum_variant_names)] // Don't care.
+  _IsFirstMessage,
+  _Timestamp,
+  _EmoteOnly,
+  _Contents,
+  _ThirdPartyEmotesUsed,
+  IsSubscriber,
 }

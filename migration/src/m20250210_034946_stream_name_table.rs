@@ -1,4 +1,3 @@
-use super::m20250210_030348_stream_table::Stream;
 use sea_orm_migration::prelude::*;
 
 #[derive(DeriveMigrationName)]
@@ -42,10 +41,20 @@ impl MigrationTrait for Migration {
 }
 
 #[derive(Iden)]
-pub enum StreamName {
+enum StreamName {
   Table,
   Id,
   StreamId,
   Name,
   Timestamp,
+}
+
+#[derive(Iden)]
+enum Stream {
+  Table,
+  Id,
+  _TwitchUserId,
+  _TwitchStreamId,
+  _StartTimestamp,
+  _EndTimestamp,
 }

@@ -1,7 +1,4 @@
-use crate::m20250210_035251_donation_event_table::DonationEvent;
 use sea_orm_migration::prelude::*;
-
-pub const SUBSCRIPTION_TIER_COLUMN_NAME: &str = "subscription_tier";
 
 #[derive(DeriveMigrationName)]
 pub struct Migration;
@@ -14,7 +11,7 @@ impl MigrationTrait for Migration {
         Table::alter()
           .table(DonationEvent::Table)
           .add_column(
-            ColumnDef::new(Alias::new(SUBSCRIPTION_TIER_COLUMN_NAME))
+            ColumnDef::new(DonationEvent::SubscriptionTier)
               .integer()
               .null(),
           )
@@ -28,9 +25,22 @@ impl MigrationTrait for Migration {
       .alter_table(
         Table::alter()
           .table(DonationEvent::Table)
-          .drop_column(Alias::new(SUBSCRIPTION_TIER_COLUMN_NAME))
+          .drop_column(DonationEvent::SubscriptionTier)
           .to_owned(),
       )
       .await
   }
+}
+
+#[derive(Iden)]
+enum DonationEvent {
+  Table,
+  _Id,
+  _DonatorTwitchUserId,
+  _DonationReceiverTwitchUserId,
+  _StreamId,
+  _EventType,
+  _Amount,
+  _Timestamp,
+  SubscriptionTier,
 }

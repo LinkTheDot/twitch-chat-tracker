@@ -1,5 +1,5 @@
 use crate::{errors::AppError, pastebin::generate_pastebin};
-use app_config::clap::CLAP_ARGS;
+use app_config::clap::Args;
 use database_connection::get_database_connection;
 use entities::stream;
 use sea_orm::*;
@@ -30,7 +30,7 @@ pub async fn upload_reports<S1: AsRef<str>, S2: AsRef<str>>(
     let (report_name, report) = (report_name.as_ref(), report.as_ref());
     let report_date_and_name = format!("[{stream_start_time}]|{report_name}");
 
-    if CLAP_ARGS.generate_file_reports() {
+    if Args::generate_file_reports() {
       let mut file_reports_dir = PathBuf::from(FILE_REPORTS_DIR);
       file_reports_dir.push(report_stream_id.to_string());
 

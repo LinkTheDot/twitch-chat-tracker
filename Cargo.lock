@@ -125,6 +125,7 @@ name = "app_config"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "chrono",
  "clap",
  "lazy_static",
  "schematic",

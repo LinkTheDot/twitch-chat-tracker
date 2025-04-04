@@ -1,4 +1,4 @@
-use app_config::clap::CLAP_ARGS;
+use app_config::clap::ARGS;
 use database_connection::get_database_connection;
 use database_report_generator::upload_reports::upload_reports;
 use entities::extensions::twitch_user::*;
@@ -9,9 +9,9 @@ use sea_orm::*;
 async fn main() {
   database_report_generator::logging::setup_logging_config().unwrap();
 
-  let report_stream_id = if let Some(stream_id) = CLAP_ARGS.report_stream_id() {
+  let report_stream_id = if let Some(stream_id) = ARGS::report_stream_id() {
     stream_id
-  } else if let Some(streamer_name) = CLAP_ARGS.streamer_name_report() {
+  } else if let Some(streamer_name) = ARGS::streamer_name_report() {
     let streamer_twitch_user_model = twitch_user::Model::get_or_set_by_name(streamer_name)
       .await
       .unwrap();

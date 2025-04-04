@@ -56,7 +56,7 @@ pub async fn upload_reports<S1: AsRef<str>, S2: AsRef<str>>(
 
       println!("Report {:?} generated.", report_name);
     } else {
-      match generate_pastebin(report_date_and_name.as_str(), report).await {
+      match generate_pastebin(&report_date_and_name, report).await {
         Ok(pastebin_url) => println!("{}:\n  {}", report_name, pastebin_url),
         Err(error) => {
           tracing::error!(

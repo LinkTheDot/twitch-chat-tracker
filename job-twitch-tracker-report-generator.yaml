@@ -1,0 +1,35 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: twitch-tracker-report-generator
+spec:
+  completions: 1
+  backoffLimit: 4
+  template:
+    metadata:
+      labels:
+        app: twitch-tracker-report-generator
+    spec:
+      containers:
+        - name: twitch-tracker-report-generator
+          image: homelab.local:5000/twitch-tracker-report-generator:latest
+          imagePullPolicy: Always
+          env:
+            - name: TWITCH_ACCESS_TOKEN
+              value: "Not-needed"
+            - name: TWITCH_CLIENT_ID
+              value: "Not-needed"
+            - name: PASTEBIN_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: twitch-chat-logger
+                  key: pastebinApiKey
+            - name: CONFIG_PATH
+              value: "/app/config/deploy_config.yml"
+            - name: DATABASE_HOST_ADDRESS
+              value: "mysql"
+          args:
+            - "-n"
+            - "fallenshadow"
+      restartPolicy: Never
+

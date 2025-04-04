@@ -16,6 +16,7 @@ impl ClapArgs {
   const DONATION_RANKING_REPORT_MONTH: &'static str = "donation_ranking_report_month";
   const STREAM_REPORT_TIME: &'static str = "stream_report_time";
   const CREATE_REPORT_TOTALS: &'static str = "create_report_totals";
+  const STREAMER_NAME_REPORT: &'static str = "streamer_name_report";
 
   pub fn new() -> Self {
     let args = Self::setup_args();
@@ -23,10 +24,10 @@ impl ClapArgs {
     Self { args }
   }
 
-  pub fn report_stream_id(&self) -> i32 {
-    let value = self.args.get_one::<String>(Self::STREAM_REPORT_ID).unwrap();
+  pub fn report_stream_id(&self) -> Option<i32> {
+    let value = self.args.get_one::<String>(Self::STREAM_REPORT_ID)?;
 
-    value.parse::<i32>().unwrap()
+    value.parse::<i32>().ok()
   }
 
   pub fn generate_file_reports(&self) -> bool {
@@ -58,6 +59,10 @@ impl ClapArgs {
       .args
       .get_one::<bool>(Self::CREATE_REPORT_TOTALS)
       .unwrap()
+  }
+
+  pub fn streamer_name_report(&self) -> Option<&String> {
+    self.args.get_one::<String>(Self::STREAMER_NAME_REPORT)
   }
 
   fn setup_args() -> clap::ArgMatches {
@@ -102,6 +107,13 @@ impl ClapArgs {
           .long("total")
           .action(clap::ArgAction::SetTrue)
             .help("Creates additional files that reports on all data in the database."),
+      )
+      .arg(
+        Arg::new(Self::STREAMER_NAME_REPORT)
+          .short('n')
+          .long("streamer_name")
+          .action(clap::ArgAction::Set)
+            .help("Sets the streamer to generate a report for. Chooses their latest stream."),
       )
       .get_matches()
   }

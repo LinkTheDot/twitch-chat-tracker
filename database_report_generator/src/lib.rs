@@ -59,7 +59,10 @@ pub async fn generate_reports(
     Ok(donator_monthly_rankings) => {
       reports.push(("donator_monthly_rankings", donator_monthly_rankings))
     }
-    Err(error) => tracing::error!("Failed to generate monthly donation rankings. Reason: {:?}", error),
+    Err(error) => tracing::error!(
+      "Failed to generate monthly donation rankings. Reason: {:?}",
+      error
+    ),
   }
 
   if CLAP_ARGS.generate_report_totals() {

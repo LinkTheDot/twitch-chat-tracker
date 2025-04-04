@@ -41,5 +41,5 @@ enum SubscriptionEvent {
   _SubscriberTwitchUserId,
   _MonthsSubscribed,
   _Timestamp,
-  SubscriptionTier
+  SubscriptionTier,
 }

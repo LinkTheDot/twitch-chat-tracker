@@ -72,14 +72,23 @@ async fn run_migration(database: &DatabaseConnection) -> anyhow::Result<()> {
 
   Migrator::up(database, None).await?;
 
-  check_if_has_table(&schema_manager, "twitch_user").await?;
-  check_if_has_table(&schema_manager, "stream").await?;
-  check_if_has_table(&schema_manager, "stream_message").await?;
-  check_if_has_table(&schema_manager, "emote").await?;
-  check_if_has_table(&schema_manager, "stream_name").await?;
-  check_if_has_table(&schema_manager, "donation_event").await?;
-  check_if_has_table(&schema_manager, "subscription_event").await?;
-  check_if_has_table(&schema_manager, "user_timeout").await?;
+  let check_tables = [
+    "twitch_user",
+    "stream",
+    "stream_message",
+    "emote",
+    "stream_name",
+    "donation_event",
+    "subscription_event",
+    "user_timeout",
+    "unknown_user",
+    "twitch_user_unknown_user_association",
+    "twitch_user_name_change",
+  ];
+
+  for table in check_tables {
+    check_if_has_table(&schema_manager, table).await?;
+  }
 
   Ok(())
 }

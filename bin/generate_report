@@ -1,3 +1,11 @@
 #!/usr/bin/env zsh
 
-cargo run --release --manifest-path "$PWD/database_report_generator/Cargo.toml" -- $@
+kubectl apply -f "$PWD/job-twitch-tracker-report-generator.yaml"
+
+kubectl wait --for=condition=Ready pod -l job-name="twitch-tracker-report-generator" 
+
+kubectl logs -f job/twitch-tracker-report-generator
+
+echo "\n\n"
+
+kubectl delete job "twitch-tracker-report-generator";

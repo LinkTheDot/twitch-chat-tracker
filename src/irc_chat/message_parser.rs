@@ -589,15 +589,17 @@ mod tests {
       .await
       .unwrap();
 
-    assert_eq!(result.duration, ActiveValue::Set(Some(600)));
-    assert_eq!(result.is_permanent, ActiveValue::Set(0_i8));
-    assert_eq!(
-      result.timestamp,
-      ActiveValue::Set(timestamp_from_string("1740956922774"))
-    );
-    assert_eq!(result.channel_id, ActiveValue::Set(1));
-    assert_eq!(result.stream_id, ActiveValue::Set(None));
-    assert_eq!(result.twitch_user_id, ActiveValue::Set(2));
+    let expected_active_model = user_timeout::ActiveModel {
+      id: ActiveValue::NotSet,
+      duration: ActiveValue::Set(Some(600)),
+      is_permanent: ActiveValue::Set(0_i8),
+      timestamp: ActiveValue::Set(timestamp_from_string("1740956922774")),
+      channel_id: ActiveValue::Set(1),
+      stream_id: ActiveValue::Set(None),
+      twitch_user_id: ActiveValue::Set(2),
+    };
+
+    assert_eq!(result, expected_active_model);
   }
 
   fn get_timeout_template() -> (IrcMessage, DatabaseConnection) {
@@ -648,15 +650,17 @@ mod tests {
       .await
       .unwrap();
 
-    assert_eq!(result.months_subscribed, ActiveValue::Set(12));
-    assert_eq!(
-      result.timestamp,
-      ActiveValue::Set(timestamp_from_string("1740956922774"))
-    );
-    assert_eq!(result.channel_id, ActiveValue::Set(1));
-    assert_eq!(result.stream_id, ActiveValue::Set(None));
-    assert_eq!(result.subscriber_twitch_user_id, ActiveValue::Set(Some(3)));
-    assert_eq!(result.subscription_tier, ActiveValue::Set(Some(1)));
+    let expected_active_model = subscription_event::ActiveModel {
+      id: ActiveValue::NotSet,
+      months_subscribed: ActiveValue::Set(12),
+      timestamp: ActiveValue::Set(timestamp_from_string("1740956922774")),
+      channel_id: ActiveValue::Set(1),
+      stream_id: ActiveValue::Set(None),
+      subscriber_twitch_user_id: ActiveValue::Set(Some(3)),
+      subscription_tier: ActiveValue::Set(Some(1)),
+    };
+
+    assert_eq!(result, expected_active_model);
   }
 
   fn get_subscription_template() -> (IrcMessage, DatabaseConnection) {
@@ -711,17 +715,19 @@ mod tests {
       .await
       .unwrap();
 
-    assert_eq!(result.event_type, ActiveValue::Set(EventType::GiftSubs));
-    assert_eq!(result.amount, ActiveValue::Set(5.0_f32));
-    assert_eq!(
-      result.timestamp,
-      ActiveValue::Set(timestamp_from_string("1740956922774"))
-    );
-    assert_eq!(result.donator_twitch_user_id, ActiveValue::Set(Some(3)));
-    assert_eq!(result.donation_receiver_twitch_user_id, ActiveValue::Set(1));
-    assert_eq!(result.stream_id, ActiveValue::Set(None));
-    assert_eq!(result.subscription_tier, ActiveValue::Set(Some(1)));
-    assert_eq!(result.unknown_user_id, ActiveValue::NotSet);
+    let expected_active_model = donation_event::ActiveModel {
+      id: ActiveValue::NotSet,
+      event_type: ActiveValue::Set(EventType::GiftSubs),
+      amount: ActiveValue::Set(5.0_f32),
+      timestamp: ActiveValue::Set(timestamp_from_string("1740956922774")),
+      donator_twitch_user_id: ActiveValue::Set(Some(3)),
+      donation_receiver_twitch_user_id: ActiveValue::Set(1),
+      stream_id: ActiveValue::Set(None),
+      subscription_tier: ActiveValue::Set(Some(1)),
+      unknown_user_id: ActiveValue::NotSet,
+    };
+
+    assert_eq!(result, expected_active_model);
   }
 
   fn get_gift_subs_template() -> (IrcMessage, DatabaseConnection) {
@@ -776,17 +782,19 @@ mod tests {
       .await
       .unwrap();
 
-    assert_eq!(result.event_type, ActiveValue::Set(EventType::Bits));
-    assert_eq!(result.amount, ActiveValue::Set(100000.0_f32));
-    assert_eq!(
-      result.timestamp,
-      ActiveValue::Set(timestamp_from_string("1740956922774"))
-    );
-    assert_eq!(result.donator_twitch_user_id, ActiveValue::Set(Some(3)));
-    assert_eq!(result.donation_receiver_twitch_user_id, ActiveValue::Set(1));
-    assert_eq!(result.stream_id, ActiveValue::Set(None));
-    assert_eq!(result.subscription_tier, ActiveValue::NotSet);
-    assert_eq!(result.unknown_user_id, ActiveValue::NotSet);
+    let expected_active_model = donation_event::ActiveModel {
+      id: ActiveValue::NotSet,
+      event_type: ActiveValue::Set(EventType::Bits),
+      amount: ActiveValue::Set(100000.0_f32),
+      timestamp: ActiveValue::Set(timestamp_from_string("1740956922774")),
+      donator_twitch_user_id: ActiveValue::Set(Some(3)),
+      donation_receiver_twitch_user_id: ActiveValue::Set(1),
+      stream_id: ActiveValue::Set(None),
+      subscription_tier: ActiveValue::NotSet,
+      unknown_user_id: ActiveValue::NotSet,
+    };
+
+    assert_eq!(result, expected_active_model);
   }
 
   fn get_bits_template() -> (IrcMessage, DatabaseConnection) {
@@ -843,14 +851,16 @@ mod tests {
       .await
       .unwrap();
 
-    assert_eq!(
-      result.timestamp,
-      ActiveValue::Set(timestamp_from_string("1740956922774"))
-    );
-    assert_eq!(result.size, ActiveValue::Set(69420));
-    assert_eq!(result.stream_id, ActiveValue::Set(None));
-    assert_eq!(result.twitch_user_id, ActiveValue::Set(1));
-    assert_eq!(result.raider_twitch_user_id, ActiveValue::Set(Some(3)));
+    let expected_active_model = raid::ActiveModel {
+      id: ActiveValue::NotSet,
+      timestamp: ActiveValue::Set(timestamp_from_string("1740956922774")),
+      size: ActiveValue::Set(69420),
+      stream_id: ActiveValue::Set(None),
+      twitch_user_id: ActiveValue::Set(1),
+      raider_twitch_user_id: ActiveValue::Set(Some(3)),
+    };
+
+    assert_eq!(result, expected_active_model);
   }
 
   fn get_raid_template() -> (IrcMessage, DatabaseConnection) {
@@ -905,20 +915,19 @@ mod tests {
       .await
       .unwrap();
 
-    assert_eq!(
-      result.event_type,
-      ActiveValue::Set(EventType::StreamlabsDonation)
-    );
-    assert_eq!(result.amount, ActiveValue::Set(5000.0_f32));
-    assert_eq!(
-      result.timestamp,
-      ActiveValue::Set(timestamp_from_string("1740956922774"))
-    );
-    assert_eq!(result.donator_twitch_user_id, ActiveValue::Set(Some(3)));
-    assert_eq!(result.donation_receiver_twitch_user_id, ActiveValue::Set(1));
-    assert_eq!(result.stream_id, ActiveValue::Set(None));
-    assert_eq!(result.subscription_tier, ActiveValue::NotSet);
-    assert_eq!(result.unknown_user_id, ActiveValue::Set(None));
+    let expected_active_model = donation_event::ActiveModel {
+      id: ActiveValue::NotSet,
+      event_type: ActiveValue::Set(EventType::StreamlabsDonation),
+      amount: ActiveValue::Set(5000.0_f32),
+      timestamp: ActiveValue::Set(timestamp_from_string("1740956922774")),
+      donator_twitch_user_id: ActiveValue::Set(Some(3)),
+      donation_receiver_twitch_user_id: ActiveValue::Set(1),
+      stream_id: ActiveValue::Set(None),
+      subscription_tier: ActiveValue::NotSet,
+      unknown_user_id: ActiveValue::Set(None),
+    };
+
+    assert_eq!(result, expected_active_model);
   }
 
   fn get_streamlabs_donation_template() -> (IrcMessage, DatabaseConnection) {
@@ -976,28 +985,25 @@ mod tests {
       .await
       .unwrap();
 
-    assert_eq!(result.is_first_message, ActiveValue::Set(0_i8));
-    assert_eq!(
-      result.timestamp,
-      ActiveValue::Set(timestamp_from_string("1740956922774"))
-    );
-    assert_eq!(result.emote_only, ActiveValue::Set(0_i8));
-    assert_eq!(
-      result.contents,
-      ActiveValue::Set("Cat <3 syadouStanding".to_string())
-    );
-    assert_eq!(result.twitch_user_id, ActiveValue::Set(3));
-    assert_eq!(result.channel_id, ActiveValue::Set(1));
-    assert_eq!(result.stream_id, ActiveValue::Set(None));
-    assert_eq!(
-      result.third_party_emotes_used,
-      ActiveValue::Set(Some("{\"Cat\":1}".to_string()))
-    );
-    assert_eq!(result.is_subscriber, ActiveValue::Set(1_i8));
-    assert!(
-      result.twitch_emote_usage == ActiveValue::Set(Some("{\"1\":1,\"2\":1}".to_string()))
-        || result.twitch_emote_usage == ActiveValue::Set(Some("{\"2\":1,\"1\":1}".to_string()))
-    );
+    let expected_active_model_v1 = stream_message::ActiveModel {
+      id: ActiveValue::NotSet,
+      is_first_message: ActiveValue::Set(0_i8),
+      timestamp: ActiveValue::Set(timestamp_from_string("1740956922774")),
+      emote_only: ActiveValue::Set(0_i8),
+      contents: ActiveValue::Set("Cat <3 syadouStanding".to_string()),
+      twitch_user_id: ActiveValue::Set(3),
+      channel_id: ActiveValue::Set(1),
+      stream_id: ActiveValue::Set(None),
+      third_party_emotes_used: ActiveValue::Set(Some("{\"Cat\":1}".to_string())),
+      is_subscriber: ActiveValue::Set(1_i8),
+      twitch_emote_usage: ActiveValue::Set(Some("{\"1\":1,\"2\":1}".to_string())),
+    };
+    let expected_active_model_v2 = stream_message::ActiveModel {
+      twitch_emote_usage: ActiveValue::Set(Some("{\"2\":1,\"1\":1}".to_string())),
+      ..expected_active_model_v1.clone()
+    };
+
+    assert!(result == expected_active_model_v1 || result == expected_active_model_v2);
   }
 
   fn get_user_message_template() -> (IrcMessage, DatabaseConnection) {
@@ -1052,6 +1058,69 @@ mod tests {
           id: 2,
           twitch_id: "emotesv2_18a345125f024ec7a4fe0b51e6638e12".into(),
           name: "syadouStanding".into(),
+        }],
+      ])
+      .into_connection();
+
+    (message, mock_database)
+  }
+
+  #[tokio::test]
+  async fn subscribe_continuation_off_gift_subs_works() {
+    let (sub_message, subscription_mock_database) = get_subscription_continuation_template();
+    let third_party_emote_storage = EmoteListStorage::new().await.unwrap();
+    let message_parser = MessageParser::new(&sub_message, &third_party_emote_storage)
+      .unwrap()
+      .unwrap();
+
+    let result = message_parser
+      .parse_subscription(&subscription_mock_database)
+      .await
+      .unwrap();
+
+    let expected_active_model = subscription_event::ActiveModel {
+      id: ActiveValue::NotSet,
+      months_subscribed: ActiveValue::Set(2),
+      timestamp: ActiveValue::Set(timestamp_from_string("1740956922774")),
+      channel_id: ActiveValue::Set(1),
+      stream_id: ActiveValue::Set(None),
+      subscriber_twitch_user_id: ActiveValue::Set(Some(3)),
+      subscription_tier: ActiveValue::Set(Some(1)),
+    };
+
+    assert_eq!(result, expected_active_model);
+  }
+
+  fn get_subscription_continuation_template() -> (IrcMessage, DatabaseConnection) {
+    let tags = vec![
+      IrcTag("room-id".into(), Some("578762718".into())),
+      IrcTag("display-name".into(), Some("LinkTheDot".into())),
+      IrcTag("tmi-sent-ts".into(), Some("1740956922774".into())),
+      IrcTag("msg-id".into(), Some("giftpaidupgrade".into())),
+      IrcTag("login".into(), Some("linkthedot".into())),
+      IrcTag("user-id".into(), Some("128831052".into())),
+    ];
+
+    let message = IrcMessage {
+      tags: Some(tags),
+      prefix: Some(Prefix::ServerName("tmi.twitch.tv".into())),
+      command: Command::Raw("USERNOTICE".into(), vec!["#fallenshadow".into()]),
+    };
+
+    let mock_database = MockDatabase::new(DatabaseBackend::MySql)
+      .append_query_results([
+        vec![twitch_user::Model {
+          id: 1,
+          twitch_id: 578762718,
+          login_name: "fallenshadow".into(),
+          display_name: "fallenshadow".into(),
+        }],
+        vec![],
+        vec![twitch_user::Model {
+          id: 3,
+          twitch_id: 128831052,
+          login_name: "linkthedot".into(),
+          display_name: "LinkTheDot".into(),
         }],
       ])
       .into_connection();

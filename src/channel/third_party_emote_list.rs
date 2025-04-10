@@ -1,5 +1,4 @@
 use crate::errors::AppError;
-use crate::REQWEST_CLIENT;
 use entities::twitch_user;
 use serde_json::Value;
 use std::collections::HashSet;
@@ -56,8 +55,9 @@ impl EmoteList {
     let mut _7tv_query_url = Url::parse(_7TV_API_URL)?;
     _7tv_query_url = _7tv_query_url.join("emote-sets/global")?;
     // let _7tv = Self::_7tv_emote_list(client, _7tv_query_url).await?;
+    let reqwest_client = reqwest::Client::new();
 
-    let response = REQWEST_CLIENT.get(_7tv_query_url).send().await?;
+    let response = reqwest_client.get(_7tv_query_url).send().await?;
     let response_body = response.text().await?;
 
     if response_body.contains("error code: ") {
@@ -112,7 +112,8 @@ impl EmoteList {
 
   async fn _7tv_emote_list(query_url: Url) -> Result<HashSet<String>, AppError> {
     tracing::info!("querying emote set for url: {:?}", query_url);
-    let response = REQWEST_CLIENT.get(query_url).send().await?;
+    let reqwest_client = reqwest::Client::new();
+    let response = reqwest_client.get(query_url).send().await?;
     let response_body = response.text().await?;
 
     if response_body.contains("error code: ") {

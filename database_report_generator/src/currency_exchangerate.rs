@@ -1,10 +1,14 @@
-use crate::{errors::AppError, REQWEST_CLIENT};
+use crate::errors::AppError;
 use app_config::{secret_string::Secret, APP_CONFIG};
 use serde_json::Value;
 
 const EXCHANGERATE_URL: &str = "https://v6.exchangerate-api.com/v6/{API_KEY}/latest/{FROM}";
 
-pub async fn convert_currency<S1, S2>(from: S1, to: S2) -> Result<f64, AppError>
+pub async fn convert_currency<S1, S2>(
+  reqwest_client: reqwest::Client,
+  from: S1,
+  to: S2,
+) -> Result<f64, AppError>
 where
   S1: AsRef<str>,
   S2: AsRef<str>,
@@ -20,7 +24,7 @@ where
       Secret::read_secret_string(api_key.read_value()),
     )
     .replace("{FROM}", from);
-  let request_response = REQWEST_CLIENT.get(request_url).send().await?;
+  let request_response = reqwest_client.get(request_url).send().await?;
 
   if !request_response.status().is_success() {
     return Err(AppError::FailedToRetrieveCurrenyExchangeRates(

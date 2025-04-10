@@ -18,10 +18,6 @@ pub mod upload_reports;
 /// Message containing this percentage of emotes per word is emote dominant.
 pub const EMOTE_DOMINANCE: f32 = 0.7;
 
-lazy_static::lazy_static! {
-  pub static ref REQWEST_CLIENT: reqwest::Client = reqwest::Client::new();
-}
-
 /// Generates reports for the given stream ID.
 /// Returns a list of the name and report string.
 pub async fn generate_reports(

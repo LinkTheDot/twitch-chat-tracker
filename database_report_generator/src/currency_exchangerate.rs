@@ -1,5 +1,5 @@
 use crate::errors::AppError;
-use app_config::{secret_string::Secret, APP_CONFIG};
+use app_config::{secret_string::Secret, AppConfig};
 use serde_json::Value;
 
 const EXCHANGERATE_URL: &str = "https://v6.exchangerate-api.com/v6/{API_KEY}/latest/{FROM}";
@@ -15,7 +15,7 @@ where
 {
   let (from, to) = (from.as_ref(), to.as_ref());
 
-  let Some(api_key) = APP_CONFIG.exchange_rate_api_key() else {
+  let Some(api_key) = AppConfig::exchange_rate_api_key() else {
     return Err(AppError::MissingEchangeRateApiKey);
   };
   let request_url = EXCHANGERATE_URL

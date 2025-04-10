@@ -1,8 +1,8 @@
-use app_config::APP_CONFIG;
+use app_config::AppConfig;
 use tracing_subscriber::EnvFilter;
 
 pub fn setup_logging_config() -> Result<(), Box<dyn std::error::Error>> {
-  let Some(log_level) = APP_CONFIG.log_level() else {
+  let Some(log_level) = AppConfig::log_level() else {
     println!("Logging is disabled.");
 
     return Ok(());

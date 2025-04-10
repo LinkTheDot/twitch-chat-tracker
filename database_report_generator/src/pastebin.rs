@@ -1,6 +1,6 @@
 use crate::errors::AppError;
 use app_config::secret_string::Secret;
-use app_config::APP_CONFIG;
+use app_config::AppConfig;
 use std::collections::HashMap;
 
 /// Takes the name and data for a report and uploads it to pastebin.
@@ -9,7 +9,7 @@ pub async fn generate_pastebin<S1: AsRef<str>, S2: AsRef<str>>(
   name: S1,
   data: S2,
 ) -> Result<String, AppError> {
-  let Some(api_key) = APP_CONFIG.pastebin_api_key() else {
+  let Some(api_key) = AppConfig::pastebin_api_key() else {
     return Err(AppError::MissingPastebinApiKey);
   };
   let reqwest_client = reqwest::Client::new();

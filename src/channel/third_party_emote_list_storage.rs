@@ -1,6 +1,6 @@
 use crate::channel::third_party_emote_list::EmoteList;
 use crate::errors::AppError;
-use app_config::APP_CONFIG;
+use app_config::AppConfig;
 use database_connection::get_database_connection;
 use entities::twitch_user;
 use entity_extensions::prelude::*;
@@ -35,7 +35,7 @@ impl EmoteListStorage {
       }
     }
 
-    for channel_login_name in APP_CONFIG.channels() {
+    for channel_login_name in AppConfig::channels() {
       let channel =
         twitch_user::Model::get_or_set_by_name(channel_login_name, database_connection).await?;
 

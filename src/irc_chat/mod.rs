@@ -2,7 +2,7 @@ use crate::channel::third_party_emote_list_storage::EmoteListStorage;
 use crate::errors::AppError;
 use crate::irc_chat::message_parser::MessageParser;
 use app_config::secret_string::Secret;
-use app_config::APP_CONFIG;
+use app_config::AppConfig;
 use irc::client::prelude::*;
 use irc::client::ClientStream;
 use irc::proto::CapSubCommand;
@@ -68,12 +68,12 @@ impl TwitchIrc {
   }
 
   fn get_config() -> Result<Config, AppError> {
-    let password = APP_CONFIG.access_token().read_value();
+    let password = AppConfig::access_token().read_value();
     let password = Some("oauth:".to_string() + Secret::read_secret_string(password));
 
     Ok(Config {
       server: Some("irc.chat.twitch.tv".to_string()),
-      nickname: Some(APP_CONFIG.twitch_nickname().to_owned()),
+      nickname: Some(AppConfig::twitch_nickname().to_owned()),
       port: Some(6697),
       password,
       use_tls: Some(true),
@@ -83,8 +83,7 @@ impl TwitchIrc {
   }
 
   fn get_channels() -> Vec<String> {
-    APP_CONFIG
-      .channels()
+    AppConfig::channels()
       .iter()
       .map(|channel_name| {
         if !channel_name.starts_with("#") {

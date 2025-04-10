@@ -36,7 +36,8 @@ impl EmoteListStorage {
     }
 
     for channel_login_name in APP_CONFIG.channels() {
-      let channel = twitch_user::Model::get_or_set_by_name(channel_login_name, database_connection).await?;
+      let channel =
+        twitch_user::Model::get_or_set_by_name(channel_login_name, database_connection).await?;
 
       let channel_emote_list = match EmoteList::get_list(&channel).await {
         Ok(emote_list) => emote_list,

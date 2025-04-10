@@ -6,7 +6,10 @@ use std::collections::HashMap;
 
 /// Takes the name and data for a report and uploads it to pastebin.
 /// Returns the URL of the pastebin created.
-pub async fn generate_pastebin<S1: AsRef<str>, S2: AsRef<str>>(name: S1, data: S2) -> Result<String, AppError> {
+pub async fn generate_pastebin<S1: AsRef<str>, S2: AsRef<str>>(
+  name: S1,
+  data: S2,
+) -> Result<String, AppError> {
   let Some(api_key) = APP_CONFIG.pastebin_api_key() else {
     return Err(AppError::MissingPastebinApiKey);
   };

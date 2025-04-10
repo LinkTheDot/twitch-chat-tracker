@@ -14,7 +14,6 @@ use tokio_stream::StreamExt;
 pub mod message_parser;
 pub mod mirrored_twitch_objects;
 pub mod sub_tier;
-pub mod tags;
 
 pub const EMOTE_MESSAGE_THRESHOLD: f32 = 0.75;
 

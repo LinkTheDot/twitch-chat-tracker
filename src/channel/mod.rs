@@ -7,7 +7,6 @@ use entity_extensions::{prelude::*, twitch_user::ChannelIdentifier};
 use sea_orm::*;
 use std::collections::HashMap;
 
-pub mod live_status;
 pub mod third_party_emote_list;
 pub mod third_party_emote_list_storage;
 
@@ -56,7 +55,9 @@ impl TrackedChannels {
       {
         tracing::info!("{:?} has stopped streaming", channel_name);
 
-        if let Some(latest_stream) = stream::Model::get_active_stream_for_user(channel, database_connection).await? {
+        if let Some(latest_stream) =
+          stream::Model::get_active_stream_for_user(channel, database_connection).await?
+        {
           if latest_stream.is_live() {
             tracing::info!(
               "Setting end_timestamp for latest stream from {:?}",
@@ -96,7 +97,8 @@ impl TrackedChannels {
         };
 
         let known_existing_stream =
-          stream::Model::get_stream_from_stream_twitch_id(stream_twitch_id, database_connection).await?;
+          stream::Model::get_stream_from_stream_twitch_id(stream_twitch_id, database_connection)
+            .await?;
 
         if let Some(stream_model) = known_existing_stream {
           self

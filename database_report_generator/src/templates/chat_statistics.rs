@@ -3,8 +3,8 @@
 use crate::chat_statistics::ChatStatistics;
 use crate::errors::AppError;
 use database_connection::get_database_connection;
-use entities::extensions::prelude::*;
 use entities::*;
+use entity_extensions::prelude::*;
 use human_time::ToHumanTimeString;
 use sea_orm::*;
 use std::collections::HashMap;
@@ -109,7 +109,8 @@ async fn get_top_n_emotes(
     .filter(stream_message::Column::StreamId.eq(Some(stream_id)))
     .all(database_connection)
     .await?;
-  let twitch_emotes_used = stream::Model::get_all_twitch_emotes_used_from_id(stream_id).await?;
+  let twitch_emotes_used =
+    stream::Model::get_all_twitch_emotes_used_from_id(stream_id, database_connection).await?;
 
   let mut emote_uses: HashMap<String, usize> = HashMap::new();
 

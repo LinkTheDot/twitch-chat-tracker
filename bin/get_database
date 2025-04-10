@@ -1,0 +1,35 @@
+#!/usr/bin/env zsh
+
+# Retrieves the database from the mysql instance running on Kubernetes.
+
+DATABASE_DUMP_NAME=$1
+LOCAL_PORT="3307"
+REMOTE_PORT="3306"
+HOST="127.0.0.1"
+CHECK_TIMEOUT=1
+SLEEP_INTERVAL=2
+DATABASE_NAME="twitch_tracker_db"
+
+if [[ -z $DATABASE_DUMP_NAME ]]; then
+  DATABASE_DUMP_NAME="database_dump.sql"
+fi
+
+echo "Forwarding ${HOST}:${LOCAL_PORT} to mysql:${REMOTE_PORT}."
+
+kubectl port-forward svc/mysql ${LOCAL_PORT}:${REMOTE_PORT} -n default &
+
+PORT_FORWARD_PID=$!
+
+echo "Waiting for connection on ${HOST}:${LOCAL_PORT}..."
+
+while ! nc -z -w "${CHECK_TIMEOUT}" "${HOST}" "${LOCAL_PORT}" 2>/dev/null; do
+  echo -n "." 
+
+  sleep "${SLEEP_INTERVAL}"
+done
+
+echo "Dumping the database to ${DATABASE_DUMP_NAME}"
+
+mysqldump -h ${HOST} -P ${LOCAL_PORT} -uroot -ppassword ${DATABASE_NAME} > ${DATABASE_DUMP_NAME}
+
+kill -SIGINT ${PORT_FORWARD_PID}

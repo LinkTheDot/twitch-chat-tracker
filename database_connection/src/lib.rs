@@ -9,21 +9,13 @@ use tokio::sync::OnceCell;
 static DATABASE_CONNECTION: OnceCell<DatabaseConnection> = OnceCell::const_new();
 
 pub async fn get_database_connection() -> &'static DatabaseConnection {
-  // Cannot get_or_init because create_database_connection is asynchronous.
-  if let Some(database_connection) = DATABASE_CONNECTION.get() {
-    database_connection
-  } else {
-    create_database_connection().await;
-
-    DATABASE_CONNECTION.get().unwrap()
-  }
+  DATABASE_CONNECTION
+    .get_or_init(create_database_connection)
+    .await
 }
 
-/// Panics if [`OnceCell::set`](tokio::sync::OnceCell::set) fails.
-async fn create_database_connection() {
-  let database_connection = get_connection().await.unwrap();
-
-  DATABASE_CONNECTION.set(database_connection).unwrap();
+async fn create_database_connection() -> DatabaseConnection {
+  get_connection().await.unwrap()
 }
 
 async fn get_connection() -> anyhow::Result<sea_orm::DatabaseConnection> {

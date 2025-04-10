@@ -81,6 +81,10 @@ async fn update_channel_status(mut connected_channels: TrackedChannels) {
 
 #[allow(dead_code)]
 async fn running_animation() {
+  if APP_CONFIG.logging_dir().is_none() {
+    return;
+  }
+
   fn move_cursor_left() {
     print!("\x1B[1D")
   }

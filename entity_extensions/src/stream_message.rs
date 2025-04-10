@@ -1,4 +1,4 @@
-use crate::stream_message;
+use entities::stream_message;
 use std::collections::HashMap;
 
 pub trait StreamMessageExtensions {

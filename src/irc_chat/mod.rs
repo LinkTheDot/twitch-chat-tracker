@@ -6,11 +6,13 @@ use app_config::APP_CONFIG;
 use irc::client::prelude::*;
 use irc::client::ClientStream;
 use irc::proto::CapSubCommand;
+use irc::proto::Message as IrcMessage;
 use std::time::Duration;
 use tokio::time::timeout;
 use tokio_stream::StreamExt;
 
 pub mod message_parser;
+pub mod mirrored_twitch_objects;
 pub mod sub_tier;
 pub mod tags;
 
@@ -109,7 +111,7 @@ impl TwitchIrc {
       .ok_or(AppError::FailedToGetIrcClient)
   }
 
-  pub async fn raw_next(&mut self) -> Result<Option<irc::proto::Message>, AppError> {
+  pub async fn raw_next(&mut self) -> Result<Option<IrcMessage>, AppError> {
     let Ok(Some(message_result)) = timeout(
       Duration::from_secs(10),
       self.get_mut_client_stream()?.next(),
@@ -155,8 +157,6 @@ impl TwitchIrc {
       _ => (),
     }
 
-    tracing::debug!("Got a message: {:?}", message);
-
     let Some(message_parser) = MessageParser::new(&message, &self.third_party_emote_lists)? else {
       return Ok(());
     };
@@ -182,8 +182,9 @@ mod tests {
   /// Used to manually configure IRC messages from Twitch to
   /// check if the parser is working as intended.
   #[tokio::test]
+  #[ignore]
   async fn manual_message_testing() {
-    let message = Message {
+    let message = IrcMessage {
       tags: Some(vec![
         Tag("display-name".into(), Some("Day_Mi_In".into())),
         Tag("first-msg".into(), Some("0".into())),

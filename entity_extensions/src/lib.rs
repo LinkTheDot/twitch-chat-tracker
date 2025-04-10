@@ -1,4 +1,5 @@
 #![allow(async_fn_in_trait)]
+#![allow(clippy::needless_return)]
 
 use lazy_static::lazy_static;
 

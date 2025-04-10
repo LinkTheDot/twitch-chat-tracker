@@ -2,9 +2,8 @@ use crate::errors::AppError;
 use app_config::APP_CONFIG;
 use chrono::Utc;
 use database_connection::get_database_connection;
-use entities::extensions::prelude::*;
-use entities::extensions::twitch_user::*;
 use entities::{prelude::*, stream, twitch_user};
+use entity_extensions::{prelude::*, twitch_user::ChannelIdentifier};
 use sea_orm::*;
 use std::collections::HashMap;
 
@@ -57,8 +56,7 @@ impl TrackedChannels {
       {
         tracing::info!("{:?} has stopped streaming", channel_name);
 
-        if let Some(latest_stream) = stream::Model::get_most_recent_stream_for_user(channel).await?
-        {
+        if let Some(latest_stream) = stream::Model::get_active_stream_for_user(channel, database_connection).await? {
           if latest_stream.is_live() {
             tracing::info!(
               "Setting end_timestamp for latest stream from {:?}",
@@ -98,7 +96,7 @@ impl TrackedChannels {
         };
 
         let known_existing_stream =
-          stream::Model::get_stream_from_stream_twitch_id(stream_twitch_id).await?;
+          stream::Model::get_stream_from_stream_twitch_id(stream_twitch_id, database_connection).await?;
 
         if let Some(stream_model) = known_existing_stream {
           self

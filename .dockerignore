@@ -9,3 +9,5 @@ docs/
 bin/
 README.md
 tokens
+bin/build_and_push_*
+bin/update

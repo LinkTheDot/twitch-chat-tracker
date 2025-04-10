@@ -1,11 +1,11 @@
-use crate::extensions::prelude::*;
-use crate::extensions::REQWEST_CLIENT;
-use crate::twitch_user_name_change;
-use crate::{twitch_user, twitch_user_unknown_user_association, unknown_user};
+use crate::REQWEST_CLIENT;
+use crate::prelude::*;
 use anyhow::anyhow;
-use app_config::secret_string::Secret;
 use app_config::APP_CONFIG;
-use database_connection::get_database_connection;
+use app_config::secret_string::Secret;
+use entities::{
+  twitch_user, twitch_user_name_change, twitch_user_unknown_user_association, unknown_user,
+};
 use sea_orm::*;
 use serde_json::Value;
 use strsim::jaro_winkler;
@@ -30,8 +30,14 @@ impl<'a> From<ChannelIdentifier<&'a str>> for &'a str {
 }
 
 pub trait TwitchUserExtensions {
-  async fn get_or_set_by_name(login_name: &str) -> anyhow::Result<twitch_user::Model>;
-  async fn get_or_set_by_twitch_id(twitch_id: &str) -> anyhow::Result<twitch_user::Model>;
+  async fn get_or_set_by_name(
+    login_name: &str,
+    database_connection: &DatabaseConnection,
+  ) -> anyhow::Result<twitch_user::Model>;
+  async fn get_or_set_by_twitch_id(
+    twitch_id: &str,
+    database_connection: &DatabaseConnection,
+  ) -> anyhow::Result<twitch_user::Model>;
   async fn query_helix_for_channels_from_list<S: AsRef<str>>(
     channels: &[ChannelIdentifier<S>],
   ) -> anyhow::Result<Vec<twitch_user::ActiveModel>>;
@@ -39,7 +45,10 @@ pub trait TwitchUserExtensions {
   /// Takes a login name that might be within the database, and guesses the user using a levenshtein distance.
   ///
   /// Use this if [`get_or_set_by_name`](TwitchUserExtensions::get_or_set_by_name) fails on a name you expect to exist.
-  async fn guess_login_name(guess_name: &str) -> anyhow::Result<Option<twitch_user::Model>>;
+  async fn guess_name(
+    guess_name: &str,
+    database_connection: &DatabaseConnection,
+  ) -> anyhow::Result<Option<twitch_user::Model>>;
 }
 
 impl TwitchUserExtensions for twitch_user::Model {
@@ -47,11 +56,15 @@ impl TwitchUserExtensions for twitch_user::Model {
   /// Otherwise creates the user entry for the database and returns the resulting model.                 
   ///
   /// Also updates the user's name if it was changed since last check.
-  async fn get_or_set_by_name(login_name: &str) -> anyhow::Result<twitch_user::Model> {
-    let database_connection = get_database_connection().await;
-
+  async fn get_or_set_by_name(
+    user_name: &str,
+    database_connection: &DatabaseConnection,
+  ) -> anyhow::Result<twitch_user::Model> {
+    let user_condition = Condition::any()
+      .add(twitch_user::Column::LoginName.eq(user_name))
+      .add(twitch_user::Column::DisplayName.eq(user_name));
     let user_model = twitch_user::Entity::find()
-      .filter(twitch_user::Column::LoginName.eq(login_name))
+      .filter(user_condition)
       .one(database_connection)
       .await?;
 
@@ -60,18 +73,18 @@ impl TwitchUserExtensions for twitch_user::Model {
     }
 
     let helix_channel =
-      Self::query_helix_for_channels_from_list(&[ChannelIdentifier::Login(login_name)]).await?;
+      Self::query_helix_for_channels_from_list(&[ChannelIdentifier::Login(user_name)]).await?;
     let Some(helix_channel) = helix_channel.first().cloned() else {
       return Err(anyhow!(
         "Failed to query helix data for the user {:?}",
-        login_name
+        user_name
       ));
     };
 
     let ActiveValue::Set(twitch_id) = helix_channel.twitch_id else {
       return Err(anyhow!(
         "Failed to get twitch_id from a queried user {}.",
-        login_name
+        user_name
       ));
     };
     let maybe_model = twitch_user::Entity::find()
@@ -80,7 +93,8 @@ impl TwitchUserExtensions for twitch_user::Model {
       .await?;
 
     if let Some(existing_model) = maybe_model {
-      let user_model = check_for_name_change(existing_model, helix_channel).await?;
+      let user_model =
+        check_for_name_change(existing_model, helix_channel, database_connection).await?;
 
       return Ok(user_model);
     } else {
@@ -94,16 +108,21 @@ impl TwitchUserExtensions for twitch_user::Model {
   }
 
   /// Retrieves the user model from the database if it exists.
-  /// Otherwise creates the user entry for the database and returns the resulting model.                 
+  /// Otherwise creates the user entry for the database and returns the resulting model.
   ///
   /// Also updates the user's name if it was changed since last check.
-  async fn get_or_set_by_twitch_id(twitch_id: &str) -> anyhow::Result<twitch_user::Model> {
-    let database_connection = get_database_connection().await;
-
+  async fn get_or_set_by_twitch_id(
+    twitch_id: &str,
+    database_connection: &DatabaseConnection,
+  ) -> anyhow::Result<twitch_user::Model> {
     let user_model = twitch_user::Entity::find()
       .filter(twitch_user::Column::TwitchId.eq(twitch_id))
       .one(database_connection)
       .await?;
+
+    if cfg!(test) || cfg!(feature = "__test_hook") {
+      return Ok(user_model.unwrap());
+    }
 
     let helix_channel =
       Self::query_helix_for_channels_from_list(&[ChannelIdentifier::TwitchID(twitch_id)]).await?;
@@ -115,7 +134,8 @@ impl TwitchUserExtensions for twitch_user::Model {
     };
 
     if let Some(user_model) = user_model {
-      let user_model = check_for_name_change(user_model, helix_channel).await?;
+      let user_model =
+        check_for_name_change(user_model, helix_channel, database_connection).await?;
 
       return Ok(user_model);
     }
@@ -129,7 +149,7 @@ impl TwitchUserExtensions for twitch_user::Model {
   async fn query_helix_for_channels_from_list<S: AsRef<str>>(
     channels: &[ChannelIdentifier<S>],
   ) -> anyhow::Result<Vec<twitch_user::ActiveModel>> {
-    if channels.is_empty() {
+    if channels.is_empty() || cfg!(feature = "__test_hook") || cfg!(test) {
       return Ok(vec![]);
     }
 
@@ -170,12 +190,16 @@ impl TwitchUserExtensions for twitch_user::Model {
     let Value::Object(response_value) = serde_json::from_str::<Value>(&response_body)? else {
       tracing::error!("Unkown response: {:?}", response_body);
 
-      return Err(anyhow!("Received an unknown response body structure when querying. Body location: query channel list response body."));
+      return Err(anyhow!(
+        "Received an unknown response body structure when querying. Body location: query channel list response body."
+      ));
     };
     let Some(Value::Array(channel_list)) = response_value.get("data") else {
       tracing::error!("Unkown response: {:?}", response_body);
 
-      return Err(anyhow!("Received an unknown response body structure when querying. Body location: query channel list internal list."));
+      return Err(anyhow!(
+        "Received an unknown response body structure when querying. Body location: query channel list internal list."
+      ));
     };
 
     let mut user_list = vec![];
@@ -218,15 +242,19 @@ impl TwitchUserExtensions for twitch_user::Model {
     Ok(user_list)
   }
 
-  /// Takes a guessed name and compares it against all login names in the database.
+  /// Takes a guessed name and compares it against all login and display names in the database.
   ///
   /// If the name matches close enough to one in the database, the model for it is returned.
   /// Otherwise None is returned.
-  async fn guess_login_name(guess_name: &str) -> anyhow::Result<Option<twitch_user::Model>> {
-    let database_connection = get_database_connection().await;
-
-    let unknown_user = unknown_user::Model::get_or_set_by_name(guess_name).await?;
-    let maybe_association = unknown_user.get_associated_twich_user().await?;
+  async fn guess_name(
+    guess_name: &str,
+    database_connection: &DatabaseConnection,
+  ) -> anyhow::Result<Option<twitch_user::Model>> {
+    let unknown_user =
+      unknown_user::Model::get_or_set_by_name(guess_name, database_connection).await?;
+    let maybe_association = unknown_user
+      .get_associated_twich_user(database_connection)
+      .await?;
 
     if let Some(associated_user) = maybe_association {
       return Ok(Some(associated_user));
@@ -234,14 +262,16 @@ impl TwitchUserExtensions for twitch_user::Model {
 
     let all_users = twitch_user::Entity::find().all(database_connection).await?;
 
-    let maybe_user_match = all_users
-      .into_iter()
-      .find(|user| jaro_winkler(&user.login_name, guess_name) >= JARO_NAME_SIMILARITY_THRESHOLD);
+    let maybe_user_match = all_users.into_iter().find(|user| {
+      jaro_winkler(&user.login_name, guess_name) >= JARO_NAME_SIMILARITY_THRESHOLD
+        || jaro_winkler(&user.display_name, guess_name) >= JARO_NAME_SIMILARITY_THRESHOLD
+    });
 
     if let Some(matched_user) = &maybe_user_match {
       let _ = twitch_user_unknown_user_association::Model::get_or_set_connection(
         &unknown_user,
         matched_user,
+        database_connection,
       )
       .await?;
     }
@@ -258,6 +288,7 @@ impl TwitchUserExtensions for twitch_user::Model {
 async fn check_for_name_change(
   existing_twitch_user: twitch_user::Model,
   helix_twitch_user: twitch_user::ActiveModel,
+  database_connection: &DatabaseConnection,
 ) -> anyhow::Result<twitch_user::Model> {
   tracing::info!(
     "Updating user name change from {} to {:?}",
@@ -268,8 +299,6 @@ async fn check_for_name_change(
   if existing_twitch_user.login_name == *helix_twitch_user.login_name.as_ref() {
     return Ok(existing_twitch_user);
   }
-
-  let database_connection = get_database_connection().await;
 
   let name_change = twitch_user_name_change::ActiveModel {
     twitch_user_id: ActiveValue::Set(existing_twitch_user.id),

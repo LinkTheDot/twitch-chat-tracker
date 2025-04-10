@@ -1,384 +1,525 @@
+use super::mirrored_twitch_objects::message::TwitchIrcMessage;
+use super::mirrored_twitch_objects::twitch_message_type::TwitchMessageType;
 use crate::channel::third_party_emote_list_storage::EmoteListStorage;
 use crate::errors::AppError;
-use crate::irc_chat::sub_tier::*;
-use crate::irc_chat::tags::Tag;
-use chrono::{DateTime, TimeZone};
 use database_connection::get_database_connection;
-use entities::extensions::prelude::*;
 use entities::sea_orm_active_enums::EventType;
 use entities::*;
+use entity_extensions::prelude::*;
 use irc::client::prelude::*;
+use irc::proto::Message as IrcMessage;
 use sea_orm::*;
 use std::collections::HashMap;
 
-pub struct MessageParser<'a, 'b> {
-  message: &'a irc::proto::Message,
-  tags_of_interest: HashMap<&'a str, &'a str>,
-  third_party_emote_lists: &'b EmoteListStorage,
-  timestamp: DateTime<chrono::Utc>,
-  is_first_message: bool,
-  is_subscriber: bool,
+pub struct MessageParser<'a> {
+  message: TwitchIrcMessage,
+  third_party_emote_lists: &'a EmoteListStorage,
 }
 
-impl<'a, 'b> MessageParser<'a, 'b> {
+impl<'a> MessageParser<'a> {
   pub fn new(
-    message: &'a irc::proto::Message,
-    third_party_emote_lists: &'b EmoteListStorage,
+    message: &IrcMessage,
+    third_party_emote_lists: &'a EmoteListStorage,
   ) -> Result<Option<Self>, AppError> {
-    let tags_of_interest = Self::find_tags(message, &Tag::TAGS_OF_INTEREST.to_vec())?;
-
-    let Some(timestamp) = Self::get_timestamp(&tags_of_interest)? else {
+    let Some(message) = TwitchIrcMessage::new(message)? else {
       return Ok(None);
-    };
-    let is_first_message = tags_of_interest
-      .get(Tag::FIRST_MESSAGE)
-      .map(|v| v == &"1")
-      .unwrap_or(false);
-    let is_subscriber = if let Some(value) = tags_of_interest.get(Tag::SUBSCRIBER) {
-      *value == "1"
-    } else {
-      false
     };
 
     Ok(Some(Self {
       message,
-      tags_of_interest,
       third_party_emote_lists,
-      timestamp,
-      is_first_message,
-      is_subscriber,
     }))
   }
 
   pub async fn parse(self) -> Result<(), AppError> {
-    let _ = self.check_for_timeout().await?
-      || self.check_subs_and_gift_subs().await?
-      || self.check_for_bits().await?
-      || self.check_for_streamlabs_donation().await?
-      || self.check_for_raid().await?
-      || self.check_for_user_message().await?;
+    let database_connection = get_database_connection().await;
+
+    match self.message.message_type() {
+      TwitchMessageType::Timeout => {
+        self
+          .parse_timeout(database_connection)
+          .await?
+          .insert(database_connection)
+          .await?;
+      }
+      TwitchMessageType::Subscription => {
+        self
+          .parse_subscription(database_connection)
+          .await?
+          .insert(database_connection)
+          .await?;
+      }
+      TwitchMessageType::GiftSub => {
+        self
+          .parse_gift_subs(database_connection)
+          .await?
+          .insert(database_connection)
+          .await?;
+      }
+      TwitchMessageType::Bits => {
+        self
+          .parse_bits(database_connection)
+          .await?
+          .insert(database_connection)
+          .await?;
+      }
+      TwitchMessageType::StreamlabsDonation => {
+        self
+          .parse_streamlabs_donation(database_connection)
+          .await?
+          .insert(database_connection)
+          .await?;
+      }
+      TwitchMessageType::Raid => {
+        self
+          .parse_raid(database_connection)
+          .await?
+          .insert(database_connection)
+          .await?;
+      }
+      TwitchMessageType::UserMessage => {
+        self
+          .parse_user_message(database_connection)
+          .await?
+          .insert(database_connection)
+          .await?;
+      }
+    };
 
     Ok(())
   }
 
-  fn find_tags(
-    message: &'a irc::proto::Message,
-    desired_tags: &Vec<&str>,
-  ) -> Result<HashMap<&'a str, &'a str>, AppError> {
-    let Some(tags) = message.tags.as_ref() else {
-      return Err(AppError::NoTagsInMessage);
-    };
-
-    Ok(
-      tags
-        .iter()
-        .filter_map(|tag| {
-          if desired_tags.contains(&tag.0.as_str()) {
-            Some((tag.0.as_str(), tag.1.as_ref()?.as_str()))
-          } else {
-            None
-          }
-        })
-        .collect(),
-    )
-  }
-
-  fn get_timestamp(
-    tags_of_interest: &HashMap<&str, &str>,
-  ) -> Result<Option<DateTime<chrono::Utc>>, AppError> {
-    let Some(timestamp) = tags_of_interest.get(Tag::TIMESTAMP) else {
-      return Ok(None);
-    };
-    let Ok(timestamp) = timestamp.trim().parse::<i64>() else {
-      return Err(AppError::FailedToParseUnixTimestampFromMessage(
-        timestamp.to_string(),
-      ));
-    };
-    let Some(timestamp) = chrono::Utc.timestamp_millis_opt(timestamp).single() else {
-      return Err(AppError::CouldNotCreateTimestampWithUnixTimestamp(
-        timestamp,
-      ));
-    };
-
-    Ok(Some(timestamp))
-  }
-
-  pub async fn check_for_timeout(&self) -> Result<bool, AppError> {
-    tracing::debug!("Checking if timeout.");
-
-    let Command::Raw(command, command_tags) = &self.message.command else {
-      return Ok(false);
-    };
-
-    if command != "CLEARCHAT" {
-      return Ok(false);
+  async fn parse_timeout(
+    &self,
+    database_connection: &DatabaseConnection,
+  ) -> Result<user_timeout::ActiveModel, AppError> {
+    if self.message.message_type() != TwitchMessageType::Timeout {
+      return Err(AppError::IncorrectMessageType {
+        expected_type: TwitchMessageType::Timeout,
+        got_type: self.message.message_type(),
+      });
     }
 
-    let Some(timedout_user_login_name) = command_tags.get(1) else {
-      return Ok(false);
-    };
-    let timedout_user = twitch_user::Model::get_or_set_by_name(timedout_user_login_name).await?;
-
     let duration = self
-      .tags_of_interest
-      .get(Tag::BAN_DURATION)
-      .and_then(|value| value.trim().parse::<usize>().ok());
+      .message
+      .ban_duration()
+      .and_then(|value| value.trim().parse::<i32>().ok());
     let is_permanent = duration.is_none();
-
-    let Some(streamer_twitch_id) = self.tags_of_interest.get(Tag::ROOM_ID) else {
-      return Ok(false);
+    let Some(streamer_twitch_id) = self.message.room_id() else {
+      return Err(AppError::MissingExpectedValue {
+        expected_value_name: "room id",
+        location: "timeout parsing",
+      });
     };
-    let streamer = twitch_user::Model::get_or_set_by_twitch_id(streamer_twitch_id).await?;
-    let stream = stream::Model::get_most_recent_stream_for_user(&streamer)
-      .await?
-      .filter(stream::Model::is_live);
+
+    let streamer =
+      twitch_user::Model::get_or_set_by_twitch_id(streamer_twitch_id, database_connection).await?;
+    let maybe_stream =
+      stream::Model::get_active_stream_for_user(&streamer, database_connection).await?;
+    let Some(timedout_user_twitch_id) = self.message.timedout_user_id() else {
+      return Err(AppError::MissingExpectedValue {
+        expected_value_name: "timedout user id",
+        location: "timeout parsing",
+      });
+    };
+    let timedout_user =
+      twitch_user::Model::get_or_set_by_twitch_id(timedout_user_twitch_id, database_connection)
+        .await?;
 
     let timeout = user_timeout::ActiveModel {
-      duration: ActiveValue::Set(duration.map(|duration| duration as i32)),
+      duration: ActiveValue::Set(duration),
       is_permanent: ActiveValue::Set(is_permanent as i8),
-      timestamp: ActiveValue::Set(self.timestamp),
+      timestamp: ActiveValue::Set(*self.message.timestamp()),
       channel_id: ActiveValue::Set(streamer.id),
-      stream_id: ActiveValue::Set(stream.map(|stream| stream.id)),
+      stream_id: ActiveValue::Set(maybe_stream.map(|stream| stream.id)),
       twitch_user_id: ActiveValue::Set(timedout_user.id),
       ..Default::default()
     };
 
-    let _insert_result = timeout.insert(get_database_connection().await).await?;
-
-    Ok(true)
+    Ok(timeout)
   }
 
-  pub async fn check_subs_and_gift_subs(&self) -> Result<bool, AppError> {
-    tracing::debug!("Checking if gift sub.");
-
-    match self.tags_of_interest.get(Tag::MESSAGE_ID) {
-      Some(&"sub" | &"resub" | &"submysterygift" | &"giftpaidupgrade") => (),
-      _ => return Ok(false),
+  async fn parse_subscription(
+    &self,
+    database_connection: &DatabaseConnection,
+  ) -> Result<subscription_event::ActiveModel, AppError> {
+    if self.message.message_type() != TwitchMessageType::Subscription {
+      return Err(AppError::IncorrectMessageType {
+        expected_type: TwitchMessageType::Subscription,
+        got_type: self.message.message_type(),
+      });
     }
 
-    let Command::Raw(_, donation_receiver) = &self.message.command else {
-      return Ok(false);
+    let Some(streamer_twitch_id) = self.message.room_id() else {
+      return Err(AppError::MissingExpectedValue {
+        expected_value_name: "room id",
+        location: "subscription parsing",
+      });
     };
-    let Some(mut donation_receiver) = donation_receiver.first().cloned() else {
-      return Ok(false);
+    let streamer_model =
+      twitch_user::Model::get_or_set_by_twitch_id(streamer_twitch_id, database_connection).await?;
+    let maybe_stream =
+      stream::Model::get_active_stream_for_user(&streamer_model, database_connection).await?;
+    let Some(donator_name) = self.message.display_name() else {
+      return Err(AppError::MissingExpectedValue {
+        expected_value_name: "display name",
+        location: "subscription parsing",
+      });
+    };
+    let donator = twitch_user::Model::get_or_set_by_name(donator_name, database_connection).await?;
+    let Some(subscription_tier) = self.message.subscription_plan().cloned() else {
+      return Err(AppError::MissingExpectedValue {
+        expected_value_name: "subscription plan",
+        location: "subscription parsing",
+      });
+    };
+    let Some(time_subbed) = self.message.months_subscribed() else {
+      return Err(AppError::MissingExpectedValue {
+        expected_value_name: "months subscribed",
+        location: "subscription parsing",
+      });
+    };
+    let Ok(time_subbed) = time_subbed.parse::<i32>() else {
+      return Err(AppError::FailedToParseValue {
+        value_name: "subscription time",
+        location: "subscription parsing",
+        value: time_subbed.to_string(),
+      });
     };
 
-    if donation_receiver.starts_with('#') {
-      donation_receiver.remove(0);
-    }
-
-    let donation_receiver = twitch_user::Model::get_or_set_by_name(&donation_receiver).await?;
-
-    let Some(subscription_plan) = self.tags_of_interest.get(Tag::SUBSCRIPTION_PLAN) else {
-      return Err(AppError::NoSubscriptionPlan);
+    let subscription_event = subscription_event::ActiveModel {
+      months_subscribed: ActiveValue::Set(time_subbed),
+      timestamp: ActiveValue::Set(*self.message.timestamp()),
+      stream_id: ActiveValue::Set(maybe_stream.map(|stream| stream.id)),
+      subscriber_twitch_user_id: ActiveValue::Set(Some(donator.id)),
+      channel_id: ActiveValue::Set(streamer_model.id),
+      subscription_tier: ActiveValue::Set(Some(subscription_tier.into())),
+      ..Default::default()
     };
-    let tier: SubTier = (*subscription_plan).into();
 
-    let Some(donator_name) = self.tags_of_interest.get(Tag::DISPLAY_NAME) else {
-      return Err(AppError::NoDisplayName);
-    };
-    let donator = twitch_user::Model::get_or_set_by_name(donator_name).await?;
-
-    let stream = stream::Model::get_most_recent_stream_for_user(&donation_receiver)
-      .await?
-      .filter(stream::Model::is_live);
-
-    let database_connection = get_database_connection().await;
-
-    if let Some(gift_amount) = self.tags_of_interest.get(Tag::GIFT_SUB_COUNT) {
-      let gift_amount = gift_amount.trim().parse::<usize>().unwrap() as f32;
-
-      let donation_event = donation_event::ActiveModel {
-        event_type: ActiveValue::Set(EventType::GiftSubs),
-        amount: ActiveValue::Set(gift_amount),
-        timestamp: ActiveValue::Set(self.timestamp),
-        donator_twitch_user_id: ActiveValue::Set(Some(donator.id)),
-        donation_receiver_twitch_user_id: ActiveValue::Set(donation_receiver.id),
-        stream_id: ActiveValue::Set(stream.map(|stream| stream.id)),
-        subscription_tier: ActiveValue::Set(Some(tier.into())),
-        ..Default::default()
-      };
-
-      donation_event.insert(database_connection).await?;
-    } else if let Some(time_subbed) = self.tags_of_interest.get(Tag::MONTHS_SUBSCRIBED) {
-      let Ok(time_subbed) = time_subbed.parse::<i32>() else {
-        return Err(AppError::FailedToParseSubscriptionMonths(
-          time_subbed.to_string(),
-        ));
-      };
-
-      let subscription_event = subscription_event::ActiveModel {
-        months_subscribed: ActiveValue::Set(time_subbed),
-        timestamp: ActiveValue::Set(self.timestamp),
-        stream_id: ActiveValue::Set(stream.map(|stream| stream.id)),
-        subscriber_twitch_user_id: ActiveValue::Set(Some(donator.id)),
-        channel_id: ActiveValue::Set(donation_receiver.id),
-        subscription_tier: ActiveValue::Set(Some(tier.into())),
-        ..Default::default()
-      };
-
-      subscription_event.insert(database_connection).await?;
-    } else {
-      return Ok(false);
-    }
-
-    Ok(true)
+    Ok(subscription_event)
   }
 
-  pub async fn check_for_bits(&self) -> Result<bool, AppError> {
-    tracing::debug!("Checking if bits.");
+  async fn parse_gift_subs(
+    &self,
+    database_connection: &DatabaseConnection,
+  ) -> Result<donation_event::ActiveModel, AppError> {
+    if self.message.message_type() != TwitchMessageType::GiftSub {
+      return Err(AppError::IncorrectMessageType {
+        expected_type: TwitchMessageType::GiftSub,
+        got_type: self.message.message_type(),
+      });
+    }
 
-    let Some(bit_quantity) = self.tags_of_interest.get(Tag::BITS) else {
-      return Ok(false);
+    let Some(streamer_twitch_id) = self.message.room_id() else {
+      return Err(AppError::MissingExpectedValue {
+        expected_value_name: "room id",
+        location: "gift sub parsing",
+      });
+    };
+    let streamer_model =
+      twitch_user::Model::get_or_set_by_twitch_id(streamer_twitch_id, database_connection).await?;
+    let maybe_stream =
+      stream::Model::get_active_stream_for_user(&streamer_model, database_connection).await?;
+    let Some(donator_id) = self.message.user_id() else {
+      return Err(AppError::MissingExpectedValue {
+        expected_value_name: "user id",
+        location: "gift sub parsing",
+      });
+    };
+    let donator =
+      twitch_user::Model::get_or_set_by_twitch_id(donator_id, database_connection).await?;
+    let Some(subscription_tier) = self.message.subscription_plan().cloned() else {
+      return Err(AppError::MissingExpectedValue {
+        expected_value_name: "subscription plan",
+        location: "gift sub parsing",
+      });
+    };
+    let Some(gift_amount) = self.message.gift_sub_count() else {
+      return Err(AppError::MissingExpectedValue {
+        expected_value_name: "gift sub count",
+        location: "gift sub parsing",
+      });
+    };
+    let Ok(gift_amount) = gift_amount.trim().parse::<f32>() else {
+      return Err(AppError::FailedToParseValue {
+        value_name: "gift sub count",
+        location: "gift sub parsing",
+        value: gift_amount.to_string(),
+      });
     };
 
-    let Some(donator_name) = self.tags_of_interest.get(Tag::DISPLAY_NAME) else {
-      return Err(AppError::NoDisplayName);
+    let donation_event = donation_event::ActiveModel {
+      event_type: ActiveValue::Set(EventType::GiftSubs),
+      amount: ActiveValue::Set(gift_amount),
+      timestamp: ActiveValue::Set(*self.message.timestamp()),
+      donator_twitch_user_id: ActiveValue::Set(Some(donator.id)),
+      donation_receiver_twitch_user_id: ActiveValue::Set(streamer_model.id),
+      stream_id: ActiveValue::Set(maybe_stream.map(|stream| stream.id)),
+      subscription_tier: ActiveValue::Set(Some(subscription_tier.into())),
+      ..Default::default()
     };
-    let donator = twitch_user::Model::get_or_set_by_name(donator_name).await?;
+
+    Ok(donation_event)
+  }
+
+  async fn parse_bits(
+    &self,
+    database_connection: &DatabaseConnection,
+  ) -> Result<donation_event::ActiveModel, AppError> {
+    if self.message.message_type() != TwitchMessageType::Bits {
+      return Err(AppError::IncorrectMessageType {
+        expected_type: TwitchMessageType::Bits,
+        got_type: self.message.message_type(),
+      });
+    }
+
+    let Some(streamer_twitch_id) = self.message.room_id() else {
+      return Err(AppError::MissingExpectedValue {
+        expected_value_name: "room id",
+        location: "bit donation parsing",
+      });
+    };
+    let streamer_model =
+      twitch_user::Model::get_or_set_by_twitch_id(streamer_twitch_id, database_connection).await?;
+    let maybe_stream =
+      stream::Model::get_active_stream_for_user(&streamer_model, database_connection).await?;
+    let Some(donator_id) = self.message.user_id() else {
+      return Err(AppError::MissingExpectedValue {
+        expected_value_name: "user id",
+        location: "bit donation parsing",
+      });
+    };
+    let donator =
+      twitch_user::Model::get_or_set_by_twitch_id(donator_id, database_connection).await?;
+    let Some(bit_quantity) = self.message.bits() else {
+      return Err(AppError::MissingExpectedValue {
+        expected_value_name: "bits",
+        location: "bit donation parsing",
+      });
+    };
     let Ok(bit_quantity) = bit_quantity.trim().parse::<f32>() else {
-      return Err(AppError::FailedToParseBitQuantity(bit_quantity.to_string()));
+      return Err(AppError::FailedToParseValue {
+        value_name: "bit_quantity",
+        location: "bit donation parsing",
+        value: bit_quantity.to_string(),
+      });
     };
-    let Some(donation_receiver) = self.tags_of_interest.get(Tag::ROOM_ID) else {
-      return Err(AppError::MissingRoomIDForBitMessage);
-    };
-    let donation_receiver = twitch_user::Model::get_or_set_by_twitch_id(donation_receiver).await?;
-    let stream = stream::Model::get_most_recent_stream_for_user(&donation_receiver)
-      .await?
-      .filter(stream::Model::is_live);
 
     let donation_event = donation_event::ActiveModel {
       event_type: ActiveValue::Set(EventType::Bits),
       amount: ActiveValue::Set(bit_quantity),
-      timestamp: ActiveValue::Set(self.timestamp),
+      timestamp: ActiveValue::Set(*self.message.timestamp()),
       donator_twitch_user_id: ActiveValue::Set(Some(donator.id)),
-      donation_receiver_twitch_user_id: ActiveValue::Set(donation_receiver.id),
-      stream_id: ActiveValue::Set(stream.map(|stream| stream.id)),
+      donation_receiver_twitch_user_id: ActiveValue::Set(streamer_model.id),
+      stream_id: ActiveValue::Set(maybe_stream.map(|stream| stream.id)),
       ..Default::default()
     };
 
-    donation_event
-      .insert(get_database_connection().await)
-      .await?;
-
-    Ok(true)
+    Ok(donation_event)
   }
 
-  pub async fn check_for_streamlabs_donation(&self) -> Result<bool, AppError> {
-    tracing::debug!("Checking if streamlabs donation.");
-
-    let Some(user) = self.tags_of_interest.get(Tag::DISPLAY_NAME) else {
-      return Ok(false);
-    };
-    let user = user.to_string();
-
-    if user.to_lowercase().trim() != "streamelements" {
-      return Ok(false);
+  async fn parse_streamlabs_donation(
+    &self,
+    database_connection: &DatabaseConnection,
+  ) -> Result<donation_event::ActiveModel, AppError> {
+    if self.message.message_type() != TwitchMessageType::StreamlabsDonation {
+      return Err(AppError::IncorrectMessageType {
+        expected_type: TwitchMessageType::StreamlabsDonation,
+        got_type: self.message.message_type(),
+      });
     }
 
-    let Command::PRIVMSG(channel_name, contents) = &self.message.command else {
-      return Ok(false);
+    let Some(login_name) = self.message.login_name() else {
+      return Err(AppError::MissingExpectedValue {
+        expected_value_name: "login name",
+        location: "streamlabs donation parsing",
+      });
     };
-    let mut channel_name = channel_name.to_owned();
 
-    if channel_name.starts_with('#') {
-      channel_name.remove(0);
+    if login_name != "streamelements" {
+      return Err(AppError::IncorrectUserWhenParsingStreamlabsDonation {
+        got_user: login_name.to_string(),
+      });
     }
 
-    let donation_receiver = twitch_user::Model::get_or_set_by_name(&channel_name).await;
-
-    let Some(donator_display_name) = contents.split(" ").next() else {
-      return Ok(false);
+    let Command::PRIVMSG(_, message_contents) = &self.message.command() else {
+      return Err(AppError::IncorrectCommandWhenParsingMessage {
+        location: "streamlabs parser",
+        command_string: format!("{:?}", self.message.command()),
+      });
     };
-    let donator_login_name = donator_display_name.to_lowercase();
-    let donator = match twitch_user::Model::get_or_set_by_name(&donator_login_name).await {
+    let Some(mut donation_quantity) = message_contents.split(" ").nth(2).map(str::to_string) else {
+      return Err(AppError::FailedToParseValue {
+        value_name: "donation quantity",
+        location: "streamlabs donation parsing",
+        value: message_contents.to_string(),
+      });
+    };
+    donation_quantity = donation_quantity.replace("£", "");
+    donation_quantity = donation_quantity.replace("!", "");
+    let Ok(donation_quantity) = donation_quantity.parse::<f32>() else {
+      return Err(AppError::FailedToParseValue {
+        value_name: "donation quantity",
+        location: "streamlabs donation parsing",
+        value: message_contents.to_string(),
+      });
+    };
+
+    let Some(donator_display_name) = message_contents.split(" ").next() else {
+      return Err(AppError::FailedToParseValue {
+        value_name: "donation quantity",
+        location: "streamlabs donation parsing",
+        value: message_contents.to_string(),
+      });
+    };
+    let donator = match twitch_user::Model::get_or_set_by_name(
+      donator_display_name,
+      database_connection,
+    )
+    .await
+    {
       Ok(donator) => Some(donator),
       Err(error) => {
         tracing::warn!("Failed to get donator from a streamlabs donation. Reason: {:?}. Attempting guess based on known users.", error);
 
-        twitch_user::Model::guess_login_name(&donator_login_name).await?
+        twitch_user::Model::guess_name(donator_display_name, database_connection).await?
       }
     };
-
-    let unknown_user = donator
-      .is_none()
-      .then_some(unknown_user::Model::get_or_set_by_name(&donator_login_name).await?);
-
-    let Some(mut quantity) = contents.split(" ").nth(3).map(str::to_string) else {
-      return Ok(false);
-    };
-    quantity = quantity.replace("£", "");
-    quantity = quantity.replace("!", "");
-    let Ok(quantity) = quantity.parse::<f32>() else {
-      return Ok(false);
+    let unknown_user = if donator.is_none() {
+      Some(
+        unknown_user::Model::get_or_set_by_name(donator_display_name, database_connection).await?,
+      )
+    } else {
+      None
     };
 
-    let stream =
-      stream::Model::get_most_recent_stream_for_user(donation_receiver.as_ref().unwrap())
-        .await?
-        .filter(stream::Model::is_live);
+    let Some(streamer_twitch_id) = self.message.room_id() else {
+      return Err(AppError::MissingExpectedValue {
+        expected_value_name: "room id",
+        location: "bit donation parsing",
+      });
+    };
+    let streamer_model =
+      twitch_user::Model::get_or_set_by_twitch_id(streamer_twitch_id, database_connection).await?;
+    let maybe_stream =
+      stream::Model::get_active_stream_for_user(&streamer_model, database_connection).await?;
 
-    let donation_event_active_model = donation_event::ActiveModel {
+    let donation_event = donation_event::ActiveModel {
       event_type: ActiveValue::Set(EventType::StreamlabsDonation),
-      amount: ActiveValue::Set(quantity),
-      timestamp: ActiveValue::Set(self.timestamp),
+      amount: ActiveValue::Set(donation_quantity),
+      timestamp: ActiveValue::Set(*self.message.timestamp()),
       donator_twitch_user_id: ActiveValue::Set(donator.map(|donator| donator.id)),
       unknown_user_id: ActiveValue::Set(unknown_user.map(|user| user.id)),
-      donation_receiver_twitch_user_id: ActiveValue::Set(donation_receiver.unwrap().id),
-      stream_id: ActiveValue::Set(stream.map(|stream| stream.id)),
+      donation_receiver_twitch_user_id: ActiveValue::Set(streamer_model.id),
+      stream_id: ActiveValue::Set(maybe_stream.map(|stream| stream.id)),
       ..Default::default()
     };
 
-    donation_event_active_model
-      .insert(get_database_connection().await)
-      .await?;
-
-    Ok(true)
+    Ok(donation_event)
   }
 
-  pub async fn check_for_user_message(&self) -> Result<bool, AppError> {
-    tracing::debug!("Checking if user message.");
-
-    let Some(sender_login_name) = self.tags_of_interest.get(Tag::DISPLAY_NAME) else {
-      return Err(AppError::FailedToGetUserName);
-    };
-    let sender_login_name = sender_login_name.to_string();
-
-    let emotes = self.tags_of_interest.get("emotes").unwrap_or(&"");
-    let Command::PRIVMSG(streamer_channel_name, message_contents) = &self.message.command else {
-      return Ok(false);
-    };
-    let mut streamer_login_name = streamer_channel_name.to_owned();
-
-    if !streamer_login_name.is_empty() {
-      // Remove the # at the beginning of the name.
-      if streamer_login_name.starts_with('#') {
-        streamer_login_name.remove(0);
-      } else {
-        return Err(AppError::ExpectedNameWhereThereWasNone);
-      }
-    } else {
-      return Ok(false);
+  async fn parse_raid(
+    &self,
+    database_connection: &DatabaseConnection,
+  ) -> Result<raid::ActiveModel, AppError> {
+    if self.message.message_type() != TwitchMessageType::Raid {
+      return Err(AppError::IncorrectMessageType {
+        expected_type: TwitchMessageType::Raid,
+        got_type: self.message.message_type(),
+      });
     }
 
-    let streamer = twitch_user::Model::get_or_set_by_name(&streamer_login_name).await?;
-    let message_sender = twitch_user::Model::get_or_set_by_name(&sender_login_name).await?;
-    let stream = stream::Model::get_most_recent_stream_for_user(&streamer)
-      .await?
-      .filter(stream::Model::is_live);
-    let emote_only = self
-      .tags_of_interest
-      .get(Tag::MESSAGE_IS_ONLY_EMOTES)
-      .map(|value| *value == "1")
-      .unwrap_or(false);
+    let Some(raid_size) = self.message.raid_viewer_count() else {
+      return Err(AppError::MissingExpectedValue {
+        expected_value_name: "raid viewer count",
+        location: "raid parsing",
+      });
+    };
+    let Ok(raid_size) = raid_size.parse::<i32>() else {
+      return Err(AppError::FailedToParseValue {
+        value_name: "raid size",
+        location: "raid parsing",
+        value: raid_size.to_string(),
+      });
+    };
+    let Some(raider_twitch_id) = self.message.user_id() else {
+      return Err(AppError::MissingExpectedValue {
+        expected_value_name: "user id",
+        location: "raid parsing",
+      });
+    };
+    let Some(streamer_twitch_id) = self.message.room_id() else {
+      return Err(AppError::MissingExpectedValue {
+        expected_value_name: "room id",
+        location: "raid parsing",
+      });
+    };
+    let streamer_twitch_user_model =
+      twitch_user::Model::get_or_set_by_twitch_id(streamer_twitch_id, database_connection).await?;
+    let maybe_stream =
+      stream::Model::get_active_stream_for_user(&streamer_twitch_user_model, database_connection)
+        .await?;
+    let raider_twitch_user_model =
+      twitch_user::Model::get_or_set_by_twitch_id(raider_twitch_id, database_connection).await?;
+
+    let raid_active_model = raid::ActiveModel {
+      timestamp: ActiveValue::Set(*self.message.timestamp()),
+      size: ActiveValue::Set(raid_size),
+      stream_id: ActiveValue::Set(maybe_stream.map(|stream| stream.id)),
+      twitch_user_id: ActiveValue::Set(streamer_twitch_user_model.id),
+      raider_twitch_user_id: ActiveValue::Set(Some(raider_twitch_user_model.id)),
+      ..Default::default()
+    };
+
+    Ok(raid_active_model)
+  }
+
+  async fn parse_user_message(
+    &self,
+    database_connection: &DatabaseConnection,
+  ) -> Result<stream_message::ActiveModel, AppError> {
+    if self.message.message_type() != TwitchMessageType::UserMessage {
+      return Err(AppError::IncorrectMessageType {
+        expected_type: TwitchMessageType::UserMessage,
+        got_type: self.message.message_type(),
+      });
+    }
+
+    let emotes = self.message.emotes().unwrap_or("");
+    let Command::PRIVMSG(_, message_contents) = self.message.command() else {
+      return Err(AppError::IncorrectCommandWhenParsingMessage {
+        location: "user message parser",
+        command_string: format!("{:?}", self.message.command()),
+      });
+    };
+    let Some(sender_twitch_id) = self.message.user_id() else {
+      return Err(AppError::MissingExpectedValue {
+        expected_value_name: "user id",
+        location: "user message parsing",
+      });
+    };
+    let Some(streamer_twitch_id) = self.message.room_id() else {
+      return Err(AppError::MissingExpectedValue {
+        expected_value_name: "room id",
+        location: "user message parsing",
+      });
+    };
+    let streamer_twitch_user_model =
+      twitch_user::Model::get_or_set_by_twitch_id(streamer_twitch_id, database_connection).await?;
+    let maybe_stream =
+      stream::Model::get_active_stream_for_user(&streamer_twitch_user_model, database_connection)
+        .await?;
+    let sender_twitch_user_model =
+      twitch_user::Model::get_or_set_by_twitch_id(sender_twitch_id, database_connection).await?;
+
     let third_party_emotes_used =
-      self.parse_7tv_emotes_from_message_contents(&streamer, message_contents);
+      self.parse_7tv_emotes_from_message_contents(&streamer_twitch_user_model, message_contents);
     let third_party_emotes_used_serialized = (!third_party_emotes_used.is_empty())
       .then_some(serde_json::to_string(&third_party_emotes_used).ok())
       .flatten();
-
-    let database_connection = get_database_connection().await;
-    let emote_list = emote::Model::get_or_set_list(message_contents, emotes).await?;
+    let emote_list =
+      emote::Model::get_or_set_list(message_contents, emotes, database_connection).await?;
     let mut twitch_emotes_used: HashMap<i32, i32> = HashMap::new();
 
     for (emote, positions) in emote_list {
@@ -390,22 +531,20 @@ impl<'a, 'b> MessageParser<'a, 'b> {
       (!twitch_emotes_used.is_empty()).then_some(serde_json::to_string(&twitch_emotes_used)?);
 
     let message = stream_message::ActiveModel {
-      is_first_message: ActiveValue::Set(self.is_first_message as i8),
-      timestamp: ActiveValue::Set(self.timestamp),
-      emote_only: ActiveValue::Set(emote_only as i8),
+      is_first_message: ActiveValue::Set(self.message.is_first_message() as i8),
+      timestamp: ActiveValue::Set(*self.message.timestamp()),
+      emote_only: ActiveValue::Set(self.message.message_is_only_emotes() as i8),
       contents: ActiveValue::Set(message_contents.to_owned()),
-      twitch_user_id: ActiveValue::Set(message_sender.id),
-      channel_id: ActiveValue::Set(streamer.id),
-      stream_id: ActiveValue::Set(stream.map(|stream| stream.id)),
+      twitch_user_id: ActiveValue::Set(sender_twitch_user_model.id),
+      channel_id: ActiveValue::Set(streamer_twitch_user_model.id),
+      stream_id: ActiveValue::Set(maybe_stream.map(|stream| stream.id)),
       third_party_emotes_used: ActiveValue::Set(third_party_emotes_used_serialized),
-      is_subscriber: ActiveValue::Set(self.is_subscriber as i8),
+      is_subscriber: ActiveValue::Set(self.message.is_subscriber() as i8),
       twitch_emote_usage: ActiveValue::Set(twitch_emotes_used),
       ..Default::default()
     };
 
-    message.insert(database_connection).await?;
-
-    Ok(true)
+    Ok(message)
   }
 
   fn parse_7tv_emotes_from_message_contents(
@@ -428,59 +567,501 @@ impl<'a, 'b> MessageParser<'a, 'b> {
         emote_and_frequency
       })
   }
+}
 
-  async fn check_for_raid(&self) -> Result<bool, AppError> {
-    tracing::debug!("Checking if raid.");
+#[cfg(test)]
+mod tests {
+  use super::*;
+  use chrono::{DateTime, TimeZone, Utc};
+  use irc::proto::message::Tag as IrcTag;
+  use irc::proto::{Command, Prefix};
 
-    match self.tags_of_interest.get(Tag::MESSAGE_ID) {
-      Some(&"raid") => (),
-      _ => return Ok(false),
-    }
+  #[tokio::test]
+  async fn parse_timeout_expected_value() {
+    let (timeout_message, timeout_mock_database) = get_timeout_template();
+    let third_party_emote_storage = EmoteListStorage::new().await.unwrap();
+    let message_parser = MessageParser::new(&timeout_message, &third_party_emote_storage)
+      .unwrap()
+      .unwrap();
 
-    let Some(raid_size) = self.tags_of_interest.get(Tag::RAID_VIEWER_COUNT) else {
-      tracing::error!("Failed to get the raid size from a raid message.");
-      return Ok(true);
-    };
-    let raid_size = match raid_size.parse::<i32>() {
-      Ok(raid_size) => raid_size,
-      Err(error) => {
-        return Err(AppError::FailedToParseRaidSize(error.to_string()));
-      }
-    };
+    let result = message_parser
+      .parse_timeout(&timeout_mock_database)
+      .await
+      .unwrap();
 
-    let Some(raider_twitch_id) = self.tags_of_interest.get(Tag::USER_ID) else {
-      tracing::error!("Failed to retrieve the ID of a raider.");
-      return Ok(true);
-    };
-    let Some(streamer_twitch_id) = self.tags_of_interest.get(Tag::ROOM_ID) else {
-      tracing::error!(
-        "Failed to get the room ID of a streamer from a raid. Raider twitch ID: {}",
-        raider_twitch_id
-      );
-      return Ok(true);
-    };
+    assert_eq!(result.duration, ActiveValue::Set(Some(600)));
+    assert_eq!(result.is_permanent, ActiveValue::Set(0_i8));
+    assert_eq!(
+      result.timestamp,
+      ActiveValue::Set(timestamp_from_string("1740956922774"))
+    );
+    assert_eq!(result.channel_id, ActiveValue::Set(1));
+    assert_eq!(result.stream_id, ActiveValue::Set(None));
+    assert_eq!(result.twitch_user_id, ActiveValue::Set(2));
+  }
 
-    let raider_twitch_user_model =
-      twitch_user::Model::get_or_set_by_twitch_id(raider_twitch_id).await?;
-    let streamer_twitch_user_model =
-      twitch_user::Model::get_or_set_by_twitch_id(streamer_twitch_id).await?;
+  fn get_timeout_template() -> (IrcMessage, DatabaseConnection) {
+    let tags = vec![
+      IrcTag("ban-duration".into(), Some("600".into())),
+      IrcTag("target-user-id".into(), Some("795025340".into())),
+      IrcTag("room-id".into(), Some("578762718".into())),
+      IrcTag("tmi-sent-ts".into(), Some("1740956922774".into())),
+    ];
 
-    let stream =
-      stream::Model::get_most_recent_stream_for_user(&streamer_twitch_user_model).await?;
-
-    let raid_active_model = raid::ActiveModel {
-      timestamp: ActiveValue::Set(self.timestamp),
-      size: ActiveValue::Set(raid_size),
-      stream_id: ActiveValue::Set(stream.map(|stream| stream.id)),
-      twitch_user_id: ActiveValue::Set(streamer_twitch_user_model.id),
-      raider_twitch_user_id: ActiveValue::Set(Some(raider_twitch_user_model.id)),
-      ..Default::default()
+    let message = IrcMessage {
+      tags: Some(tags),
+      prefix: Some(Prefix::ServerName("tmi.twitch.tv".into())),
+      command: Command::Raw("#fallenshadow".into(), vec!["qwertymchurtywastaken".into()]),
     };
 
-    raid_active_model
-      .insert(get_database_connection().await)
-      .await?;
+    let mock_database = MockDatabase::new(DatabaseBackend::MySql)
+      .append_query_results([
+        vec![twitch_user::Model {
+          id: 1,
+          twitch_id: 578762718,
+          login_name: "fallenshadow".into(),
+          display_name: "fallenshadow".into(),
+        }],
+        vec![],
+        vec![twitch_user::Model {
+          id: 2,
+          twitch_id: 795025340,
+          login_name: "shadowchama".into(),
+          display_name: "shadowchama".into(),
+        }],
+      ])
+      .into_connection();
 
-    Ok(true)
+    (message, mock_database)
+  }
+
+  #[tokio::test]
+  async fn parse_subscription_expected_value() {
+    let (sub_message, subscription_mock_database) = get_subscription_template();
+    let third_party_emote_storage = EmoteListStorage::new().await.unwrap();
+    let message_parser = MessageParser::new(&sub_message, &third_party_emote_storage)
+      .unwrap()
+      .unwrap();
+
+    let result = message_parser
+      .parse_subscription(&subscription_mock_database)
+      .await
+      .unwrap();
+
+    assert_eq!(result.months_subscribed, ActiveValue::Set(12));
+    assert_eq!(
+      result.timestamp,
+      ActiveValue::Set(timestamp_from_string("1740956922774"))
+    );
+    assert_eq!(result.channel_id, ActiveValue::Set(1));
+    assert_eq!(result.stream_id, ActiveValue::Set(None));
+    assert_eq!(result.subscriber_twitch_user_id, ActiveValue::Set(Some(3)));
+    assert_eq!(result.subscription_tier, ActiveValue::Set(Some(1)));
+  }
+
+  fn get_subscription_template() -> (IrcMessage, DatabaseConnection) {
+    let tags = vec![
+      IrcTag("room-id".into(), Some("578762718".into())),
+      IrcTag("display-name".into(), Some("LinkTheDot".into())),
+      IrcTag("msg-param-sub-plan".into(), Some("1000".into())),
+      IrcTag("msg-param-cumulative-months".into(), Some("12".into())),
+      IrcTag("tmi-sent-ts".into(), Some("1740956922774".into())),
+      IrcTag("msg-id".into(), Some("resub".into())),
+      IrcTag("login".into(), Some("linkthedot".into())),
+      IrcTag("user-id".into(), Some("128831052".into())),
+    ];
+
+    let message = IrcMessage {
+      tags: Some(tags),
+      prefix: Some(Prefix::ServerName("tmi.twitch.tv".into())),
+      command: Command::Raw("USERNOTICE".into(), vec!["#fallenshadow".into()]),
+    };
+
+    let mock_database = MockDatabase::new(DatabaseBackend::MySql)
+      .append_query_results([
+        vec![twitch_user::Model {
+          id: 1,
+          twitch_id: 578762718,
+          login_name: "fallenshadow".into(),
+          display_name: "fallenshadow".into(),
+        }],
+        vec![],
+        vec![twitch_user::Model {
+          id: 3,
+          twitch_id: 128831052,
+          login_name: "linkthedot".into(),
+          display_name: "LinkTheDot".into(),
+        }],
+      ])
+      .into_connection();
+
+    (message, mock_database)
+  }
+
+  #[tokio::test]
+  async fn parse_gift_subs_expected_value() {
+    let (giftsub_message, giftsub_mock_database) = get_gift_subs_template();
+    let third_party_emote_storage = EmoteListStorage::new().await.unwrap();
+    let message_parser = MessageParser::new(&giftsub_message, &third_party_emote_storage)
+      .unwrap()
+      .unwrap();
+
+    let result = message_parser
+      .parse_gift_subs(&giftsub_mock_database)
+      .await
+      .unwrap();
+
+    assert_eq!(result.event_type, ActiveValue::Set(EventType::GiftSubs));
+    assert_eq!(result.amount, ActiveValue::Set(5.0_f32));
+    assert_eq!(
+      result.timestamp,
+      ActiveValue::Set(timestamp_from_string("1740956922774"))
+    );
+    assert_eq!(result.donator_twitch_user_id, ActiveValue::Set(Some(3)));
+    assert_eq!(result.donation_receiver_twitch_user_id, ActiveValue::Set(1));
+    assert_eq!(result.stream_id, ActiveValue::Set(None));
+    assert_eq!(result.subscription_tier, ActiveValue::Set(Some(1)));
+    assert_eq!(result.unknown_user_id, ActiveValue::NotSet);
+  }
+
+  fn get_gift_subs_template() -> (IrcMessage, DatabaseConnection) {
+    let tags = vec![
+      IrcTag("room-id".into(), Some("578762718".into())),
+      IrcTag("user-id".into(), Some("128831052".into())),
+      IrcTag("msg-param-sub-plan".into(), Some("1000".into())),
+      IrcTag("msg-param-mass-gift-count".into(), Some("5".into())),
+      IrcTag("tmi-sent-ts".into(), Some("1740956922774".into())),
+      IrcTag("msg-id".into(), Some("submysterygift".into())),
+      IrcTag("login".into(), Some("linkthedot".into())),
+      IrcTag("display-name".into(), Some("LinkTheDot".into())),
+    ];
+
+    let message = IrcMessage {
+      tags: Some(tags),
+      prefix: Some(Prefix::ServerName("tmi.twitch.tv".into())),
+      command: Command::Raw("USERNOTICE".into(), vec!["#fallenshadow".into()]),
+    };
+
+    let mock_database = MockDatabase::new(DatabaseBackend::MySql)
+      .append_query_results([
+        vec![twitch_user::Model {
+          id: 1,
+          twitch_id: 578762718,
+          login_name: "fallenshadow".into(),
+          display_name: "fallenshadow".into(),
+        }],
+        vec![],
+        vec![twitch_user::Model {
+          id: 3,
+          twitch_id: 128831052,
+          login_name: "linkthedot".into(),
+          display_name: "LinkTheDot".into(),
+        }],
+      ])
+      .into_connection();
+
+    (message, mock_database)
+  }
+
+  #[tokio::test]
+  async fn parse_bits_expected_value() {
+    let (bits_message, bit_donation_mock_database) = get_bits_template();
+    let third_party_emote_storage = EmoteListStorage::new().await.unwrap();
+    let message_parser = MessageParser::new(&bits_message, &third_party_emote_storage)
+      .unwrap()
+      .unwrap();
+
+    let result = message_parser
+      .parse_bits(&bit_donation_mock_database)
+      .await
+      .unwrap();
+
+    assert_eq!(result.event_type, ActiveValue::Set(EventType::Bits));
+    assert_eq!(result.amount, ActiveValue::Set(100000.0_f32));
+    assert_eq!(
+      result.timestamp,
+      ActiveValue::Set(timestamp_from_string("1740956922774"))
+    );
+    assert_eq!(result.donator_twitch_user_id, ActiveValue::Set(Some(3)));
+    assert_eq!(result.donation_receiver_twitch_user_id, ActiveValue::Set(1));
+    assert_eq!(result.stream_id, ActiveValue::Set(None));
+    assert_eq!(result.subscription_tier, ActiveValue::NotSet);
+    assert_eq!(result.unknown_user_id, ActiveValue::NotSet);
+  }
+
+  fn get_bits_template() -> (IrcMessage, DatabaseConnection) {
+    let tags = vec![
+      IrcTag("room-id".into(), Some("578762718".into())),
+      IrcTag("user-id".into(), Some("128831052".into())),
+      IrcTag("bits".into(), Some("100000".into())),
+      IrcTag("tmi-sent-ts".into(), Some("1740956922774".into())),
+      IrcTag("display-name".into(), Some("LinkTheDot".into())),
+      IrcTag("login".into(), Some("linkthedot".into())),
+    ];
+
+    let message = IrcMessage {
+      tags: Some(tags),
+      prefix: Some(Prefix::Nickname(
+        "linkthedot".into(),
+        "linkthedot".into(),
+        "linkthedot.tmi.twitch.tv".into(),
+      )),
+      command: Command::PRIVMSG("#fallenshadow".into(), "cheer100000 Cat".into()),
+    };
+
+    let mock_database = MockDatabase::new(DatabaseBackend::MySql)
+      .append_query_results([
+        vec![twitch_user::Model {
+          id: 1,
+          twitch_id: 578762718,
+          login_name: "fallenshadow".into(),
+          display_name: "fallenshadow".into(),
+        }],
+        vec![],
+        vec![twitch_user::Model {
+          id: 3,
+          twitch_id: 128831052,
+          login_name: "linkthedot".into(),
+          display_name: "LinkTheDot".into(),
+        }],
+      ])
+      .into_connection();
+
+    (message, mock_database)
+  }
+
+  #[tokio::test]
+  async fn parse_raid_expected_value() {
+    let (raid_message, raid_mock_database) = get_raid_template();
+    let third_party_emote_storage = EmoteListStorage::new().await.unwrap();
+    let message_parser = MessageParser::new(&raid_message, &third_party_emote_storage)
+      .unwrap()
+      .unwrap();
+
+    let result = message_parser
+      .parse_raid(&raid_mock_database)
+      .await
+      .unwrap();
+
+    assert_eq!(
+      result.timestamp,
+      ActiveValue::Set(timestamp_from_string("1740956922774"))
+    );
+    assert_eq!(result.size, ActiveValue::Set(69420));
+    assert_eq!(result.stream_id, ActiveValue::Set(None));
+    assert_eq!(result.twitch_user_id, ActiveValue::Set(1));
+    assert_eq!(result.raider_twitch_user_id, ActiveValue::Set(Some(3)));
+  }
+
+  fn get_raid_template() -> (IrcMessage, DatabaseConnection) {
+    let tags = vec![
+      IrcTag("msg-param-viewerCount".into(), Some("69420".into())),
+      IrcTag("user-id".into(), Some("128831052".into())),
+      IrcTag("room-id".into(), Some("578762718".into())),
+      IrcTag("tmi-sent-ts".into(), Some("1740956922774".into())),
+      IrcTag("msg-id".into(), Some("raid".into())),
+      IrcTag("login".into(), Some("linkthedot".into())),
+      IrcTag("display-name".into(), Some("LinkTheDot".into())),
+    ];
+
+    let message = IrcMessage {
+      tags: Some(tags),
+      prefix: Some(Prefix::ServerName("tmi.twitch.tv".into())),
+      command: Command::Raw("USERNOTICE".into(), vec!["#fallenshadow".into()]),
+    };
+
+    let mock_database = MockDatabase::new(DatabaseBackend::MySql)
+      .append_query_results([
+        vec![twitch_user::Model {
+          id: 1,
+          twitch_id: 578762718,
+          login_name: "fallenshadow".into(),
+          display_name: "fallenshadow".into(),
+        }],
+        vec![],
+        vec![twitch_user::Model {
+          id: 3,
+          twitch_id: 128831052,
+          login_name: "linkthedot".into(),
+          display_name: "LinkTheDot".into(),
+        }],
+      ])
+      .into_connection();
+
+    (message, mock_database)
+  }
+
+  #[tokio::test]
+  async fn parse_streamlabs_donation_expected_value() {
+    let (streamlabs_message, streamlabs_donation_mock_database) =
+      get_streamlabs_donation_template();
+    let third_party_emote_storage = EmoteListStorage::new().await.unwrap();
+    let message_parser = MessageParser::new(&streamlabs_message, &third_party_emote_storage)
+      .unwrap()
+      .unwrap();
+
+    let result = message_parser
+      .parse_streamlabs_donation(&streamlabs_donation_mock_database)
+      .await
+      .unwrap();
+
+    assert_eq!(
+      result.event_type,
+      ActiveValue::Set(EventType::StreamlabsDonation)
+    );
+    assert_eq!(result.amount, ActiveValue::Set(5000.0_f32));
+    assert_eq!(
+      result.timestamp,
+      ActiveValue::Set(timestamp_from_string("1740956922774"))
+    );
+    assert_eq!(result.donator_twitch_user_id, ActiveValue::Set(Some(3)));
+    assert_eq!(result.donation_receiver_twitch_user_id, ActiveValue::Set(1));
+    assert_eq!(result.stream_id, ActiveValue::Set(None));
+    assert_eq!(result.subscription_tier, ActiveValue::NotSet);
+    assert_eq!(result.unknown_user_id, ActiveValue::Set(None));
+  }
+
+  fn get_streamlabs_donation_template() -> (IrcMessage, DatabaseConnection) {
+    let tags = vec![
+      IrcTag("login".into(), Some("streamelements".into())),
+      IrcTag("room-id".into(), Some("578762718".into())),
+      IrcTag("tmi-sent-ts".into(), Some("1740956922774".into())),
+      IrcTag("user-id".into(), Some("100135110".into())),
+    ];
+
+    let message = IrcMessage {
+      tags: Some(tags),
+      prefix: Some(Prefix::Nickname(
+        "streamelements".into(),
+        "streamelements".into(),
+        "streamelements.tmi.twitch.tv".into(),
+      )),
+      command: Command::PRIVMSG(
+        "#fallenshadow".into(),
+        "LinkTheDot tipped £5000.00! Wow!".into(),
+      ),
+    };
+
+    let mock_database = MockDatabase::new(DatabaseBackend::MySql)
+      .append_query_results([
+        vec![twitch_user::Model {
+          id: 3,
+          twitch_id: 128831052,
+          login_name: "linkthedot".into(),
+          display_name: "LinkTheDot".into(),
+        }],
+        vec![twitch_user::Model {
+          id: 1,
+          twitch_id: 578762718,
+          login_name: "fallenshadow".into(),
+          display_name: "fallenshadow".into(),
+        }],
+        vec![],
+      ])
+      .into_connection();
+
+    (message, mock_database)
+  }
+
+  #[tokio::test]
+  async fn parse_user_message_expected_value() {
+    let (user_message, user_message_mock_database) = get_user_message_template();
+    let third_party_emote_storage = EmoteListStorage::new().await.unwrap();
+    let message_parser = MessageParser::new(&user_message, &third_party_emote_storage)
+      .unwrap()
+      .unwrap();
+
+    let result = message_parser
+      .parse_user_message(&user_message_mock_database)
+      .await
+      .unwrap();
+
+    assert_eq!(result.is_first_message, ActiveValue::Set(0_i8));
+    assert_eq!(
+      result.timestamp,
+      ActiveValue::Set(timestamp_from_string("1740956922774"))
+    );
+    assert_eq!(result.emote_only, ActiveValue::Set(0_i8));
+    assert_eq!(
+      result.contents,
+      ActiveValue::Set("Cat <3 syadouStanding".to_string())
+    );
+    assert_eq!(result.twitch_user_id, ActiveValue::Set(3));
+    assert_eq!(result.channel_id, ActiveValue::Set(1));
+    assert_eq!(result.stream_id, ActiveValue::Set(None));
+    assert_eq!(
+      result.third_party_emotes_used,
+      ActiveValue::Set(Some("{\"Cat\":1}".to_string()))
+    );
+    assert_eq!(result.is_subscriber, ActiveValue::Set(1_i8));
+    assert!(
+      result.twitch_emote_usage == ActiveValue::Set(Some("{\"1\":1,\"2\":1}".to_string()))
+        || result.twitch_emote_usage == ActiveValue::Set(Some("{\"2\":1,\"1\":1}".to_string()))
+    );
+  }
+
+  fn get_user_message_template() -> (IrcMessage, DatabaseConnection) {
+    let tags = vec![
+      IrcTag(
+        "emotes".into(),
+        Some("555555584:4-5/emotesv2_18a345125f024ec7a4fe0b51e6638e12:7-20".into()),
+      ),
+      IrcTag("user-id".into(), Some("128831052".into())),
+      IrcTag("room-id".into(), Some("578762718".into())),
+      IrcTag("tmi-sent-ts".into(), Some("1740956922774".into())),
+      IrcTag("first-msg".into(), Some("0".into())),
+      IrcTag("emote-only".into(), Some("0".into())),
+      IrcTag("subscriber".into(), Some("1".into())),
+      IrcTag("display-name".into(), Some("LinkTheDot".into())),
+      IrcTag("login".into(), Some("linkthedot".into())),
+    ];
+
+    let message = IrcMessage {
+      tags: Some(tags),
+      prefix: Some(Prefix::Nickname(
+        "linkthedot".into(),
+        "linkthedot".into(),
+        "linkthedot.tmi.twitch.tv".into(),
+      )),
+      command: Command::PRIVMSG("#fallenshadow".into(), "Cat <3 syadouStanding".into()),
+    };
+
+    let mock_database = MockDatabase::new(DatabaseBackend::MySql)
+      .append_query_results([
+        vec![twitch_user::Model {
+          id: 1,
+          twitch_id: 578762718,
+          login_name: "fallenshadow".into(),
+          display_name: "fallenshadow".into(),
+        }],
+        vec![],
+        vec![twitch_user::Model {
+          id: 3,
+          twitch_id: 128831052,
+          login_name: "linkthedot".into(),
+          display_name: "LinkTheDot".into(),
+        }],
+      ])
+      .append_query_results([
+        vec![emote::Model {
+          id: 1,
+          twitch_id: "555555584".into(),
+          name: "<3".into(),
+        }],
+        vec![emote::Model {
+          id: 2,
+          twitch_id: "emotesv2_18a345125f024ec7a4fe0b51e6638e12".into(),
+          name: "syadouStanding".into(),
+        }],
+      ])
+      .into_connection();
+
+    (message, mock_database)
+  }
+
+  fn timestamp_from_string(value: &str) -> DateTime<Utc> {
+    let timestamp = value.trim().parse::<i64>().unwrap();
+
+    chrono::Utc.timestamp_millis_opt(timestamp).unwrap()
   }
 }

@@ -1,31 +1,36 @@
-use crate::emote;
-use crate::extensions::stream_message::StreamMessageExtensions;
-use crate::extensions::REQWEST_CLIENT;
-use crate::{stream, stream_message, twitch_user};
+use crate::REQWEST_CLIENT;
+use crate::stream_message::StreamMessageExtensions;
 use anyhow::anyhow;
-use app_config::secret_string::Secret;
 use app_config::APP_CONFIG;
+use app_config::secret_string::Secret;
 use chrono::{DateTime, Utc};
-use database_connection::get_database_connection;
+use entities::{emote, stream, stream_message, twitch_user};
 use reqwest::RequestBuilder;
 use sea_orm::*;
 use serde_json::Value;
-use std::collections::{hash_map::Entry, HashMap};
+use std::collections::{HashMap, hash_map::Entry};
 use url::Url;
 
 const HELIX_STREAM_QUERY_URL: &str = "https://api.twitch.tv/helix/streams";
 
 pub trait StreamExtensions {
-  async fn get_all_twitch_emotes_used(&self) -> Result<Vec<(emote::Model, usize)>, DbErr>;
+  async fn get_all_twitch_emotes_used(
+    &self,
+    database_connection: &DatabaseConnection,
+  ) -> Result<Vec<(emote::Model, usize)>, DbErr>;
   async fn get_all_twitch_emotes_used_from_id(
     stream_id: i32,
+    database_connection: &DatabaseConnection,
   ) -> Result<Vec<(emote::Model, usize)>, DbErr>;
   fn is_live(&self) -> bool;
-  async fn get_most_recent_stream_for_user(
+  /// Returns a stream object if the user passed in is currently streaming.
+  async fn get_active_stream_for_user(
     user: &twitch_user::Model,
+    database_connection: &DatabaseConnection,
   ) -> Result<Option<stream::Model>, DbErr>;
   async fn get_stream_from_stream_twitch_id(
     stream_twitch_id: u64,
+    database_connection: &DatabaseConnection,
   ) -> Result<Option<stream::Model>, DbErr>;
   async fn get_active_livestreams<'a, I>(
     channels: I,
@@ -35,10 +40,17 @@ pub trait StreamExtensions {
 }
 
 impl StreamExtensions for stream::Model {
+  async fn get_all_twitch_emotes_used(
+    &self,
+    database_connection: &DatabaseConnection,
+  ) -> Result<Vec<(emote::Model, usize)>, DbErr> {
+    Self::get_all_twitch_emotes_used_from_id(self.id, database_connection).await
+  }
+
   async fn get_all_twitch_emotes_used_from_id(
     stream_id: i32,
+    database_connection: &DatabaseConnection,
   ) -> Result<Vec<(emote::Model, usize)>, DbErr> {
-    let database_connection = get_database_connection().await;
     let messages = stream_message::Entity::find()
       .filter(stream_message::Column::StreamId.eq(stream_id))
       .all(database_connection)
@@ -75,39 +87,31 @@ impl StreamExtensions for stream::Model {
     Ok(known_emotes.into_values().collect())
   }
 
-  async fn get_all_twitch_emotes_used(&self) -> Result<Vec<(emote::Model, usize)>, DbErr> {
-    Self::get_all_twitch_emotes_used_from_id(self.id).await
-  }
-
   fn is_live(&self) -> bool {
     self.end_timestamp.is_none()
   }
 
-  async fn get_most_recent_stream_for_user(
+  async fn get_active_stream_for_user(
     user: &twitch_user::Model,
+    database_connection: &DatabaseConnection,
   ) -> Result<Option<stream::Model>, DbErr> {
     // Fetch the latest stream for the given user
     let latest_stream = stream::Entity::find()
       .filter(stream::Column::TwitchUserId.eq(user.id))
       .order_by_desc(stream::Column::StartTimestamp)
-      .one(get_database_connection().await)
+      .one(database_connection)
       .await?;
 
-    if let Some(stream) = &latest_stream {
-      if stream.end_timestamp.is_some() {
-        return Ok(None);
-      }
-    }
-
-    Ok(latest_stream)
+    Ok(latest_stream.filter(stream::Model::is_live))
   }
 
   async fn get_stream_from_stream_twitch_id(
     stream_twitch_id: u64,
+    database_connection: &DatabaseConnection,
   ) -> Result<Option<stream::Model>, DbErr> {
     stream::Entity::find()
       .filter(stream::Column::TwitchStreamId.eq(stream_twitch_id))
-      .one(get_database_connection().await)
+      .one(database_connection)
       .await
   }
 
@@ -131,13 +135,16 @@ impl StreamExtensions for stream::Model {
     let Value::Object(response_value): Value = serde_json::from_str(&response_body)? else {
       tracing::error!("Unkown response: {:?}", response_body);
 
-      return Err(
-        anyhow!("Received an unknown response body structure when querying. Body location: update live status response body."));
+      return Err(anyhow!(
+        "Received an unknown response body structure when querying. Body location: update live status response body."
+      ));
     };
     let Some(Value::Array(live_streams)) = response_value.get("data") else {
       tracing::error!("Unkown response: {:?}", response_body);
 
-      return Err(anyhow!("Received an unknown response body structure when querying. Body location: update live status live stream list."));
+      return Err(anyhow!(
+        "Received an unknown response body structure when querying. Body location: update live status live stream list."
+      ));
     };
 
     let mut live_channels: HashMap<String, (DateTime<Utc>, String)> = HashMap::new();

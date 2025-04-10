@@ -8,3 +8,4 @@ migration/target
 secrets.*
 /docs
 bin/build_and_push_*
+bin/update

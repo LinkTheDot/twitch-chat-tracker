@@ -1,7 +1,7 @@
-use crate::emote;
-use database_connection::get_database_connection;
+use entities::emote;
 use sea_orm::*;
 
+#[derive(Debug)]
 struct EmoteData<'a> {
   twitch_id: &'a str,
   name: String,
@@ -17,6 +17,7 @@ pub trait EmoteExtensions {
   async fn get_or_set_list(
     message_contents: &str,
     emote_list: &str,
+    database_connection: &DatabaseConnection,
   ) -> Result<Vec<(emote::Model, Vec<(usize, usize)>)>, DbErr>;
 }
 
@@ -24,12 +25,11 @@ impl EmoteExtensions for emote::Model {
   async fn get_or_set_list(
     message_contents: &str,
     emote_list: &str,
+    database_connection: &DatabaseConnection,
   ) -> Result<Vec<(emote::Model, Vec<(usize, usize)>)>, DbErr> {
     if emote_list.is_empty() {
       return Ok(vec![]);
     }
-
-    let database_connection = get_database_connection().await;
 
     let emote_data = parse_emotes(message_contents, emote_list);
     let mut emote_models = vec![];
@@ -42,6 +42,7 @@ impl EmoteExtensions for emote::Model {
 
       if let Some(emote_model) = emote_model {
         emote_models.push((emote_model, emote.positions));
+
         continue;
       }
 

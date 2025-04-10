@@ -10,8 +10,8 @@ pub fn setup_logging_config() -> Result<(), Box<dyn std::error::Error>> {
   };
 
   let subscriber_builder = tracing_subscriber::fmt()
+    .with_env_filter(EnvFilter::new("sea_orm=error"))
     .with_env_filter(EnvFilter::new(log_level))
-    .with_env_filter(EnvFilter::new("sea_orm::query=error"))
     .with_ansi(false);
 
   if let Some(logging_dir) = APP_CONFIG.logging_dir() {

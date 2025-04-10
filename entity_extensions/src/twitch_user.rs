@@ -1,6 +1,6 @@
 use crate::prelude::*;
 use anyhow::anyhow;
-use app_config::APP_CONFIG;
+use app_config::AppConfig;
 use app_config::secret_string::Secret;
 use entities::{
   twitch_user, twitch_user_name_change, twitch_user_unknown_user_association, unknown_user,
@@ -176,12 +176,12 @@ impl TwitchUserExtensions for twitch_user::Model {
         "Authorization",
         format!(
           "Bearer {}",
-          Secret::read_secret_string(APP_CONFIG.access_token().read_value())
+          Secret::read_secret_string(AppConfig::access_token().read_value())
         ),
       )
       .header(
         "Client-Id",
-        Secret::read_secret_string(APP_CONFIG.client_id().read_value()),
+        Secret::read_secret_string(AppConfig::client_id().read_value()),
       );
 
     let response = request.send().await?;

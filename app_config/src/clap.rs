@@ -1,6 +1,6 @@
+use std::sync::OnceLock;
 use chrono::{DateTime, Utc};
 use clap::Parser;
-use std::sync::OnceLock;
 
 static ARGS: OnceLock<Args> = OnceLock::new();
 

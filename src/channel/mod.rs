@@ -1,5 +1,5 @@
 use crate::errors::AppError;
-use app_config::APP_CONFIG;
+use app_config::AppConfig;
 use chrono::Utc;
 use database_connection::get_database_connection;
 use entities::{prelude::*, stream, twitch_user};
@@ -20,7 +20,7 @@ pub struct TrackedChannels {
 
 impl TrackedChannels {
   pub async fn new() -> Result<Self, AppError> {
-    let connected_channels = Self::get_channels_from_list(APP_CONFIG.channels()).await?;
+    let connected_channels = Self::get_channels_from_list(AppConfig::channels()).await?;
 
     let mut tracked_channels = TrackedChannels {
       channels: connected_channels,

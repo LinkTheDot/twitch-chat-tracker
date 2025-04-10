@@ -1,6 +1,6 @@
 use crate::stream_message::StreamMessageExtensions;
 use anyhow::anyhow;
-use app_config::APP_CONFIG;
+use app_config::AppConfig;
 use app_config::secret_string::Secret;
 use chrono::{DateTime, Utc};
 use entities::{emote, stream, stream_message, twitch_user};
@@ -216,12 +216,12 @@ where
         "Authorization",
         format!(
           "Bearer {}",
-          Secret::read_secret_string(APP_CONFIG.access_token().read_value())
+          Secret::read_secret_string(AppConfig::access_token().read_value())
         ),
       )
       .header(
         "Client-Id",
-        Secret::read_secret_string(APP_CONFIG.client_id().read_value()),
+        Secret::read_secret_string(AppConfig::client_id().read_value()),
       ),
   )
 }

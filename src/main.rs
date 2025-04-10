@@ -1,4 +1,4 @@
-use app_config::APP_CONFIG;
+use app_config::AppConfig;
 use chrono::*;
 use database_connection::*;
 use entities::{stream_message, twitch_user};
@@ -22,7 +22,7 @@ mod manual_migrations;
 async fn main() {
   twitch_chat_logger::logging::setup_logging_config().unwrap();
 
-  if APP_CONFIG.channels().is_empty() {
+  if AppConfig::channels().is_empty() {
     println!("No channels to track.");
 
     std::process::exit(0);
@@ -61,7 +61,7 @@ async fn main() {
 }
 
 async fn update_channel_status(mut connected_channels: TrackedChannels) {
-  let query_wait_duration = Duration::from_secs((60 / APP_CONFIG.queries_per_minute()) as u64);
+  let query_wait_duration = Duration::from_secs((60 / AppConfig::queries_per_minute()) as u64);
 
   loop {
     tracing::debug!("Updating live status.");
@@ -81,7 +81,7 @@ async fn update_channel_status(mut connected_channels: TrackedChannels) {
 
 #[allow(dead_code)]
 async fn running_animation() {
-  if APP_CONFIG.logging_dir().is_none() {
+  if AppConfig::logging_dir().is_none() {
     return;
   }
 

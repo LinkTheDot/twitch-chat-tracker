@@ -1,19 +1,16 @@
 use crate::log_level_wrapper::*;
 use crate::rolling_appender_rotation::*;
 use crate::secret_string::Secret;
-use anyhow::anyhow;
-use lazy_static::lazy_static;
 use schematic::{Config, ConfigLoader};
 use std::path::PathBuf;
+use std::sync::OnceLock;
 
 const CONFIG_PATH_ENV_VAR: &str = "CONFIG_PATH";
 const DEFAULT_CONFIG_FILEPATH: &str = "./config/config.yml";
 const MAX_QUERIES_PER_MINUTE: usize = 12;
 const RATE_LIMIT: usize = 500;
 
-lazy_static! {
-  pub static ref APP_CONFIG: AppConfig = AppConfig::new().unwrap();
-}
+static APP_CONFIG: OnceLock<AppConfig> = OnceLock::new();
 
 #[derive(Debug, Config, serde::Serialize, serde::Deserialize)]
 pub struct AppConfig {
@@ -37,7 +34,6 @@ pub struct AppConfig {
   #[setting(required, env = "TWITCH_CLIENT_ID")]
   client_id: Option<Secret>,
 
-  // database_protocol: DatabaseProtocol,
   #[setting(default = "root", env = "DATABASE_USERNAME")]
   database_username: String,
   #[setting(default = "localhost:3306", env = "DATABASE_HOST_ADDRESS")]
@@ -59,11 +55,12 @@ pub struct AppConfig {
 }
 
 impl AppConfig {
-  fn new() -> anyhow::Result<Self> {
+  fn new() -> Self {
     let mut config = ConfigLoader::<AppConfig>::new()
       .file_optional(get_config_path())
       .unwrap()
-      .load()?
+      .load()
+      .unwrap()
       .config;
 
     if config.queries_per_minute == 0 {
@@ -74,72 +71,76 @@ impl AppConfig {
     }
 
     if config.channels.len() * config.queries_per_minute > RATE_LIMIT {
-      return Err(anyhow!("The amount of channels being queried each minute exceeds the limit of 800. channel_count * quieries_per_minute must be <= 800."));
+      panic!("The amount of channels being queried each minute exceeds the limit of 800. channel_count * quieries_per_minute must be <= 800.");
     }
 
-    Ok(config)
+    config
   }
 
-  pub fn log_level(&self) -> Option<&LoggingConfigLevel> {
-    self.log_level.as_ref()
+  fn get_or_set() -> &'static Self {
+    APP_CONFIG.get_or_init(Self::new)
   }
 
-  pub fn logging_dir(&self) -> Option<&PathBuf> {
-    self.logging_dir.as_ref()
+  pub fn log_level() -> Option<&'static LoggingConfigLevel> {
+    Self::get_or_set().log_level.as_ref()
   }
 
-  pub fn logging_filename_prefix(&self) -> &str {
-    &self.logging_filename_prefix
+  pub fn logging_dir() -> Option<&'static PathBuf> {
+    Self::get_or_set().logging_dir.as_ref()
   }
 
-  pub fn logging_file_roll_appender(&self) -> &RollingAppenderRotation {
-    &self.logging_roll_appender
+  pub fn logging_filename_prefix() -> &'static str {
+    &Self::get_or_set().logging_filename_prefix
   }
 
-  pub fn channels(&self) -> &Vec<String> {
-    &self.channels
+  pub fn logging_file_roll_appender() -> &'static RollingAppenderRotation {
+    &Self::get_or_set().logging_roll_appender
   }
 
-  pub fn queries_per_minute(&self) -> usize {
-    self.queries_per_minute
+  pub fn channels() -> &'static Vec<String> {
+    &Self::get_or_set().channels
   }
 
-  pub fn twitch_nickname(&self) -> &str {
-    self.twitch_nickname.as_ref().unwrap()
+  pub fn queries_per_minute() -> usize {
+    Self::get_or_set().queries_per_minute
   }
 
-  pub fn access_token(&self) -> &Secret {
-    self.access_token.as_ref().unwrap()
+  pub fn twitch_nickname() -> &'static str {
+    Self::get_or_set().twitch_nickname.as_ref().unwrap()
   }
 
-  pub fn client_id(&self) -> &Secret {
-    self.client_id.as_ref().unwrap()
+  pub fn access_token() -> &'static Secret {
+    Self::get_or_set().access_token.as_ref().unwrap()
   }
 
-  pub fn database_username(&self) -> &str {
-    &self.database_username
+  pub fn client_id() -> &'static Secret {
+    Self::get_or_set().client_id.as_ref().unwrap()
   }
 
-  pub fn database_address(&self) -> &str {
-    &self.database_host_address
+  pub fn database_username() -> &'static str {
+    &Self::get_or_set().database_username
   }
 
-  pub fn database(&self) -> &str {
-    &self.database
+  pub fn database_address() -> &'static str {
+    &Self::get_or_set().database_host_address
   }
 
-  pub fn sql_user_password(&self) -> &Secret {
-    &self.sql_user_password
+  pub fn database() -> &'static str {
+    &Self::get_or_set().database
+  }
+
+  pub fn sql_user_password() -> &'static Secret {
+    &Self::get_or_set().sql_user_password
   }
 
   /// Obtained from https://pastebin.com/doc_api#1
-  pub fn pastebin_api_key(&self) -> Option<&Secret> {
-    self.pastebin_api_key.as_ref()
+  pub fn pastebin_api_key() -> Option<&'static Secret> {
+    Self::get_or_set().pastebin_api_key.as_ref()
   }
 
   /// Obtained from https://app.exchangerate-api.com
-  pub fn exchange_rate_api_key(&self) -> Option<&Secret> {
-    self.exchange_rate_api_key.as_ref()
+  pub fn exchange_rate_api_key() -> Option<&'static Secret> {
+    Self::get_or_set().exchange_rate_api_key.as_ref()
   }
 }
 

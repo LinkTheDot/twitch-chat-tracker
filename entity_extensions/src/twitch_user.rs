@@ -1,4 +1,3 @@
-use crate::REQWEST_CLIENT;
 use crate::prelude::*;
 use anyhow::anyhow;
 use app_config::APP_CONFIG;
@@ -154,6 +153,7 @@ impl TwitchUserExtensions for twitch_user::Model {
     }
 
     let mut query_url = Url::parse(HELIX_USER_QUERY_URL)?;
+    let reqwest_client = reqwest::Client::new();
 
     {
       let mut query_pairs = query_url.query_pairs_mut();
@@ -170,7 +170,7 @@ impl TwitchUserExtensions for twitch_user::Model {
       }
     }
 
-    let request = REQWEST_CLIENT
+    let request = reqwest_client
       .get(query_url)
       .header(
         "Authorization",

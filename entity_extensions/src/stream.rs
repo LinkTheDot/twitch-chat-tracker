@@ -1,4 +1,3 @@
-use crate::REQWEST_CLIENT;
 use crate::stream_message::StreamMessageExtensions;
 use anyhow::anyhow;
 use app_config::APP_CONFIG;
@@ -200,6 +199,7 @@ where
   I: IntoIterator<Item = &'a twitch_user::Model>,
 {
   let mut query_url = Url::parse(HELIX_STREAM_QUERY_URL)?;
+  let reqwest_client = reqwest::Client::new();
 
   query_url.query_pairs_mut().append_pair("first", "100");
 
@@ -210,7 +210,7 @@ where
   }
 
   Ok(
-    REQWEST_CLIENT
+    reqwest_client
       .get(query_url)
       .header(
         "Authorization",

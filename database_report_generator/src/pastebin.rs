@@ -1,5 +1,4 @@
 use crate::errors::AppError;
-use crate::REQWEST_CLIENT;
 use app_config::secret_string::Secret;
 use app_config::APP_CONFIG;
 use std::collections::HashMap;
@@ -13,6 +12,7 @@ pub async fn generate_pastebin<S1: AsRef<str>, S2: AsRef<str>>(
   let Some(api_key) = APP_CONFIG.pastebin_api_key() else {
     return Err(AppError::MissingPastebinApiKey);
   };
+  let reqwest_client = reqwest::Client::new();
 
   let parameters = HashMap::from([
     (
@@ -24,7 +24,7 @@ pub async fn generate_pastebin<S1: AsRef<str>, S2: AsRef<str>>(
     ("api_paste_name", name.as_ref()),
   ]);
 
-  let response = REQWEST_CLIENT
+  let response = reqwest_client
     .post("https://pastebin.com/api/api_post.php")
     .form(&parameters)
     .send()

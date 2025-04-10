@@ -48,7 +48,7 @@ impl TwitchIrcMessage {
       return false;
     };
 
-    ["sub", "resub"].contains(&message_id)
+    ["sub", "resub", "giftpaidupgrade", "anongiftpaidupgrade"].contains(&message_id)
   }
 
   fn is_gift_sub(tags: &TwitchIrcTagValues) -> bool {

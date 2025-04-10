@@ -89,6 +89,7 @@ impl TwitchIrcTagValues {
 
     let mut message: Self = serde_json::from_str(&serialized_tag_map)?;
     message.set_timestamp()?;
+    message.check_resub_after_giftsub();
 
     Ok(Some(message))
   }
@@ -110,6 +111,15 @@ impl TwitchIrcTagValues {
     self.timestamp = timestamp;
 
     Ok(())
+  }
+
+  /// Checks if the subtier is empty, but the message id is `giftpaidupgrade`/`anongiftpaidupgrade`.
+  /// Assigning subscription plan to SubTier::One and months_subscribed to 2 if it was.
+  fn check_resub_after_giftsub(&mut self) {
+    if let Some("giftpaidupgrade" | "anongiftpaidupgrade") = self.message_id() {
+      self.subscription_plan = Some(SubTier::One);
+      self.months_subscribed = Some(2.to_string());
+    }
   }
 
   pub fn login_name(&self) -> Option<&str> {

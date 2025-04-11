@@ -72,10 +72,18 @@ impl EmoteListStorage {
     let Some(channel_emote_list) = self.third_party_emote_lists.get(&channel.login_name) else {
       return false;
     };
-    let global_emote_list = self
-      .third_party_emote_lists
-      .get(EmoteList::GLOBAL_NAME)
-      .expect("Global emotes aren't being set for EmoteListStorage.");
+    let global_emote_list = match self.third_party_emote_lists.get(EmoteList::GLOBAL_NAME) {
+      Some(emote_list) => emote_list,
+      None => {
+        tracing::error!(
+          "Failed to retrieve global emote list when checking if channel `{}` contains emote `{}`",
+          channel.id,
+          emote_name
+        );
+
+        &EmoteList::get_empty("".to_string())
+      }
+    };
 
     channel_emote_list.contains(emote_name) || global_emote_list.contains(emote_name)
   }

@@ -17,7 +17,13 @@ impl TwitchIrcMessage {
       return Ok(None);
     };
 
-    let message_type = Self::calculate_message_type(&tags, message);
+    let Some(message_type) = Self::calculate_message_type(&tags, message) else {
+      return Err(AppError::FailedToParseValue {
+        value_name: "irc message message type",
+        location: "twitch irc message creation",
+        value: message.to_string(),
+      });
+    };
 
     Ok(Some(Self {
       tags,
@@ -26,8 +32,11 @@ impl TwitchIrcMessage {
     }))
   }
 
-  fn calculate_message_type(tags: &TwitchIrcTagValues, message: &IrcMessage) -> TwitchMessageType {
-    match () {
+  fn calculate_message_type(
+    tags: &TwitchIrcTagValues,
+    message: &IrcMessage,
+  ) -> Option<TwitchMessageType> {
+    let result = match () {
       _ if Self::is_timeout(tags) => TwitchMessageType::Timeout,
       _ if Self::is_subscription(tags) => TwitchMessageType::Subscription,
       _ if Self::is_gift_sub(tags) => TwitchMessageType::GiftSub,
@@ -35,8 +44,10 @@ impl TwitchIrcMessage {
       _ if Self::is_streamlabs_donation(tags, message) => TwitchMessageType::StreamlabsDonation,
       _ if Self::is_raid(tags) => TwitchMessageType::Raid,
       _ if Self::is_user_message(tags, message) => TwitchMessageType::UserMessage,
-      _ => panic!("{:?}", tags),
-    }
+      _ => return None,
+    };
+
+    Some(result)
   }
 
   fn is_timeout(tags: &TwitchIrcTagValues) -> bool {
@@ -56,7 +67,7 @@ impl TwitchIrcMessage {
       return false;
     };
 
-    ["submysterygift", "giftpaidupgrade"].contains(&message_id)
+    ["submysterygift", "giftpaidupgrade", "subgift"].contains(&message_id)
   }
 
   fn is_bits(tags: &TwitchIrcTagValues) -> bool {

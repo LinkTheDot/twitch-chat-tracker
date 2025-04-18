@@ -130,8 +130,23 @@ impl TwitchIrcTagValues {
     self.display_name.as_deref()
   }
 
-  pub fn gift_sub_count(&self) -> Option<&str> {
-    self.gift_sub_count.as_deref()
+  /// If the value didn't exist, "1" is returned.
+  ///
+  /// For some reason Twitch just omits the value if it's 1.
+  /// Make sure to check if the message is a gift sub before calling this.
+  pub fn gift_sub_count_unchecked(&self) -> Option<&str> {
+    self.gift_sub_count.as_deref().or(Some("1"))
+  }
+
+  pub fn get_sub_count(&self) -> Option<&str> {
+    let message_id = self.message_id()?;
+    let is_gift_sub = ["submysterygift", "giftpaidupgrade", "subgift"].contains(&message_id);
+
+    if is_gift_sub {
+      self.gift_sub_count_unchecked()
+    } else {
+      None
+    }
   }
 
   pub fn bits(&self) -> Option<&str> {
@@ -236,7 +251,7 @@ mod tests {
 
     assert_eq!(message.login_name(), Some("this_is_name"));
     assert_eq!(message.display_name(), Some("This_Is_Name"));
-    assert_eq!(message.gift_sub_count(), Some("69"));
+    assert_eq!(message.gift_sub_count_unchecked(), Some("69"));
     assert_eq!(message.bits(), Some("420"));
     assert_eq!(message.first_message(), Some("1"));
     assert_eq!(message.timestamp(), &expected_timestamp);

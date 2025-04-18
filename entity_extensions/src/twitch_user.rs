@@ -1,5 +1,5 @@
+use crate::errors::EntityExtensionError;
 use crate::prelude::*;
-use anyhow::anyhow;
 use app_config::AppConfig;
 use app_config::secret_string::Secret;
 use entities::{
@@ -32,14 +32,14 @@ pub trait TwitchUserExtensions {
   async fn get_or_set_by_name(
     login_name: &str,
     database_connection: &DatabaseConnection,
-  ) -> anyhow::Result<twitch_user::Model>;
+  ) -> Result<twitch_user::Model, EntityExtensionError>;
   async fn get_or_set_by_twitch_id(
     twitch_id: &str,
     database_connection: &DatabaseConnection,
-  ) -> anyhow::Result<twitch_user::Model>;
+  ) -> Result<twitch_user::Model, EntityExtensionError>;
   async fn query_helix_for_channels_from_list<S: AsRef<str>>(
     channels: &[ChannelIdentifier<S>],
-  ) -> anyhow::Result<Vec<twitch_user::ActiveModel>>;
+  ) -> Result<Vec<twitch_user::ActiveModel>, EntityExtensionError>;
 
   /// Takes a login name that might be within the database, and guesses the user using a levenshtein distance.
   ///
@@ -47,7 +47,7 @@ pub trait TwitchUserExtensions {
   async fn guess_name(
     guess_name: &str,
     database_connection: &DatabaseConnection,
-  ) -> anyhow::Result<Option<twitch_user::Model>>;
+  ) -> Result<Option<twitch_user::Model>, EntityExtensionError>;
 }
 
 impl TwitchUserExtensions for twitch_user::Model {
@@ -58,7 +58,7 @@ impl TwitchUserExtensions for twitch_user::Model {
   async fn get_or_set_by_name(
     user_name: &str,
     database_connection: &DatabaseConnection,
-  ) -> anyhow::Result<twitch_user::Model> {
+  ) -> Result<twitch_user::Model, EntityExtensionError> {
     let user_condition = Condition::any()
       .add(twitch_user::Column::LoginName.eq(user_name))
       .add(twitch_user::Column::DisplayName.eq(user_name));
@@ -74,17 +74,19 @@ impl TwitchUserExtensions for twitch_user::Model {
     let helix_channel =
       Self::query_helix_for_channels_from_list(&[ChannelIdentifier::Login(user_name)]).await?;
     let Some(helix_channel) = helix_channel.first().cloned() else {
-      return Err(anyhow!(
-        "Failed to query helix data for the user {:?}",
-        user_name
-      ));
+      return Err(EntityExtensionError::FailedToQuery {
+        value_name: "helix user data",
+        location: "get or set twitch user by name",
+        value: user_name.to_owned(),
+      });
     };
 
     let ActiveValue::Set(twitch_id) = helix_channel.twitch_id else {
-      return Err(anyhow!(
-        "Failed to get twitch_id from a queried user {}.",
-        user_name
-      ));
+      return Err(EntityExtensionError::FailedToGetValue {
+        value_name: "twitch id",
+        location: "get or set twitch user by name",
+        additional_data: user_name.to_string(),
+      });
     };
     let maybe_model = twitch_user::Entity::find()
       .filter(twitch_user::Column::TwitchId.eq(twitch_id))
@@ -113,7 +115,7 @@ impl TwitchUserExtensions for twitch_user::Model {
   async fn get_or_set_by_twitch_id(
     twitch_id: &str,
     database_connection: &DatabaseConnection,
-  ) -> anyhow::Result<twitch_user::Model> {
+  ) -> Result<twitch_user::Model, EntityExtensionError> {
     let user_model = twitch_user::Entity::find()
       .filter(twitch_user::Column::TwitchId.eq(twitch_id))
       .one(database_connection)
@@ -126,10 +128,11 @@ impl TwitchUserExtensions for twitch_user::Model {
     let helix_channel =
       Self::query_helix_for_channels_from_list(&[ChannelIdentifier::TwitchID(twitch_id)]).await?;
     let Some(helix_channel) = helix_channel.first().cloned() else {
-      return Err(anyhow!(
-        "Failed to query helix data for the user {:?}",
-        twitch_id
-      ));
+      return Err(EntityExtensionError::FailedToQuery {
+        value_name: "helix user data",
+        location: "get or set twitch user by twitch id",
+        value: twitch_id.to_owned(),
+      });
     };
 
     if let Some(user_model) = user_model {
@@ -147,7 +150,7 @@ impl TwitchUserExtensions for twitch_user::Model {
 
   async fn query_helix_for_channels_from_list<S: AsRef<str>>(
     channels: &[ChannelIdentifier<S>],
-  ) -> anyhow::Result<Vec<twitch_user::ActiveModel>> {
+  ) -> Result<Vec<twitch_user::ActiveModel>, EntityExtensionError> {
     if channels.is_empty() || cfg!(feature = "__test_hook") || cfg!(test) {
       return Ok(vec![]);
     }
@@ -188,18 +191,16 @@ impl TwitchUserExtensions for twitch_user::Model {
     let response_body = response.text().await?;
 
     let Value::Object(response_value) = serde_json::from_str::<Value>(&response_body)? else {
-      tracing::error!("Unkown response: {:?}", response_body);
-
-      return Err(anyhow!(
-        "Received an unknown response body structure when querying. Body location: query channel list response body."
-      ));
+      return Err(EntityExtensionError::UnknownResponseBody {
+        location: "query channel list",
+        response: response_body.to_owned(),
+      });
     };
     let Some(Value::Array(channel_list)) = response_value.get("data") else {
-      tracing::error!("Unkown response: {:?}", response_body);
-
-      return Err(anyhow!(
-        "Received an unknown response body structure when querying. Body location: query channel list internal list."
-      ));
+      return Err(EntityExtensionError::UnknownResponseBody {
+        location: "query channel list internal list",
+        response: response_body.to_owned(),
+      });
     };
 
     let mut user_list = vec![];
@@ -223,10 +224,11 @@ impl TwitchUserExtensions for twitch_user::Model {
         continue;
       };
       let Ok(user_id) = user_id.parse::<i32>() else {
-        return Err(anyhow!(
-          "Failed to parse Twitch userID into an integer. userID string: `{:?}`",
-          user_id
-        ));
+        return Err(EntityExtensionError::FailedToParseValue {
+          value_name: "twitch user id",
+          location: "query helix for channels from list",
+          value: user_id.to_string(),
+        });
       };
 
       let user = twitch_user::ActiveModel {
@@ -249,7 +251,7 @@ impl TwitchUserExtensions for twitch_user::Model {
   async fn guess_name(
     guess_name: &str,
     database_connection: &DatabaseConnection,
-  ) -> anyhow::Result<Option<twitch_user::Model>> {
+  ) -> Result<Option<twitch_user::Model>, EntityExtensionError> {
     let unknown_user =
       unknown_user::Model::get_or_set_by_name(guess_name, database_connection).await?;
     let maybe_association = unknown_user
@@ -289,7 +291,7 @@ async fn check_for_name_change(
   existing_twitch_user: twitch_user::Model,
   helix_twitch_user: twitch_user::ActiveModel,
   database_connection: &DatabaseConnection,
-) -> anyhow::Result<twitch_user::Model> {
+) -> Result<twitch_user::Model, EntityExtensionError> {
   tracing::info!(
     "Updating user name change from {} to {:?}",
     existing_twitch_user.login_name,

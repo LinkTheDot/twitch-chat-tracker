@@ -123,7 +123,11 @@ impl TwitchIrcMessage {
   }
 
   pub fn gift_sub_count(&self) -> Option<&str> {
-    self.tags.gift_sub_count()
+    if self.message_type == TwitchMessageType::GiftSub {
+      self.tags.gift_sub_count_unchecked()
+    } else {
+      None
+    }
   }
 
   pub fn bits(&self) -> Option<&str> {

@@ -1,3 +1,4 @@
+use crate::errors::EntityExtensionError;
 use entities::{twitch_user, twitch_user_unknown_user_association, unknown_user};
 use sea_orm::*;
 
@@ -6,7 +7,7 @@ pub trait TwitchUserUnkownUserAssociationExtensions {
     unknown_user: &unknown_user::Model,
     twitch_user: &twitch_user::Model,
     database_connection: &DatabaseConnection,
-  ) -> anyhow::Result<twitch_user_unknown_user_association::Model>;
+  ) -> Result<twitch_user_unknown_user_association::Model, EntityExtensionError>;
 }
 
 impl TwitchUserUnkownUserAssociationExtensions for twitch_user_unknown_user_association::Model {
@@ -14,7 +15,7 @@ impl TwitchUserUnkownUserAssociationExtensions for twitch_user_unknown_user_asso
     unknown_user: &unknown_user::Model,
     twitch_user: &twitch_user::Model,
     database_connection: &DatabaseConnection,
-  ) -> anyhow::Result<twitch_user_unknown_user_association::Model> {
+  ) -> Result<twitch_user_unknown_user_association::Model, EntityExtensionError> {
     let maybe_association = twitch_user_unknown_user_association::Entity::find()
       .filter(
         Condition::all()

@@ -1,5 +1,5 @@
+use crate::errors::EntityExtensionError;
 use crate::stream_message::StreamMessageExtensions;
-use anyhow::anyhow;
 use app_config::AppConfig;
 use app_config::secret_string::Secret;
 use chrono::{DateTime, Utc};
@@ -33,7 +33,7 @@ pub trait StreamExtensions {
   ) -> Result<Option<stream::Model>, DbErr>;
   async fn get_active_livestreams<'a, I>(
     channels: I,
-  ) -> anyhow::Result<HashMap<String, (DateTime<Utc>, String)>>
+  ) -> Result<HashMap<String, (DateTime<Utc>, String)>, EntityExtensionError>
   where
     I: IntoIterator<Item = &'a twitch_user::Model>;
 }
@@ -116,34 +116,34 @@ impl StreamExtensions for stream::Model {
 
   async fn get_active_livestreams<'a, I>(
     channels: I,
-  ) -> anyhow::Result<HashMap<String, (DateTime<Utc>, String)>>
+  ) -> Result<HashMap<String, (DateTime<Utc>, String)>, EntityExtensionError>
   where
     I: IntoIterator<Item = &'a twitch_user::Model>,
   {
     let request = build_get_streams_request(channels).await?;
     let response = request.send().await?;
 
-    if let Some(remaining_requests) = response.headers().get("ratelimit-remaining") {
-      if remaining_requests == "0" {
-        tracing::warn!("Exceeded max requests per minute.");
-        return Err(anyhow!("Remaining Helix API requests is 0."));
-      }
+    let status = response.status();
+
+    if !status.is_success() {
+      return Err(EntityExtensionError::FailedResponse {
+        location: "get active livestreams",
+        code: status.as_u16(),
+      });
     }
 
     let response_body = response.text().await?;
     let Value::Object(response_value): Value = serde_json::from_str(&response_body)? else {
-      tracing::error!("Unkown response: {:?}", response_body);
-
-      return Err(anyhow!(
-        "Received an unknown response body structure when querying. Body location: update live status response body."
-      ));
+      return Err(EntityExtensionError::UnknownResponseBody {
+        location: "get active livestreams update live status",
+        response: response_body,
+      });
     };
     let Some(Value::Array(live_streams)) = response_value.get("data") else {
-      tracing::error!("Unkown response: {:?}", response_body);
-
-      return Err(anyhow!(
-        "Received an unknown response body structure when querying. Body location: update live status live stream list."
-      ));
+      return Err(EntityExtensionError::UnknownResponseBody {
+        location: "get active livestreams update live status live stream list",
+        response: response_body,
+      });
     };
 
     let mut live_channels: HashMap<String, (DateTime<Utc>, String)> = HashMap::new();
@@ -194,7 +194,9 @@ impl StreamExtensions for stream::Model {
 }
 
 /// Takes the list of channels and builds the request for querying streams.
-async fn build_get_streams_request<'a, I>(channels: I) -> Result<RequestBuilder, url::ParseError>
+async fn build_get_streams_request<'a, I>(
+  channels: I,
+) -> Result<RequestBuilder, EntityExtensionError>
 where
   I: IntoIterator<Item = &'a twitch_user::Model>,
 {

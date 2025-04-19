@@ -60,8 +60,12 @@ async fn update_channel_status(mut connected_channels: TrackedChannels) {
     tracing::debug!("Updating live status.");
 
     match connected_channels.update_active_livestreams().await {
-      Err(AppError::EntityExtensionError(entity_extensions::errors::EntityExtensionError::FailedResponse { code: 503, .. })) => { 
-        tracing::error!("Failed to update livestreams. Received 503, service unavailable. Waiting 30 seconds.");
+      Err(AppError::EntityExtensionError(
+        entity_extensions::errors::EntityExtensionError::FailedResponse { code: 503, .. },
+      )) => {
+        tracing::error!(
+          "Failed to update livestreams. Received 503, service unavailable. Waiting 30 seconds."
+        );
 
         tokio::time::sleep(Duration::from_secs(30)).await;
       }
@@ -73,7 +77,7 @@ async fn update_channel_status(mut connected_channels: TrackedChannels) {
         );
       }
 
-      _ => ()
+      _ => (),
     }
 
     tracing::debug!("Live statuses updated.");

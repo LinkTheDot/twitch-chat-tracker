@@ -3791,6 +3791,7 @@ dependencies = [
  "database_connection",
  "entities",
  "entity_extensions",
+ "human-time",
  "irc",
  "reqwest",
  "sea-orm",

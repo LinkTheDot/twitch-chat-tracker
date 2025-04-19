@@ -27,6 +27,7 @@ sea-orm = { version = "1.1.8", features = ["sqlx-mysql", "runtime-tokio", "macro
 url = "2.5.4"
 app_config = { path = "app_config" }
 database_connection = { path = "database_connection" }
+human-time = "0.1.6"
 entities = { path = "entities" }
 entity_extensions = { path = "entity_extensions" }
 

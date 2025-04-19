@@ -125,6 +125,10 @@ impl TwitchUserExtensions for twitch_user::Model {
       return Ok(user_model.unwrap());
     }
 
+    if let Some(user_model) = user_model {
+      return Ok(user_model);
+    }
+
     let helix_channel =
       Self::query_helix_for_channels_from_list(&[ChannelIdentifier::TwitchID(twitch_id)]).await?;
     let Some(helix_channel) = helix_channel.first().cloned() else {
@@ -134,13 +138,6 @@ impl TwitchUserExtensions for twitch_user::Model {
         value: twitch_id.to_owned(),
       });
     };
-
-    if let Some(user_model) = user_model {
-      let user_model =
-        check_for_name_change(user_model, helix_channel, database_connection).await?;
-
-      return Ok(user_model);
-    }
 
     helix_channel
       .insert(database_connection)

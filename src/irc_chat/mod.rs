@@ -78,6 +78,7 @@ impl TwitchIrc {
       password,
       use_tls: Some(true),
       channels: Self::get_channels(),
+      ping_timeout: Some(30),
       ..Default::default()
     })
   }

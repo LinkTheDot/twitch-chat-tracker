@@ -9,3 +9,4 @@ secrets.*
 /docs
 bin/build_and_push_*
 bin/update
+src/manual_migrations.rs

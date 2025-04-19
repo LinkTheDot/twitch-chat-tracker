@@ -1,4 +1,0 @@
-#!/usr/bin/env zsh
-
-docker build --progress=plain -t $HOMELAB_ADDRESS:5000/twitch-chat-logger .;
-docker run -e DATABASE_PASSWORD="$DATABASE_PASSWORD" -v $(pwd)/app_log:/workspace/app_log homelab.local:5000/twitch-chat-logger &

@@ -77,7 +77,10 @@ impl AppConfig {
     }
 
     if cfg!(test) || cfg!(feature = "__test_hook") {
-      config.channels = Self::TEST_CHANNELS.iter().map(|channel_name| channel_name.to_string()).collect();
+      config.channels = Self::TEST_CHANNELS
+        .iter()
+        .map(|channel_name| channel_name.to_string())
+        .collect();
     }
 
     config
@@ -104,7 +107,6 @@ impl AppConfig {
   }
 
   pub fn channels() -> &'static Vec<String> {
-
     &Self::get_or_set().channels
   }
 

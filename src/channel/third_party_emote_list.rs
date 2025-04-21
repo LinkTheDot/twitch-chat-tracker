@@ -52,9 +52,11 @@ impl EmoteList {
       return None;
     }
 
-    let test_emotes: HashSet<String> = Self::TEST_EMOTES.iter().map(|emote_name| emote_name.to_string()).collect();
+    let test_emotes: HashSet<String> = Self::TEST_EMOTES
+      .iter()
+      .map(|emote_name| emote_name.to_string())
+      .collect();
     let mut emote_lists = vec![];
-
 
     for channel_name in AppConfig::TEST_CHANNELS {
       emote_lists.push(EmoteList {

@@ -1132,7 +1132,13 @@ mod tests {
       ..expected_active_model_v1.clone()
     };
 
-    assert!(result == expected_active_model_v1 || result == expected_active_model_v2, "result: \n{:?}\nexpected:\n{:?}\n{:?}", result, expected_active_model_v1, expected_active_model_v2);
+    assert!(
+      result == expected_active_model_v1 || result == expected_active_model_v2,
+      "result: \n{:?}\nexpected:\n{:?}\n{:?}",
+      result,
+      expected_active_model_v1,
+      expected_active_model_v2
+    );
   }
 
   fn get_user_message_template() -> (IrcMessage, DatabaseConnection) {

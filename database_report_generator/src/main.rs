@@ -7,8 +7,7 @@ use sea_orm::*;
 
 #[tokio::main]
 async fn main() {
-  database_report_generator::logging::setup_logging_config()
-    .unwrap();
+  database_report_generator::logging::setup_logging_config().unwrap();
 
   let database_connection = get_database_connection().await;
   let report_stream_id = if let Some(stream_id) = Args::report_stream_id() {

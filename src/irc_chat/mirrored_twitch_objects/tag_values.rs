@@ -62,7 +62,7 @@ pub struct TwitchIrcTagValues {
   months_subscribed: Option<String>,
 
   /// Comes with gift subs. Unique per set.
-  /// Because Twitch sends a message for each person that received a gift sub, this is used 
+  /// Because Twitch sends a message for each person that received a gift sub, this is used
   /// to uniquely identify any given gift sub set.
   #[serde(rename = "msg-param-origin-id")]
   gift_sub_origin_id: Option<String>,
@@ -212,7 +212,7 @@ impl TwitchIrcTagValues {
   }
 
   /// Comes with gift subs. Unique per set.
-  /// Because Twitch sends a message for each person that received a gift sub, this is used 
+  /// Because Twitch sends a message for each person that received a gift sub, this is used
   /// to uniquely identify any given gift sub set.
   pub fn gift_sub_origin_id(&self) -> Option<&str> {
     self.gift_sub_origin_id.as_deref()

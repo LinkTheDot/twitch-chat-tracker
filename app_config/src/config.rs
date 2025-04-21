@@ -55,6 +55,8 @@ pub struct AppConfig {
 }
 
 impl AppConfig {
+  pub const TEST_CHANNELS: &[&str] = &["fallenshadow", "shadowchama"];
+
   fn new() -> Self {
     let mut config = ConfigLoader::<AppConfig>::new()
       .file_optional(get_config_path())
@@ -72,6 +74,10 @@ impl AppConfig {
 
     if config.channels.len() * config.queries_per_minute > RATE_LIMIT {
       panic!("The amount of channels being queried each minute exceeds the limit of 800. channel_count * quieries_per_minute must be <= 800.");
+    }
+
+    if cfg!(test) || cfg!(feature = "__test_hook") {
+      config.channels = Self::TEST_CHANNELS.iter().map(|channel_name| channel_name.to_string()).collect();
     }
 
     config
@@ -98,6 +104,7 @@ impl AppConfig {
   }
 
   pub fn channels() -> &'static Vec<String> {
+
     &Self::get_or_set().channels
   }
 

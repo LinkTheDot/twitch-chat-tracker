@@ -115,7 +115,7 @@ async fn get_rankings(
       .any(|user_message| user_message.is_first_message == 1);
     let avg_words_per_message = user_messages
       .iter()
-      .map(|message| message.contents.split(' ').count())
+      .filter_map(|message| Some(message.contents.as_ref()?.split(' ').count()))
       .sum::<usize>() as f32
       / user_messages.len() as f32;
 
@@ -148,6 +148,13 @@ fn emote_filtered_messages(messages: Vec<&stream_message::Model>) -> Vec<&stream
   messages
     .into_iter()
     .filter(|message| {
+      let Some(contents) = &message.contents else {
+        tracing::error!(
+          "Failed to get message with null contents. Message ID: {}",
+          message.id
+        );
+        return false;
+      };
       let twitch_emotes_used = message.twitch_emote_usage.as_deref().unwrap_or("{}");
       let twitch_emotes_used =
         match serde_json::from_str::<HashMap<String, usize>>(twitch_emotes_used) {
@@ -178,7 +185,7 @@ fn emote_filtered_messages(messages: Vec<&stream_message::Model>) -> Vec<&stream
 
       let total_emotes_used = twitch_emotes_used + third_party_emotes_used;
 
-      let message_word_count = message.contents.split(' ').count();
+      let message_word_count = contents.split(' ').count();
 
       total_emotes_used as f32 / message_word_count as f32 <= EMOTE_DOMINANCE
     })

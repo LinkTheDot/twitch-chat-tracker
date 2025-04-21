@@ -1,4 +1,5 @@
 use crate::errors::AppError;
+use app_config::AppConfig;
 use entities::twitch_user;
 use serde_json::Value;
 use std::collections::HashSet;
@@ -23,6 +24,7 @@ pub struct EmoteList {
 
 impl EmoteList {
   pub const GLOBAL_NAME: &str = "GLOBAL";
+  pub const TEST_EMOTES: &[&str] = &["glorp", "waaa", "glorpass"];
 
   pub fn get_empty(channel_name: String) -> Self {
     Self {
@@ -40,6 +42,33 @@ impl EmoteList {
       emote_list: _7tv,
       // TODO: implememnt bttv and frankerfacez querying
     })
+  }
+
+  /// Returns the list of emotes defined by EmoteList::TEST_EMOTES for every channel under AppConfig::TEST_CHANNELS and Self::GLOBAL_NAME.
+  ///
+  /// None is returned if this method is called without the test flag set.
+  pub fn get_test_list() -> Option<Vec<Self>> {
+    if !cfg!(test) {
+      return None;
+    }
+
+    let test_emotes: HashSet<String> = Self::TEST_EMOTES.iter().map(|emote_name| emote_name.to_string()).collect();
+    let mut emote_lists = vec![];
+
+
+    for channel_name in AppConfig::TEST_CHANNELS {
+      emote_lists.push(EmoteList {
+        channel_name: channel_name.to_string(),
+        emote_list: test_emotes.clone(),
+      })
+    }
+
+    emote_lists.push(EmoteList {
+      channel_name: Self::GLOBAL_NAME.to_string(),
+      emote_list: test_emotes,
+    });
+
+    Some(emote_lists)
   }
 
   async fn get_7tv_list(channel: &twitch_user::Model) -> Result<HashSet<String>, AppError> {

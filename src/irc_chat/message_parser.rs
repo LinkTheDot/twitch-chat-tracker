@@ -5,6 +5,7 @@ use crate::errors::AppError;
 use database_connection::get_database_connection;
 use entities::sea_orm_active_enums::EventType;
 use entities::*;
+use entity_extensions::donation_event::DonationEventExtensions;
 use entity_extensions::prelude::*;
 use irc::client::prelude::*;
 use irc::proto::Message as IrcMessage;
@@ -50,11 +51,9 @@ impl<'a> MessageParser<'a> {
           .await?;
       }
       TwitchMessageType::GiftSub => {
-        self
-          .parse_gift_subs(database_connection)
-          .await?
-          .insert(database_connection)
-          .await?;
+        if let Some(gift_sub_donation) = self.parse_gift_subs(database_connection).await? {
+          gift_sub_donation.insert(database_connection).await?;
+        }
       }
       TwitchMessageType::Bits => {
         self
@@ -200,15 +199,29 @@ impl<'a> MessageParser<'a> {
     Ok(subscription_event)
   }
 
+  /// None is returned if the gift sub's origin id already exists in the database.
   async fn parse_gift_subs(
     &self,
     database_connection: &DatabaseConnection,
-  ) -> Result<donation_event::ActiveModel, AppError> {
+  ) -> Result<Option<donation_event::ActiveModel>, AppError> {
     if self.message.message_type() != TwitchMessageType::GiftSub {
       return Err(AppError::IncorrectMessageType {
         expected_type: TwitchMessageType::GiftSub,
         got_type: self.message.message_type(),
       });
+    }
+
+    let Some(origin_id) = self.message.gift_sub_origin_id() else {
+      return Err(AppError::MissingExpectedValue {
+        expected_value_name: "origin id",
+        location: "gift sub parsing",
+      });
+    };
+
+    if donation_event::Model::gift_sub_origin_id_already_exists(origin_id, database_connection)
+      .await?
+    {
+      return Ok(None);
     }
 
     let Some(streamer_twitch_id) = self.message.room_id() else {
@@ -257,10 +270,11 @@ impl<'a> MessageParser<'a> {
       donation_receiver_twitch_user_id: ActiveValue::Set(streamer_model.id),
       stream_id: ActiveValue::Set(maybe_stream.map(|stream| stream.id)),
       subscription_tier: ActiveValue::Set(Some(subscription_tier.into())),
+      origin_id: ActiveValue::Set(Some(origin_id.into())),
       ..Default::default()
     };
 
-    Ok(donation_event)
+    Ok(Some(donation_event))
   }
 
   async fn parse_bits(
@@ -349,7 +363,7 @@ impl<'a> MessageParser<'a> {
         command_string: format!("{:?}", self.message.command()),
       });
     };
-    let Some(mut donation_quantity) = message_contents.split(" ").nth(2).map(str::to_string) else {
+    let Some(mut donation_quantity) = message_contents.split(" ").nth(3).map(str::to_string) else {
       return Err(AppError::FailedToParseValue {
         value_name: "donation quantity",
         location: "streamlabs donation parsing",
@@ -534,7 +548,7 @@ impl<'a> MessageParser<'a> {
       is_first_message: ActiveValue::Set(self.message.is_first_message() as i8),
       timestamp: ActiveValue::Set(*self.message.timestamp()),
       emote_only: ActiveValue::Set(self.message.message_is_only_emotes() as i8),
-      contents: ActiveValue::Set(message_contents.to_owned()),
+      contents: ActiveValue::Set(Some(message_contents.to_owned())),
       twitch_user_id: ActiveValue::Set(sender_twitch_user_model.id),
       channel_id: ActiveValue::Set(streamer_twitch_user_model.id),
       stream_id: ActiveValue::Set(maybe_stream.map(|stream| stream.id)),
@@ -579,7 +593,7 @@ mod tests {
   #[tokio::test]
   async fn parse_timeout_expected_value() {
     let (timeout_message, timeout_mock_database) = get_timeout_template();
-    let third_party_emote_storage = EmoteListStorage::new().await.unwrap();
+    let third_party_emote_storage = EmoteListStorage::test_list().unwrap();
     let message_parser = MessageParser::new(&timeout_message, &third_party_emote_storage)
       .unwrap()
       .unwrap();
@@ -640,7 +654,7 @@ mod tests {
   #[tokio::test]
   async fn parse_subscription_expected_value() {
     let (sub_message, subscription_mock_database) = get_subscription_template();
-    let third_party_emote_storage = EmoteListStorage::new().await.unwrap();
+    let third_party_emote_storage = EmoteListStorage::test_list().unwrap();
     let message_parser = MessageParser::new(&sub_message, &third_party_emote_storage)
       .unwrap()
       .unwrap();
@@ -704,8 +718,8 @@ mod tests {
 
   #[tokio::test]
   async fn parse_gift_subs_expected_value() {
-    let (giftsub_message, giftsub_mock_database) = get_gift_subs_template();
-    let third_party_emote_storage = EmoteListStorage::new().await.unwrap();
+    let (giftsub_message, giftsub_mock_database) = get_gift_subs_template(Some(5));
+    let third_party_emote_storage = EmoteListStorage::test_list().unwrap();
     let message_parser = MessageParser::new(&giftsub_message, &third_party_emote_storage)
       .unwrap()
       .unwrap();
@@ -725,22 +739,58 @@ mod tests {
       stream_id: ActiveValue::Set(None),
       subscription_tier: ActiveValue::Set(Some(1)),
       unknown_user_id: ActiveValue::NotSet,
+      origin_id: ActiveValue::Set(Some("1000".into())),
     };
 
-    assert_eq!(result, expected_active_model);
+    assert_eq!(result, Some(expected_active_model));
   }
+  #[tokio::test]
+  async fn parse_gift_subs_no_sub_count_given() {
+    let (giftsub_message, giftsub_mock_database) = get_gift_subs_template(None);
+    let third_party_emote_storage = EmoteListStorage::new().await.unwrap();
+    let message_parser = MessageParser::new(&giftsub_message, &third_party_emote_storage)
+      .unwrap()
+      .unwrap();
 
-  fn get_gift_subs_template() -> (IrcMessage, DatabaseConnection) {
-    let tags = vec![
+    let result = message_parser
+      .parse_gift_subs(&giftsub_mock_database)
+      .await
+      .unwrap();
+
+    let expected_active_model = donation_event::ActiveModel {
+      id: ActiveValue::NotSet,
+      event_type: ActiveValue::Set(EventType::GiftSubs),
+      amount: ActiveValue::Set(1.0_f32),
+      timestamp: ActiveValue::Set(timestamp_from_string("1740956922774")),
+      donator_twitch_user_id: ActiveValue::Set(Some(3)),
+      donation_receiver_twitch_user_id: ActiveValue::Set(1),
+      stream_id: ActiveValue::Set(None),
+      subscription_tier: ActiveValue::Set(Some(1)),
+      unknown_user_id: ActiveValue::NotSet,
+      origin_id: ActiveValue::Set(Some("1000".into())),
+    };
+
+    assert_eq!(result, Some(expected_active_model));
+  }
+  fn get_gift_subs_template(sub_count: Option<i32>) -> (IrcMessage, DatabaseConnection) {
+    let mut tags = vec![
       IrcTag("room-id".into(), Some("578762718".into())),
       IrcTag("user-id".into(), Some("128831052".into())),
       IrcTag("msg-param-sub-plan".into(), Some("1000".into())),
-      IrcTag("msg-param-mass-gift-count".into(), Some("5".into())),
       IrcTag("tmi-sent-ts".into(), Some("1740956922774".into())),
       IrcTag("msg-id".into(), Some("submysterygift".into())),
       IrcTag("login".into(), Some("linkthedot".into())),
       IrcTag("display-name".into(), Some("LinkTheDot".into())),
+      IrcTag("display-name".into(), Some("LinkTheDot".into())),
+      IrcTag("msg-param-origin-id".into(), Some("1000".into())),
     ];
+
+    if let Some(sub_count) = sub_count {
+      tags.push(IrcTag(
+        "msg-param-mass-gift-count".into(),
+        Some(sub_count.to_string()),
+      ))
+    }
 
     let message = IrcMessage {
       tags: Some(tags),
@@ -750,6 +800,7 @@ mod tests {
 
     let mock_database = MockDatabase::new(DatabaseBackend::MySql)
       .append_query_results([
+        vec![],
         vec![twitch_user::Model {
           id: 1,
           twitch_id: 578762718,
@@ -768,11 +819,87 @@ mod tests {
 
     (message, mock_database)
   }
+  #[tokio::test]
+  async fn mass_gift_sub_test() {
+    let (giftsub_message, _) = get_gift_subs_template(Some(3));
+    let third_party_emote_storage = EmoteListStorage::test_list().unwrap();
+    let message_parser = MessageParser::new(&giftsub_message, &third_party_emote_storage)
+      .unwrap()
+      .unwrap();
+    let expected_model = donation_event::Model {
+      id: 1,
+      event_type: EventType::GiftSubs,
+      amount: 1.0_f32,
+      timestamp: timestamp_from_string("1740956922774"),
+      donator_twitch_user_id: Some(3),
+      donation_receiver_twitch_user_id: 1,
+      stream_id: None,
+      subscription_tier: Some(1),
+      unknown_user_id: None,
+      origin_id: Some("1000".into()),
+    };
+    let expected_active_model = donation_event::ActiveModel {
+      id: ActiveValue::NotSet,
+      event_type: ActiveValue::Set(EventType::GiftSubs),
+      amount: ActiveValue::Set(3.0_f32),
+      timestamp: ActiveValue::Set(timestamp_from_string("1740956922774")),
+      donator_twitch_user_id: ActiveValue::Set(Some(3)),
+      donation_receiver_twitch_user_id: ActiveValue::Set(1),
+      stream_id: ActiveValue::Set(None),
+      subscription_tier: ActiveValue::Set(Some(1)),
+      unknown_user_id: ActiveValue::NotSet,
+      origin_id: ActiveValue::Set(Some("1000".into())),
+    };
+    let (bulk_message, _) = get_gift_subs_template(None);
+    let bulk_message_parser = MessageParser::new(&bulk_message, &third_party_emote_storage)
+      .unwrap()
+      .unwrap();
+
+    let giftsub_mock_database = MockDatabase::new(DatabaseBackend::MySql)
+      .append_query_results([
+        vec![],
+        vec![twitch_user::Model {
+          id: 1,
+          twitch_id: 578762718,
+          login_name: "fallenshadow".into(),
+          display_name: "fallenshadow".into(),
+        }],
+        vec![],
+        vec![twitch_user::Model {
+          id: 3,
+          twitch_id: 128831052,
+          login_name: "linkthedot".into(),
+          display_name: "LinkTheDot".into(),
+        }],
+      ])
+      .append_query_results([
+        vec![expected_model.clone()],
+        vec![expected_model.clone()],
+        vec![expected_model],
+      ])
+      .into_connection();
+
+    let result = message_parser
+      .parse_gift_subs(&giftsub_mock_database)
+      .await
+      .unwrap();
+
+    assert_eq!(result, Some(expected_active_model));
+
+    for _ in 0..3 {
+      let result = bulk_message_parser
+        .parse_gift_subs(&giftsub_mock_database)
+        .await
+        .unwrap();
+
+      assert_eq!(result, None);
+    }
+  }
 
   #[tokio::test]
   async fn parse_bits_expected_value() {
     let (bits_message, bit_donation_mock_database) = get_bits_template();
-    let third_party_emote_storage = EmoteListStorage::new().await.unwrap();
+    let third_party_emote_storage = EmoteListStorage::test_list().unwrap();
     let message_parser = MessageParser::new(&bits_message, &third_party_emote_storage)
       .unwrap()
       .unwrap();
@@ -792,6 +919,7 @@ mod tests {
       stream_id: ActiveValue::Set(None),
       subscription_tier: ActiveValue::NotSet,
       unknown_user_id: ActiveValue::NotSet,
+      origin_id: ActiveValue::NotSet,
     };
 
     assert_eq!(result, expected_active_model);
@@ -841,7 +969,7 @@ mod tests {
   #[tokio::test]
   async fn parse_raid_expected_value() {
     let (raid_message, raid_mock_database) = get_raid_template();
-    let third_party_emote_storage = EmoteListStorage::new().await.unwrap();
+    let third_party_emote_storage = EmoteListStorage::test_list().unwrap();
     let message_parser = MessageParser::new(&raid_message, &third_party_emote_storage)
       .unwrap()
       .unwrap();
@@ -905,7 +1033,7 @@ mod tests {
   async fn parse_streamlabs_donation_expected_value() {
     let (streamlabs_message, streamlabs_donation_mock_database) =
       get_streamlabs_donation_template();
-    let third_party_emote_storage = EmoteListStorage::new().await.unwrap();
+    let third_party_emote_storage = EmoteListStorage::test_list().unwrap();
     let message_parser = MessageParser::new(&streamlabs_message, &third_party_emote_storage)
       .unwrap()
       .unwrap();
@@ -925,6 +1053,7 @@ mod tests {
       stream_id: ActiveValue::Set(None),
       subscription_tier: ActiveValue::NotSet,
       unknown_user_id: ActiveValue::Set(None),
+      origin_id: ActiveValue::NotSet,
     };
 
     assert_eq!(result, expected_active_model);
@@ -947,7 +1076,7 @@ mod tests {
       )),
       command: Command::PRIVMSG(
         "#fallenshadow".into(),
-        "LinkTheDot tipped £5000.00! Wow!".into(),
+        "LinkTheDot just tipped £5000.00! Wow!".into(),
       ),
     };
 
@@ -975,7 +1104,7 @@ mod tests {
   #[tokio::test]
   async fn parse_user_message_expected_value() {
     let (user_message, user_message_mock_database) = get_user_message_template();
-    let third_party_emote_storage = EmoteListStorage::new().await.unwrap();
+    let third_party_emote_storage = EmoteListStorage::test_list().unwrap();
     let message_parser = MessageParser::new(&user_message, &third_party_emote_storage)
       .unwrap()
       .unwrap();
@@ -990,11 +1119,11 @@ mod tests {
       is_first_message: ActiveValue::Set(0_i8),
       timestamp: ActiveValue::Set(timestamp_from_string("1740956922774")),
       emote_only: ActiveValue::Set(0_i8),
-      contents: ActiveValue::Set("Cat <3 syadouStanding".to_string()),
+      contents: ActiveValue::Set(Some("waaa <3 syadouStanding".to_string())),
       twitch_user_id: ActiveValue::Set(3),
       channel_id: ActiveValue::Set(1),
       stream_id: ActiveValue::Set(None),
-      third_party_emotes_used: ActiveValue::Set(Some("{\"Cat\":1}".to_string())),
+      third_party_emotes_used: ActiveValue::Set(Some("{\"waaa\":1}".to_string())),
       is_subscriber: ActiveValue::Set(1_i8),
       twitch_emote_usage: ActiveValue::Set(Some("{\"1\":1,\"2\":1}".to_string())),
     };
@@ -1003,7 +1132,7 @@ mod tests {
       ..expected_active_model_v1.clone()
     };
 
-    assert!(result == expected_active_model_v1 || result == expected_active_model_v2);
+    assert!(result == expected_active_model_v1 || result == expected_active_model_v2, "result: \n{:?}\nexpected:\n{:?}\n{:?}", result, expected_active_model_v1, expected_active_model_v2);
   }
 
   fn get_user_message_template() -> (IrcMessage, DatabaseConnection) {
@@ -1029,7 +1158,7 @@ mod tests {
         "linkthedot".into(),
         "linkthedot.tmi.twitch.tv".into(),
       )),
-      command: Command::PRIVMSG("#fallenshadow".into(), "Cat <3 syadouStanding".into()),
+      command: Command::PRIVMSG("#fallenshadow".into(), "waaa <3 syadouStanding".into()),
     };
 
     let mock_database = MockDatabase::new(DatabaseBackend::MySql)
@@ -1068,7 +1197,7 @@ mod tests {
   #[tokio::test]
   async fn subscribe_continuation_off_gift_subs_works() {
     let (sub_message, subscription_mock_database) = get_subscription_continuation_template();
-    let third_party_emote_storage = EmoteListStorage::new().await.unwrap();
+    let third_party_emote_storage = EmoteListStorage::test_list().unwrap();
     let message_parser = MessageParser::new(&sub_message, &third_party_emote_storage)
       .unwrap()
       .unwrap();

@@ -140,6 +140,14 @@ impl ChatStatistics {
     let mut emote_dominant_chats = 0;
 
     for message in messages {
+      let Some(contents) = &message.contents else {
+        tracing::error!(
+          "Failed to get message with null contents. Message ID: {}",
+          message.id
+        );
+        continue;
+      };
+
       let twitch_emotes_used = message.twitch_emote_usage.as_deref().unwrap_or("{}");
       let twitch_emotes_used =
         match serde_json::from_str::<HashMap<String, usize>>(twitch_emotes_used) {
@@ -170,7 +178,7 @@ impl ChatStatistics {
 
       let total_emotes_used = twitch_emotes_used + third_party_emotes_used;
 
-      let message_word_count = message.contents.split(' ').count();
+      let message_word_count = contents.split(' ').count();
 
       if total_emotes_used as f32 / message_word_count as f32 <= EMOTE_DOMINANCE {
         emote_dominant_chats += 1;
@@ -183,7 +191,7 @@ impl ChatStatistics {
   fn average_word_length(messages: &[stream_message::Model]) -> f32 {
     messages
       .iter()
-      .map(|message| message.contents.split(' ').count())
+      .filter_map(|message| Some(message.contents.as_ref()?.split(' ').count()))
       .sum::<usize>() as f32
       / messages.len() as f32
   }

@@ -87,7 +87,7 @@ impl TwitchIrcMessage {
       return false;
     };
 
-    let Some(mut donation_quantity) = contents.split(" ").nth(2).map(str::to_string) else {
+    let Some(mut donation_quantity) = contents.split(" ").nth(3).map(str::to_string) else {
       return false;
     };
     donation_quantity = donation_quantity.replace("£", "");
@@ -188,5 +188,9 @@ impl TwitchIrcMessage {
 
   pub fn months_subscribed(&self) -> Option<&str> {
     self.tags.months_subscribed()
+  }
+
+  pub fn gift_sub_origin_id(&self) -> Option<&str> {
+    self.tags.gift_sub_origin_id()
   }
 }

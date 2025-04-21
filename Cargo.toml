@@ -33,3 +33,4 @@ entity_extensions = { path = "entity_extensions" }
 
 [dev-dependencies]
 entity_extensions = { path = "entity_extensions", features = ["__test_hook"] }
+app_config = { path = "app_config", features = ["__test_hook"] }

@@ -68,6 +68,30 @@ impl EmoteListStorage {
     })
   }
 
+  /// Returns the list of emotes stored defined by EmoteList::TEST_EMOTES for every channel under AppConfig::TEST_CHANNELS and EmoteList::GLOBAL_NAME.
+  ///
+  /// None is returned if this method is called without the test flag set.
+  pub fn test_list() -> Option<Self> {
+    if !cfg!(test) {
+      return None;
+    }
+
+    let test_emote_storage = EmoteList::get_test_list()?;
+
+    let third_party_emote_lists = test_emote_storage.into_iter().fold(
+      HashMap::new(),
+      |mut third_party_emote_lists, emote_list| {
+        third_party_emote_lists.insert(emote_list.channel_name().to_string(), emote_list);
+
+        third_party_emote_lists
+      },
+    );
+
+    Some(Self {
+      third_party_emote_lists,
+    })
+  }
+
   pub fn channel_has_emote(&self, channel: &twitch_user::Model, emote_name: &str) -> bool {
     let Some(channel_emote_list) = self.third_party_emote_lists.get(&channel.login_name) else {
       return false;

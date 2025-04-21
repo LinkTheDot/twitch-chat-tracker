@@ -10,7 +10,8 @@ pub struct Model {
   pub is_first_message: i8,
   pub timestamp: DateTimeUtc,
   pub emote_only: i8,
-  pub contents: String,
+  #[sea_orm(column_type = "Text", nullable)]
+  pub contents: Option<String>,
   pub twitch_user_id: i32,
   pub channel_id: i32,
   pub stream_id: Option<i32>,

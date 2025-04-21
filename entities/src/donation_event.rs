@@ -17,6 +17,7 @@ pub struct Model {
   pub stream_id: Option<i32>,
   pub subscription_tier: Option<i32>,
   pub unknown_user_id: Option<i32>,
+  pub origin_id: Option<String>,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

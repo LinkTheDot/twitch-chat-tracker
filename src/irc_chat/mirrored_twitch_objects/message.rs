@@ -12,6 +12,8 @@ pub struct TwitchIrcMessage {
 }
 
 impl TwitchIrcMessage {
+  pub const STREAMELEMENTS_TWITCH_ID: &str = "100135110";
+
   pub fn new(message: &IrcMessage) -> Result<Option<Self>, AppError> {
     let Some(tags) = TwitchIrcTagValues::new(message)? else {
       return Ok(None);
@@ -75,11 +77,11 @@ impl TwitchIrcMessage {
   }
 
   fn is_streamlabs_donation(tags: &TwitchIrcTagValues, message: &IrcMessage) -> bool {
-    let Some(login_name) = tags.login_name() else {
+    let Some(user_id) = tags.user_id() else {
       return false;
     };
 
-    if login_name != "streamelements" {
+    if user_id != Self::STREAMELEMENTS_TWITCH_ID {
       return false;
     }
 

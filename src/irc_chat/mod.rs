@@ -7,7 +7,10 @@ use irc::client::prelude::*;
 use irc::client::ClientStream;
 use irc::proto::CapSubCommand;
 use irc::proto::Message as IrcMessage;
+use std::sync::Arc;
 use std::time::Duration;
+use tokio::sync::mpsc;
+use tokio::task::JoinHandle;
 use tokio::time::timeout;
 use tokio_stream::StreamExt;
 
@@ -15,38 +18,73 @@ pub mod message_parser;
 pub mod mirrored_twitch_objects;
 pub mod sub_tier;
 
-pub const EMOTE_MESSAGE_THRESHOLD: f32 = 0.75;
-
 pub struct TwitchIrc {
-  irc_client: Option<Client>,
+  irc_client: Client,
   irc_client_stream: Option<ClientStream>,
-  third_party_emote_lists: EmoteListStorage,
+  third_party_emote_lists: Arc<EmoteListStorage>,
+  message_result_processor_sender: mpsc::UnboundedSender<JoinHandle<Result<(), AppError>>>,
 }
 
 impl TwitchIrc {
-  pub async fn new() -> Result<Self, AppError> {
+  pub async fn new(
+    message_result_processor_sender: mpsc::UnboundedSender<JoinHandle<Result<(), AppError>>>,
+  ) -> Result<Self, AppError> {
     tracing::info!("Initializing Twitch IRC client.");
     let mut irc_client = Self::get_irc_client().await?;
     let irc_client_stream = irc_client.stream()?;
     let third_party_emote_lists = EmoteListStorage::new().await?;
 
     Ok(Self {
-      irc_client: Some(irc_client),
+      irc_client,
       irc_client_stream: Some(irc_client_stream),
-      third_party_emote_lists,
+      third_party_emote_lists: Arc::new(third_party_emote_lists),
+      message_result_processor_sender,
     })
   }
 
   pub async fn reconnect(&mut self) -> Result<(), AppError> {
     tracing::warn!("Reconnecting the IRC client.");
 
-    self.irc_client_stream = None;
-    self.irc_client = None;
+    if let Some(client_stream) = self.irc_client_stream.take() {
+      let messages = match client_stream.collect().await {
+        Ok(messages) => messages,
+        Err(error) => {
+          tracing::error!(
+            "Failed to retrieve remaining messages from the client stream: {}",
+            error
+          );
 
-    let mut irc_client = Self::get_irc_client().await?;
-    let irc_client_stream = irc_client.stream()?;
+          vec![]
+        }
+      };
 
-    self.irc_client = Some(irc_client);
+      if !messages.is_empty() {
+        for message in messages {
+          if let Err(error) = self.process_message(message).await {
+            tracing::error!(
+              "Failed to process a remaining message from the client stream. Reason: {}",
+              error
+            );
+          }
+        }
+      }
+    } else {
+      tracing::error!(
+        "IRC client stream was missing where it was expected. Skipping message processing."
+      );
+    }
+
+    self.irc_client.identify()?;
+
+    self.irc_client.send(Command::CAP(
+      None,
+      CapSubCommand::REQ,
+      Some("twitch.tv/tags twitch.tv/commands twitch.tv/membership".to_string()),
+      None,
+    ))?;
+
+    let irc_client_stream = self.irc_client.stream()?;
+
     self.irc_client_stream = Some(irc_client_stream);
 
     Ok(())
@@ -79,6 +117,7 @@ impl TwitchIrc {
       use_tls: Some(true),
       channels: Self::get_channels(),
       ping_timeout: Some(30),
+      ping_time: Some(180),
       ..Default::default()
     })
   }
@@ -103,13 +142,6 @@ impl TwitchIrc {
       .ok_or(AppError::FailedToGetIrcClientStream)
   }
 
-  fn get_mut_irc_client(&mut self) -> Result<&mut Client, AppError> {
-    self
-      .irc_client
-      .as_mut()
-      .ok_or(AppError::FailedToGetIrcClient)
-  }
-
   pub async fn raw_next(&mut self) -> Result<Option<IrcMessage>, AppError> {
     let Ok(Some(message_result)) = timeout(
       Duration::from_secs(10),
@@ -125,13 +157,11 @@ impl TwitchIrc {
   }
 
   /// Checks for the next message from the irc client stream.
-  /// If no message is received within 10 seconds, None is returned.
+  /// If no message is received within 10 seconds the function ends without doing anything.
   pub async fn next_message(&mut self) -> Result<(), AppError> {
-    let message_result = timeout(
-      Duration::from_secs(10),
-      self.get_mut_client_stream()?.next(),
-    )
-    .await;
+    let future = self.get_mut_client_stream()?.next();
+    let message_result = timeout(Duration::from_secs(10), future).await;
+
     let Ok(Some(message_result)) = message_result else {
       tracing::debug!("Did not recieve a message.");
 
@@ -139,6 +169,38 @@ impl TwitchIrc {
     };
     let message = message_result?;
 
+    self.process_message(message).await
+  }
+
+  async fn process_message(&mut self, message: IrcMessage) -> Result<(), AppError> {
+    if let Command::PING(url, _) = message.command {
+      self.irc_client.send_pong(url)?;
+
+      return Ok(());
+    }
+
+    let third_party_emote_lists = self.third_party_emote_lists.clone();
+
+    let process_message_future =
+      Self::create_and_run_mesage_parser(message, third_party_emote_lists);
+    let process_message_handle = tokio::spawn(process_message_future);
+
+    if let Err(error) = self
+      .message_result_processor_sender
+      .send(process_message_handle)
+    {
+      return Err(AppError::MpscConnectionClosed {
+        error: error.to_string(),
+      });
+    }
+
+    Ok(())
+  }
+
+  async fn create_and_run_mesage_parser(
+    message: IrcMessage,
+    third_party_emote_lists: Arc<EmoteListStorage>,
+  ) -> std::result::Result<(), AppError> {
     match message.command {
       Command::JOIN(_, _, _) | Command::PART(_, _) => return Ok(()),
       Command::Response(_, _) => return Ok(()),
@@ -146,17 +208,10 @@ impl TwitchIrc {
       Command::Raw(command, _) if &command == "ROOMSTATE" => return Ok(()),
       Command::CAP(_, _, _, _) => return Ok(()),
       Command::PONG(ref _url, _) => return Ok(()),
-      Command::PING(ref url, _) => {
-        self
-          .get_mut_irc_client()?
-          .send(Command::PONG(url.to_string(), None))?;
-
-        return Ok(());
-      }
       _ => (),
     }
 
-    let Some(message_parser) = MessageParser::new(&message, &self.third_party_emote_lists)? else {
+    let Some(message_parser) = MessageParser::new(&message, &third_party_emote_lists)? else {
       return Ok(());
     };
 

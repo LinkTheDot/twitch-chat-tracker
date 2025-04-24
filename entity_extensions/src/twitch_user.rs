@@ -101,10 +101,7 @@ impl TwitchUserExtensions for twitch_user::Model {
     } else {
       tracing::info!("Found a new channel from Helix: {:#?}", helix_channel);
 
-      return helix_channel
-        .insert(database_connection)
-        .await
-        .map_err(Into::into);
+      attempt_insert(helix_channel, database_connection).await
     }
   }
 
@@ -139,10 +136,7 @@ impl TwitchUserExtensions for twitch_user::Model {
       });
     };
 
-    helix_channel
-      .insert(database_connection)
-      .await
-      .map_err(Into::into)
+    attempt_insert(helix_channel, database_connection).await
   }
 
   async fn query_helix_for_channels_from_list<S: AsRef<str>>(
@@ -320,4 +314,43 @@ async fn check_for_name_change(
     .update(database_connection)
     .await
     .map_err(Into::into)
+}
+
+/// Attempts to insert the user into the database.
+///
+/// If there is a unique constraint violation, attempts to get the user again and returns the value.
+async fn attempt_insert(
+  helix_channel: twitch_user::ActiveModel,
+  database_connection: &DatabaseConnection,
+) -> Result<twitch_user::Model, EntityExtensionError> {
+  let ActiveValue::Set(twitch_id) = helix_channel.twitch_id else {
+    return Err(EntityExtensionError::FailedToGetValue {
+      value_name: "twitch id",
+      location: "attempt insert",
+      additional_data: format!("{:?}", helix_channel),
+    });
+  };
+  let result = helix_channel.insert(database_connection).await;
+
+  // Checking if there was a race condition where another process is inserting at the same time.
+  if let Err(error) = &result {
+    if let Some(SqlErr::UniqueConstraintViolation(_)) = error.sql_err() {
+      let user_model_result = twitch_user::Entity::find()
+        .filter(twitch_user::Column::TwitchId.eq(twitch_id))
+        .one(database_connection)
+        .await?;
+
+      if let Some(user_model) = user_model_result {
+        return Ok(user_model);
+      } else {
+        return Err(EntityExtensionError::FailedToQuery {
+          value_name: "twitch user",
+          location: "attempt insert",
+          value: twitch_id.to_string(),
+        });
+      }
+    }
+  }
+
+  result.map_err(Into::into)
 }

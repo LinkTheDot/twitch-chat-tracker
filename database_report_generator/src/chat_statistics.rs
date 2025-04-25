@@ -91,7 +91,10 @@ impl ChatStatistics {
       "{average_message_length}".into(),
       format!("{:.2}", self.average_word_length),
     );
-    end_pairs.insert("{raw_donations}".into(), self.raw_donations.to_string());
+    end_pairs.insert(
+      "{raw_donations}".into(),
+      self.raw_donations.max(0.0).to_string(),
+    );
     end_pairs.insert("{bits}".into(), self.bits.to_string());
     end_pairs.insert("{new_subscribers}".into(), self.new_subscribers.to_string());
     end_pairs.insert("{tier_1_subs}".into(), self.tier_1_subs.to_string());

@@ -18,7 +18,7 @@ Total chats with < {emote_message_threshold}% emotes to words: {non-emote_domina
 Subscribed|Unsubscribed chats: {subscriber_chat_percentage}|{unsubscribed_chat_percentage}
 Average word count in messages: {average_message_length}
 
-= Donation statistics =
+= Donation Statistics =
 Donations: £{raw_donations}
 Bits: {bits} 
 New subscribers: {new_subscribers}

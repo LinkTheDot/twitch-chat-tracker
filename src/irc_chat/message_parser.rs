@@ -344,16 +344,16 @@ impl<'a> MessageParser<'a> {
       });
     }
 
-    let Some(login_name) = self.message.login_name() else {
+    let Some(user_id) = self.message.user_id() else {
       return Err(AppError::MissingExpectedValue {
-        expected_value_name: "login name",
+        expected_value_name: "user id",
         location: "streamlabs donation parsing",
       });
     };
 
-    if login_name != "streamelements" {
+    if user_id != TwitchIrcMessage::STREAMELEMENTS_TWITCH_ID {
       return Err(AppError::IncorrectUserWhenParsingStreamlabsDonation {
-        got_user: login_name.to_string(),
+        got_user: user_id.to_string(),
       });
     }
 
@@ -1046,7 +1046,7 @@ mod tests {
     let expected_active_model = donation_event::ActiveModel {
       id: ActiveValue::NotSet,
       event_type: ActiveValue::Set(EventType::StreamlabsDonation),
-      amount: ActiveValue::Set(5000.0_f32),
+      amount: ActiveValue::Set(143.0_f32),
       timestamp: ActiveValue::Set(timestamp_from_string("1740956922774")),
       donator_twitch_user_id: ActiveValue::Set(Some(3)),
       donation_receiver_twitch_user_id: ActiveValue::Set(1),
@@ -1061,7 +1061,6 @@ mod tests {
 
   fn get_streamlabs_donation_template() -> (IrcMessage, DatabaseConnection) {
     let tags = vec![
-      IrcTag("login".into(), Some("streamelements".into())),
       IrcTag("room-id".into(), Some("578762718".into())),
       IrcTag("tmi-sent-ts".into(), Some("1740956922774".into())),
       IrcTag("user-id".into(), Some("100135110".into())),
@@ -1076,7 +1075,7 @@ mod tests {
       )),
       command: Command::PRIVMSG(
         "#fallenshadow".into(),
-        "LinkTheDot just tipped £5000.00! Wow!".into(),
+        "5EVEN5 just tipped £143.00! thank you for the chocolate funds~ here's what they say: hopefully this covers cost of the imval april collection dress, or goes to paying for it".into(),
       ),
     };
 
@@ -1084,9 +1083,9 @@ mod tests {
       .append_query_results([
         vec![twitch_user::Model {
           id: 3,
-          twitch_id: 128831052,
-          login_name: "linkthedot".into(),
-          display_name: "LinkTheDot".into(),
+          twitch_id: 246216923,
+          login_name: "5even5".into(),
+          display_name: "5EVEN5".into(),
         }],
         vec![twitch_user::Model {
           id: 1,

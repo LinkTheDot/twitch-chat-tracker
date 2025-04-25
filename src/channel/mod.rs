@@ -9,6 +9,7 @@ use std::collections::HashMap;
 
 pub mod third_party_emote_list;
 pub mod third_party_emote_list_storage;
+pub mod update_list;
 
 #[derive(Debug)]
 pub struct TrackedChannels {

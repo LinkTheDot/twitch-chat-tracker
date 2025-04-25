@@ -21,7 +21,7 @@ pub struct AppConfig {
   #[setting(default = "daily")]
   logging_roll_appender: RollingAppenderRotation,
 
-  #[setting(extend, merge = append_vec, validate = min_length(1), validate = max_length(100))]
+  #[setting(extend, merge = append_vec, validate = min_length(1), validate = max_length(100), env = "TRACKED_CHANNELS")]
   channels: Vec<String>,
 
   #[setting(default = 0)]

@@ -31,18 +31,21 @@ pub async fn create_sub_processes() -> mpsc::UnboundedSender<JoinHandle<Result<(
 async fn process_message_results(
   mut message_parsing_handle_receiver: mpsc::UnboundedReceiver<JoinHandle<Result<(), AppError>>>,
 ) {
-  println!("In process message results.");
-
   while let Some(message_result) = message_parsing_handle_receiver.recv().await {
     match message_result.await {
       Ok(Err(error)) => tracing::error!("Failed to parse a message from the IRC client: {}", error),
-      Err(error) => tracing::error!("An error occurred when attempting to run a join handle: {}", error),
+      Err(error) => tracing::error!(
+        "An error occurred when attempting to run a join handle: {}",
+        error
+      ),
       _ => (),
     }
-
   }
 
-  println!("Process message results ended.");
+  tracing::error!("MPSC message parsing handle receiver has broken. Exiting.");
+
+  // Should the event where the connection fails, it's best to exit the program.
+  std::process::exit(1)
 }
 
 pub async fn run_main_process(
@@ -68,16 +71,13 @@ pub async fn run_main_process(
       }
 
       Err(AppError::MpscConnectionClosed { error }) => {
-      tracing::error!("Failed to send message processing handle to the message processor: {}. Exiting the program.", error);
+        tracing::error!("Failed to send message processing handle to the message processor: {}. Exiting the program.", error);
 
-      std::process::exit(1);
+        std::process::exit(1);
       }
 
       Err(error) => {
-        tracing::error!(
-          "Failed to parse a message from the IRC client: `{}`",
-          error
-        );
+        tracing::error!("Failed to parse a message from the IRC client: `{}`", error);
       }
 
       _ => (),

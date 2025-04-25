@@ -74,14 +74,10 @@ impl TwitchIrc {
       );
     }
 
-    self.irc_client.identify()?;
+    self.irc_client_stream = None;
 
-    self.irc_client.send(Command::CAP(
-      None,
-      CapSubCommand::REQ,
-      Some("twitch.tv/tags twitch.tv/commands twitch.tv/membership".to_string()),
-      None,
-    ))?;
+    // If we fail to retrieve the client, it's best to exit the program entirely.
+    self.irc_client = Self::get_irc_client().await.unwrap();
 
     let irc_client_stream = self.irc_client.stream()?;
 
@@ -116,8 +112,8 @@ impl TwitchIrc {
       password,
       use_tls: Some(true),
       channels: Self::get_channels(),
-      ping_timeout: Some(30),
-      ping_time: Some(180),
+      ping_timeout: Some(20),
+      ping_time: Some(60),
       ..Default::default()
     })
   }

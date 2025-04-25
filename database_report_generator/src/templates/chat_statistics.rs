@@ -17,16 +17,16 @@ Total chats: {total_chats}
 Total chats with < {emote_message_threshold}% emotes to words: {non-emote_dominant_chats}
 Subscribed|Unsubscribed chats: {subscriber_chat_percentage}|{unsubscribed_chat_percentage}
 Average word count in messages: {average_message_length}
-
-= Donation Statistics =
-Donations: £{raw_donations}
-Bits: {bits} 
 New subscribers: {new_subscribers}
-
-Subscriptions: T1 - {tier_1_subs} | T2 - {tier_2_subs} | T3 - {tier_3_subs} | Prime - {prime_subscriptions}
-Gift Subs: T1 - {tier_1_gift_subs} | T2 - {tier_2_gift_subs} | T3 - {tier_3_gift_subs}
-Total Subs: T1 - {total_tier_1_subs} | T2 - {total_tier_2_subs} | T3 - {total_tier_3_subs}
 "#;
+
+// = Donation Statistics =
+// Donations: £{raw_donations}
+// Bits: {bits}
+//
+// Subscriptions: T1 - {tier_1_subs} | T2 - {tier_2_subs} | T3 - {tier_3_subs} | Prime - {prime_subscriptions}
+// Gift Subs: T1 - {tier_1_gift_subs} | T2 - {tier_2_gift_subs} | T3 - {tier_3_gift_subs}
+// Total Subs: T1 - {total_tier_1_subs} | T2 - {total_tier_2_subs} | T3 - {total_tier_3_subs}
 
 pub async fn get_chat_statistics_template_for_stream(stream_id: i32) -> Result<String, AppError> {
   let database_connection = get_database_connection().await;

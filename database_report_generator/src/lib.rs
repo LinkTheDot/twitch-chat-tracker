@@ -1,11 +1,11 @@
 use crate::templates::chat_messages::get_messages_sent_ranking_for_stream;
 use crate::templates::chat_statistics::get_chat_statistics_template_for_stream;
 use app_config::Args;
-use database_connection::get_database_connection;
-use entities::stream;
 use errors::AppError;
-use sea_orm::*;
-use templates::donation_rankings::get_donation_rankings_for_streamer_and_month;
+// use database_connection::get_database_connection;
+// use entities::stream;
+// use sea_orm::*;
+// use templates::donation_rankings::get_donation_rankings_for_streamer_and_month;
 
 pub mod chat_statistics;
 pub mod currency_exchangerate;
@@ -23,12 +23,12 @@ pub const EMOTE_DOMINANCE: f32 = 0.7;
 pub async fn generate_reports(
   report_stream_id: i32,
 ) -> Result<Vec<(&'static str, String)>, AppError> {
-  let Some(stream) = stream::Entity::find_by_id(report_stream_id)
-    .one(get_database_connection().await)
-    .await?
-  else {
-    return Err(AppError::FailedToFindStream(report_stream_id));
-  };
+  // let Some(stream) = stream::Entity::find_by_id(report_stream_id)
+  //   .one(get_database_connection().await)
+  //   .await?
+  // else {
+  //   return Err(AppError::FailedToFindStream(report_stream_id));
+  // };
 
   let general_stats_report = get_chat_statistics_template_for_stream(report_stream_id)
     .await
@@ -44,22 +44,22 @@ pub async fn generate_reports(
     ("filtered_chat_rankings", emote_filtered_chat_report),
   ];
 
-  let donator_monthly_rankings_result = get_donation_rankings_for_streamer_and_month(
-    stream.twitch_user_id,
-    Args::get_year(),
-    Args::get_month(),
-  )
-  .await;
-
-  match donator_monthly_rankings_result {
-    Ok(donator_monthly_rankings) => {
-      reports.push(("donator_monthly_rankings", donator_monthly_rankings))
-    }
-    Err(error) => tracing::error!(
-      "Failed to generate monthly donation rankings. Reason: {:?}",
-      error
-    ),
-  }
+  // let donator_monthly_rankings_result = get_donation_rankings_for_streamer_and_month(
+  //   stream.twitch_user_id,
+  //   Args::get_year(),
+  //   Args::get_month(),
+  // )
+  // .await;
+  //
+  // match donator_monthly_rankings_result {
+  //   Ok(donator_monthly_rankings) => {
+  //     reports.push(("donator_monthly_rankings", donator_monthly_rankings))
+  //   }
+  //   Err(error) => tracing::error!(
+  //     "Failed to generate monthly donation rankings. Reason: {:?}",
+  //     error
+  //   ),
+  // }
 
   if Args::generate_report_totals() {
     let (total_unfiltered_chat_report, total_emote_filtered_chat_report) =

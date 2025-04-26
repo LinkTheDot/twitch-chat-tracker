@@ -1,3 +1,4 @@
+use crate::conditions::AppQueryConditions;
 use crate::errors::AppError;
 use crate::EMOTE_DOMINANCE;
 use database_connection::get_database_connection;
@@ -30,14 +31,14 @@ pub struct ChatStatistics {
 }
 
 impl ChatStatistics {
-  pub async fn new(stream_id: i32) -> Result<Self, AppError> {
+  pub async fn new(query_conditions: &AppQueryConditions) -> Result<Self, AppError> {
     let database_connection = get_database_connection().await;
     let stream_messages = stream_message::Entity::find()
-      .filter(stream_message::Column::StreamId.eq(stream_id))
+      .filter(query_conditions.messages().clone())
       .all(database_connection)
       .await?;
     let total_chats = stream_messages.len() as i32;
-    let subscriptions = Subscriptions::new(stream_id).await?;
+    let subscriptions = Subscriptions::new(query_conditions).await?;
 
     Ok(Self {
       first_time_chatters: Self::first_time_chatters(&stream_messages),
@@ -46,12 +47,12 @@ impl ChatStatistics {
       average_word_length: Self::average_word_length(&stream_messages),
       subscribed_chat_percentage: Self::subscribed_chat_percentage(&stream_messages),
       raw_donations: Self::get_donation_event_total_amount(
-        stream_id,
+        query_conditions,
         EventType::StreamlabsDonation,
       )
       .await?,
-      bits: Self::get_donation_event_total_amount(stream_id, EventType::Bits).await? as i32,
-      new_subscribers: Self::get_new_subscribers(stream_id).await?,
+      bits: Self::get_donation_event_total_amount(query_conditions, EventType::Bits).await? as i32,
+      new_subscribers: Self::get_new_subscribers(query_conditions).await?,
       tier_1_subs: subscriptions.tier_1,
       tier_2_subs: subscriptions.tier_2,
       tier_3_subs: subscriptions.tier_3,
@@ -200,13 +201,13 @@ impl ChatStatistics {
   }
 
   async fn get_donation_event_total_amount(
-    stream_id: i32,
+    query_conditions: &AppQueryConditions,
     event_type: EventType,
   ) -> Result<f32, AppError> {
     let database_connection = get_database_connection().await;
 
     let streamlabs_donation_events = donation_event::Entity::find()
-      .filter(donation_event::Column::StreamId.eq(stream_id))
+      .filter(query_conditions.donations().clone())
       .filter(donation_event::Column::EventType.eq(event_type))
       .all(database_connection)
       .await?;
@@ -229,12 +230,12 @@ impl ChatStatistics {
     (subscriber_message_count as f32 / total_chats as f32) * 100.0
   }
 
-  async fn get_new_subscribers(stream_id: i32) -> Result<i32, AppError> {
+  async fn get_new_subscribers(query_conditions: &AppQueryConditions) -> Result<i32, AppError> {
     let database_connection = get_database_connection().await;
 
     Ok(
       subscription_event::Entity::find()
-        .filter(subscription_event::Column::StreamId.eq(stream_id))
+        .filter(query_conditions.subscriptions().clone())
         .filter(subscription_event::Column::MonthsSubscribed.eq(1))
         .all(database_connection)
         .await?
@@ -259,11 +260,11 @@ mod subscriptions {
   }
 
   impl Subscriptions {
-    pub async fn new(stream_id: i32) -> Result<Self, AppError> {
+    pub async fn new(query_conditions: &AppQueryConditions) -> Result<Self, AppError> {
       let database_connection = get_database_connection().await;
-      let subs = Self::get_subscriptions_for_stream(stream_id).await?;
+      let subs = Self::get_subscriptions_for_stream(query_conditions).await?;
       let gifted_subs = donation_event::Entity::find()
-        .filter(donation_event::Column::StreamId.eq(stream_id))
+        .filter(query_conditions.donations().clone())
         .filter(donation_event::Column::EventType.eq(EventType::GiftSubs))
         .all(database_connection)
         .await?;
@@ -317,12 +318,12 @@ mod subscriptions {
     }
 
     async fn get_subscriptions_for_stream(
-      stream_id: i32,
+      query_conditions: &AppQueryConditions,
     ) -> Result<Vec<subscription_event::Model>, AppError> {
       let database_connection = get_database_connection().await;
 
       subscription_event::Entity::find()
-        .filter(subscription_event::Column::StreamId.eq(stream_id))
+        .filter(query_conditions.subscriptions().clone())
         .all(database_connection)
         .await
         .map_err(Into::into)

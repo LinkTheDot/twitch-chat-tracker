@@ -1,6 +1,8 @@
 use app_config::clap::Args;
 use database_connection::get_database_connection;
-use database_report_generator::upload_reports::upload_reports;
+use database_report_generator::{
+  conditions::AppQueryConditionsBuilder, upload_reports::upload_reports,
+};
 use entities::{stream, twitch_user};
 use entity_extensions::twitch_user::*;
 use sea_orm::*;
@@ -10,8 +12,12 @@ async fn main() {
   database_report_generator::logging::setup_logging_config().unwrap();
 
   let database_connection = get_database_connection().await;
-  let report_stream_id = if let Some(stream_id) = Args::report_stream_id() {
-    stream_id
+  let stream = if let Some(stream_id) = Args::report_stream_id() {
+    stream::Entity::find_by_id(stream_id)
+      .one(database_connection)
+      .await
+      .unwrap()
+      .unwrap()
   } else if let Some(streamer_name) = Args::streamer_name_report() {
     let streamer_twitch_user_model =
       twitch_user::Model::get_or_set_by_name(streamer_name, database_connection)
@@ -25,7 +31,7 @@ async fn main() {
       .unwrap();
 
     if let Some(latest_stream) = maybe_latest_stream {
-      latest_stream.id
+      latest_stream
     } else {
       tracing::error!("Failed to find any streams for user {:?}.", streamer_name);
 
@@ -37,9 +43,15 @@ async fn main() {
     std::process::exit(1);
   };
 
-  match database_report_generator::generate_reports(report_stream_id).await {
+  let condition = AppQueryConditionsBuilder::new()
+    .set_stream_id(stream.id)
+    .set_streamer_twitch_user_id(stream.twitch_user_id)
+    .build()
+    .unwrap();
+
+  match database_report_generator::generate_reports(condition, stream.twitch_user_id).await {
     Ok(reports) => {
-      if let Err(error) = upload_reports(report_stream_id, reports).await {
+      if let Err(error) = upload_reports(stream.id, reports).await {
         tracing::error!("Failed to upload the reports. Reason: {:?}", error);
       }
     }

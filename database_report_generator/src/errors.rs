@@ -43,7 +43,7 @@ pub enum AppError {
   FailedToConvertJsonNumber(serde_json::Number),
 
   #[error("Attempted to generate a report for donation rankings with an invalid month of {:?}", .0)]
-  InvalidMonthValue(usize),
+  InvalidMonthValue(i32),
 
   #[error("Found no donations for date {}-{}", year, month)]
   NoDonationsForDate { year: i32, month: u32 },
@@ -53,4 +53,7 @@ pub enum AppError {
 
   #[error("Attempted to upload to pastebin without an API key.")]
   MissingPastebinApiKey,
+
+  #[error("Invalid query date range conditions. start: {} | end: {}", start, end)]
+  InvalidQueryDateConditions { start: i32, end: i32 },
 }

@@ -1,6 +1,7 @@
 #![allow(unused_assignments)]
 
 use crate::chat_statistics::ChatStatistics;
+use crate::conditions::AppQueryConditions;
 use crate::errors::AppError;
 use database_connection::get_database_connection;
 use entities::*;
@@ -17,23 +18,28 @@ Total chats: {total_chats}
 Total chats with < {emote_message_threshold}% emotes to words: {non-emote_dominant_chats}
 Subscribed|Unsubscribed chats: {subscriber_chat_percentage}|{unsubscribed_chat_percentage}
 Average word count in messages: {average_message_length}
+New subscribers: {new_subscribers}
+"#;
 
+const DONATION_STATS_TEMPLATE: &str = r#"
 = Donation Statistics =
 Donations: £{raw_donations}
-Bits: {bits} 
-New subscribers: {new_subscribers}
+Bits: {bits}
 
 Subscriptions: T1 - {tier_1_subs} | T2 - {tier_2_subs} | T3 - {tier_3_subs} | Prime - {prime_subscriptions}
 Gift Subs: T1 - {tier_1_gift_subs} | T2 - {tier_2_gift_subs} | T3 - {tier_3_gift_subs}
 Total Subs: T1 - {total_tier_1_subs} | T2 - {total_tier_2_subs} | T3 - {total_tier_3_subs}
 "#;
 
-pub async fn get_chat_statistics_template_for_stream(stream_id: i32) -> Result<String, AppError> {
+pub async fn get_chat_statistics_template(
+  query_conditions: &AppQueryConditions,
+  include_donations: bool,
+) -> Result<String, AppError> {
   let database_connection = get_database_connection().await;
-  let chat_statistics = ChatStatistics::new(stream_id).await?;
-  let (mut user_bans, user_timeouts) = get_timeouts(stream_id, database_connection).await?;
-  let raids = get_raids(stream_id, database_connection).await?;
-  let top_emotes = get_top_n_emotes(stream_id, database_connection, Some(15)).await?;
+  let chat_statistics = ChatStatistics::new(query_conditions).await?;
+  let (mut user_bans, user_timeouts) = get_timeouts(query_conditions, database_connection).await?;
+  let raids = get_raids(query_conditions, database_connection).await?;
+  let top_emotes = get_top_n_emotes(query_conditions, database_connection, Some(15)).await?;
   let mut statistics_template = String::from(STATS_FILE_TEMPLATE);
   let mut statistics_string = String::new();
 
@@ -59,6 +65,10 @@ pub async fn get_chat_statistics_template_for_stream(stream_id: i32) -> Result<S
     insert_emote_ranking_table(&mut statistics_string, top_emotes);
   }
 
+  if include_donations {
+    statistics_template.push_str(DONATION_STATS_TEMPLATE);
+  }
+
   for (key, value) in chat_statistics.to_key_value_pairs() {
     statistics_template = statistics_template.replace(&key, &value);
   }
@@ -70,11 +80,11 @@ pub async fn get_chat_statistics_template_for_stream(stream_id: i32) -> Result<S
 
 /// Returns the (bans, timeouts) for the user_timeouts of a given stream.
 async fn get_timeouts(
-  stream_id: i32,
+  query_conditions: &AppQueryConditions,
   database_connection: &DatabaseConnection,
 ) -> Result<(Vec<user_timeout::Model>, Vec<user_timeout::Model>), AppError> {
   let timeouts = user_timeout::Entity::find()
-    .filter(user_timeout::Column::StreamId.eq(stream_id))
+    .filter(query_conditions.timeouts().clone())
     .all(database_connection)
     .await?;
 
@@ -86,11 +96,11 @@ async fn get_timeouts(
 }
 
 async fn get_raids(
-  stream_id: i32,
+  query_conditions: &AppQueryConditions,
   database_connection: &DatabaseConnection,
 ) -> Result<Vec<raid::Model>, AppError> {
   raid::Entity::find()
-    .filter(raid::Column::StreamId.eq(stream_id))
+    .filter(query_conditions.raids().clone())
     .all(database_connection)
     .await
     .map_err(Into::into)
@@ -100,17 +110,20 @@ async fn get_raids(
 ///
 /// If the amount desired is None, then all entries are returned.
 async fn get_top_n_emotes(
-  stream_id: i32,
+  query_conditions: &AppQueryConditions,
   database_connection: &DatabaseConnection,
   amount: Option<usize>,
 ) -> Result<Vec<(String, usize)>, AppError> {
   // Yes I know I'm querying for all messages twice here. No I don't care.
   let stream_messages = stream_message::Entity::find()
-    .filter(stream_message::Column::StreamId.eq(Some(stream_id)))
+    .filter(query_conditions.messages().clone())
     .all(database_connection)
     .await?;
-  let twitch_emotes_used =
-    stream::Model::get_all_twitch_emotes_used_from_id(stream_id, database_connection).await?;
+  let twitch_emotes_used = stream::Model::get_all_twitch_emotes_used_with_condition(
+    query_conditions.messages().clone(),
+    database_connection,
+  )
+  .await?;
 
   let mut emote_uses: HashMap<String, usize> = HashMap::new();
 

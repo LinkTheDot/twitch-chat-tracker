@@ -130,6 +130,9 @@ pub enum AppError {
     command_string: String,
   },
 
-  #[error("Failed to send message processing handle to the message processor: {}", error)]
-  MpscConnectionClosed { error: String }
+  #[error(
+    "Failed to send message processing handle to the message processor: {}",
+    error
+  )]
+  MpscConnectionClosed { error: String },
 }

@@ -17,8 +17,10 @@ pub trait StreamExtensions {
     &self,
     database_connection: &DatabaseConnection,
   ) -> Result<Vec<(emote::Model, usize)>, DbErr>;
-  async fn get_all_twitch_emotes_used_from_id(
-    stream_id: i32,
+  /// Takes a condition to filter the stream messages by.
+  /// This can be something like only messages from a given stream or for messages within a certain time frame.
+  async fn get_all_twitch_emotes_used_with_condition(
+    message_condition: Condition,
     database_connection: &DatabaseConnection,
   ) -> Result<Vec<(emote::Model, usize)>, DbErr>;
   fn is_live(&self) -> bool;
@@ -43,15 +45,17 @@ impl StreamExtensions for stream::Model {
     &self,
     database_connection: &DatabaseConnection,
   ) -> Result<Vec<(emote::Model, usize)>, DbErr> {
-    Self::get_all_twitch_emotes_used_from_id(self.id, database_connection).await
+    let condition = Condition::all().add(stream_message::Column::StreamId.eq(self.id));
+
+    Self::get_all_twitch_emotes_used_with_condition(condition, database_connection).await
   }
 
-  async fn get_all_twitch_emotes_used_from_id(
-    stream_id: i32,
+  async fn get_all_twitch_emotes_used_with_condition(
+    message_condition: Condition,
     database_connection: &DatabaseConnection,
   ) -> Result<Vec<(emote::Model, usize)>, DbErr> {
     let messages = stream_message::Entity::find()
-      .filter(stream_message::Column::StreamId.eq(stream_id))
+      .filter(message_condition)
       .all(database_connection)
       .await?;
     let mut known_emotes: HashMap<i32, (emote::Model, usize)> = HashMap::new();

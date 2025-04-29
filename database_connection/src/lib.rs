@@ -9,12 +9,8 @@ static DATABASE_CONNECTION: OnceCell<DatabaseConnection> = OnceCell::const_new()
 
 pub async fn get_database_connection() -> &'static DatabaseConnection {
   DATABASE_CONNECTION
-    .get_or_init(create_database_connection)
+    .get_or_init(|| async { get_connection().await.unwrap() })
     .await
-}
-
-async fn create_database_connection() -> DatabaseConnection {
-  get_connection().await.unwrap()
 }
 
 async fn get_connection() -> anyhow::Result<sea_orm::DatabaseConnection> {

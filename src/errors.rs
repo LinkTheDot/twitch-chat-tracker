@@ -15,6 +15,9 @@ pub enum AppError {
   #[error("{}", .0)]
   EntityExtensionError(#[from] entity_extensions::errors::EntityExtensionError),
 
+  #[error("{}", .0)]
+  TungsteniteError(#[from] tungstenite::error::Error),
+
   #[error("Remaining Helix API requests is 0.")]
   ApiRatelimitReached,
 
@@ -107,7 +110,7 @@ pub enum AppError {
     got_type: crate::irc_chat::mirrored_twitch_objects::twitch_message_type::TwitchMessageType,
   },
 
-  #[error("Failed to parse {} at {}. Got {}", value_name, location, value)]
+  #[error("Failed to parse {} at {}. Got {:?}", value_name, location, value)]
   FailedToParseValue {
     value_name: &'static str,
     location: &'static str,
@@ -135,4 +138,26 @@ pub enum AppError {
     error
   )]
   MpscConnectionClosed { error: String },
+
+  #[error(
+    "Failed to subscribe to an event for a channel. Subscription: {}, Response: {:?}",
+    subscription_value,
+    response
+  )]
+  FailedToGetEventSubSubscription {
+    subscription_value: serde_json::Value,
+    response: Option<String>,
+  },
+
+  #[error("Twitch has issued a close request.")]
+  CloseRequested,
+
+  #[error("The websocket connection has timedout.")]
+  WebsocketTimeout,
+
+  #[error("Received an unknown value when parsing the event type for a websocket stream update message. Got: {:?}", value)]
+  UnknownEventTypeValueInStreamUpdateMessage { value: String },
+
+  #[error("Failed to retrieve an active stream for user `{}` where one was expected.", streamer_id)]
+  FailedToFindActiveStreamForAUserWhereOneWasExpected { streamer_id: i32 },
 }

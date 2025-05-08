@@ -4,6 +4,7 @@ use tokio::io::{self, AsyncWriteExt};
 
 pub async fn run_animation() {
   if AppConfig::logging_dir().is_none() {
+    tracing::info!("Animation disabled.");
     return;
   }
 

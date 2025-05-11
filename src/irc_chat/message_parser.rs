@@ -163,9 +163,9 @@ impl<'a> MessageParser<'a> {
       twitch_user::Model::get_or_set_by_twitch_id(streamer_twitch_id, database_connection).await?;
     let maybe_stream =
       stream::Model::get_active_stream_for_user(&streamer_model, database_connection).await?;
-    let Some(donator_name) = self.message.display_name() else {
+    let Some(donator_name) = self.message.login_name() else {
       return Err(AppError::MissingExpectedValue {
-        expected_value_name: "display name",
+        expected_value_name: "login name",
         location: "subscription parsing",
       });
     };

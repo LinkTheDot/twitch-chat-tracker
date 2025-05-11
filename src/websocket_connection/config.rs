@@ -37,7 +37,14 @@ const SUBSCRIPTIONS: &[EventSubscription] = &[
   // https://dev.twitch.tv/docs/eventsub/eventsub-subscription-types/#streamoffline
   EventSubscription::new(None, "stream.offline", 1),
 ];
-const SUBSCRIPTION_FAIL_RETRY_DURATION: Duration = Duration::new(5, 0);
+const SUBSCRIPTION_FAIL_RETRY_DURATION: Duration = Duration::new(20, 0);
+
+/// In seconds.
+///
+/// Bound to 10-600 as per the documentation https://dev.twitch.tv/docs/eventsub/handling-websocket-events/
+pub const KEEP_ALIVE_DURATION: u64 = 10;
+/// How many extra seconds to wait for a keep alive notification.
+pub const KEEP_ALIVE_GRACE_PERIOD: u64 = 3;
 
 pub struct TwitchWebsocketConfig {
   keep_alive_timer: Instant,
@@ -48,12 +55,6 @@ pub struct TwitchWebsocketConfig {
 }
 
 impl TwitchWebsocketConfig {
-  /// In seconds.
-  ///
-  /// Bound to 10-600 as per the documentation https://dev.twitch.tv/docs/eventsub/handling-websocket-events/
-  pub const KEEP_ALIVE_DURATION: u64 = 10;
-  /// How many extra seconds to wait for a keep alive notification.
-  pub const KEEP_ALIVE_GRACE_PERIOD: u64 = 3;
 
   pub async fn new(
     tracked_channels: TrackedChannels,
@@ -65,7 +66,7 @@ impl TwitchWebsocketConfig {
         .await?;
     url.query_pairs_mut().append_pair(
       "keepalive_timeout_seconds",
-      &Self::KEEP_ALIVE_DURATION.to_string(),
+      &KEEP_ALIVE_DURATION.to_string(),
     );
 
     let (mut socket_stream, _) = connect_async(url.to_string()).await?;
@@ -264,7 +265,7 @@ impl TwitchWebsocketConfig {
   pub async fn check_for_stream_message(&mut self) -> Result<(), AppError> {
     let future = self.socket_stream.next();
     let message_result = timeout(
-      Duration::from_secs(Self::KEEP_ALIVE_DURATION + Self::KEEP_ALIVE_GRACE_PERIOD),
+      Duration::from_secs(KEEP_ALIVE_DURATION + KEEP_ALIVE_GRACE_PERIOD),
       future,
     )
     .await;
@@ -358,12 +359,12 @@ impl TwitchWebsocketConfig {
     Ok(())
   }
 
-  /// Returns true if the duration in the keep alive timer is larger than [`Self::KEEP_ALIVE_DURATION`](TwitchWebsocketConfig::KEEP_ALIVE_DURATION)
+  /// Returns true if the duration in the keep alive timer is larger than [`KEEP_ALIVE_DURATION`](TwitchWebsocketConfig::KEEP_ALIVE_DURATION)
   ///
   /// This should be called after every message. In the case where no events are received, Twitch will send a keep alive message: https://dev.twitch.tv/docs/eventsub/handling-websocket-events/#keepalive-message
   fn update_keep_alive(&mut self) -> bool {
     if self.keep_alive_timer.elapsed()
-      > Duration::from_secs(Self::KEEP_ALIVE_DURATION + Self::KEEP_ALIVE_GRACE_PERIOD)
+      > Duration::from_secs(KEEP_ALIVE_DURATION + KEEP_ALIVE_GRACE_PERIOD)
     {
       return true;
     } else {

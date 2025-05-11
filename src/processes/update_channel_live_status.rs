@@ -88,8 +88,8 @@ async fn update_active_streams(
 
   stream::Entity::insert_many(live_stream_active_models)
     .on_conflict(
-      OnConflict::column(stream::Column::TwitchUserId)
-        .do_nothing_on([stream::Column::TwitchUserId])
+      OnConflict::column(stream::Column::TwitchStreamId)
+        .do_nothing_on([stream::Column::TwitchStreamId])
         .to_owned(),
     )
     .do_nothing()

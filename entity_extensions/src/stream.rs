@@ -33,6 +33,7 @@ pub trait StreamExtensions {
     stream_twitch_id: u64,
     database_connection: &DatabaseConnection,
   ) -> Result<Option<stream::Model>, DbErr>;
+  /// Returns a map of login_name: (stream_start, stream_twitch_id)
   async fn get_active_livestreams<'a, I>(
     channels: I,
   ) -> Result<HashMap<String, (DateTime<Utc>, String)>, EntityExtensionError>
@@ -118,6 +119,7 @@ impl StreamExtensions for stream::Model {
       .await
   }
 
+  /// Returns a map of login_name: (stream_start, stream_twitch_id)
   async fn get_active_livestreams<'a, I>(
     channels: I,
   ) -> Result<HashMap<String, (DateTime<Utc>, String)>, EntityExtensionError>
@@ -157,10 +159,15 @@ impl StreamExtensions for stream::Model {
         continue;
       };
 
-      let Some(Value::String(streamer_login_name)) = live_stream.get("user_login") else {
+      let Some(Value::String(live_status)) = live_stream.get("type") else {
         continue;
       };
-      let Some(Value::String(live_status)) = live_stream.get("type") else {
+
+      if live_status != "live" {
+        continue;
+      }
+
+      let Some(Value::String(streamer_login_name)) = live_stream.get("user_login") else {
         continue;
       };
       let Some(Value::String(stream_start)) = live_stream.get("started_at") else {
@@ -185,12 +192,10 @@ impl StreamExtensions for stream::Model {
         continue;
       };
 
-      if live_status == "live" {
-        live_channels.insert(
-          streamer_login_name.to_owned(),
-          (stream_start, stream_id.to_owned()),
-        );
-      }
+      live_channels.insert(
+        streamer_login_name.to_owned(),
+        (stream_start, stream_id.to_owned()),
+      );
     }
 
     Ok(live_channels)

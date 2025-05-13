@@ -9,7 +9,7 @@ members = [
   "database_connection", 
   "database_report_generator", 
   "entities", "entity_extensions",
-  "migration",
+  "migration", "update_changed_names",
 ]
 
 [dependencies]
@@ -27,10 +27,8 @@ sea-orm = { version = "1.1.11", features = ["sqlx-mysql", "runtime-tokio", "macr
 url = "2.5.4"
 app_config = { path = "app_config" }
 database_connection = { path = "database_connection" }
-human-time = "0.1.6"
 entities = { path = "entities" }
 entity_extensions = { path = "entity_extensions" }
-
 tungstenite = "0.26.2"
 tokio-tungstenite = { version = "0.26.2", features = ["native-tls"] }
 futures-util = { version = "0.3.31", features = [] }

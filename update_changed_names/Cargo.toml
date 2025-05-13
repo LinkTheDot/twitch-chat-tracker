@@ -1,0 +1,14 @@
+[package]
+name = "update_changed_names"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+app_config = { path = "../app_config" }
+database_connection = { path = "../database_connection" }
+entities = { path = "../entities" }
+entity_extensions = { path = "../entity_extensions" }
+tokio = { version = "1.45.0", features = ["full"] }
+sea-orm = "1.1.11"
+human-time = "0.1.6"
+futures = { version = "0.3.31", features = [] }

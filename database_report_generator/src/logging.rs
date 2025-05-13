@@ -9,8 +9,8 @@ pub fn setup_logging_config() -> Result<(), Box<dyn std::error::Error>> {
   };
 
   let subscriber_builder = tracing_subscriber::fmt()
-    .with_env_filter(EnvFilter::new(log_level))
     .with_env_filter(EnvFilter::new("sea_orm::query=error"))
+    .with_env_filter(EnvFilter::new(log_level))
     .with_ansi(false);
 
   println!("Logging to stdout.");

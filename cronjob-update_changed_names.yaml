@@ -1,0 +1,31 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: update-twitch-name-changes
+  namespace: default
+spec:
+  schedule: "* 23 * * mon"
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+          - name: update-twitch-name-changes
+            image: homelab.local:5000/build_and_push_update_names:latest
+            imagePullPolicy: Always
+            env:
+              - name: TWITCH_ACCESS_TOKEN
+                valueFrom:
+                  secretKeyRef:
+                    name: twitch-chat-logger
+                    key: twitchAccessToken
+              - name: TWITCH_CLIENT_ID
+                valueFrom:
+                  secretKeyRef:
+                    name: twitch-chat-logger
+                    key: twitchClientId
+              - name: CONFIG_PATH
+                value: "/config/deploy_config.yml"
+              - name: DATABASE_HOST_ADDRESS
+                value: "mysql"
+          restartPolicy: Never

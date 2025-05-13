@@ -37,6 +37,7 @@ pub trait TwitchUserExtensions {
     twitch_id: &str,
     database_connection: &DatabaseConnection,
   ) -> Result<twitch_user::Model, EntityExtensionError>;
+  /// Queries Helix for every user passed in.
   async fn query_helix_for_channels_from_list<S: AsRef<str>>(
     channels: &[ChannelIdentifier<S>],
   ) -> Result<Vec<twitch_user::ActiveModel>, EntityExtensionError>;

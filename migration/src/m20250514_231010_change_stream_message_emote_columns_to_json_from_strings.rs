@@ -10,14 +10,19 @@ impl MigrationTrait for Migration {
       .alter_table(
         Table::alter()
           .table(StreamMessage::Table)
-          .add_column(
+          .modify_column(
+            ColumnDef::new(StreamMessage::ThirdPartyEmotesUsed)
+              .json()
+              .to_owned(),
+          )
+          .modify_column(
             ColumnDef::new(StreamMessage::TwitchEmoteUsage)
-              .text()
-              .null(),
+              .json()
+              .to_owned(),
           )
           .to_owned(),
       )
-    .await
+      .await
   }
 
   async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
@@ -25,10 +30,19 @@ impl MigrationTrait for Migration {
       .alter_table(
         Table::alter()
           .table(StreamMessage::Table)
-          .drop_column(StreamMessage::TwitchEmoteUsage)
+          .modify_column(
+            ColumnDef::new(StreamMessage::ThirdPartyEmotesUsed)
+              .string()
+              .to_owned(),
+          )
+          .modify_column(
+            ColumnDef::new(StreamMessage::TwitchEmoteUsage)
+              .string()
+              .to_owned(),
+          )
           .to_owned(),
       )
-    .await
+      .await
   }
 }
 
@@ -44,7 +58,7 @@ enum StreamMessage {
   _Timestamp,
   _EmoteOnly,
   _Contents,
-  _ThirdPartyEmotesUsed,
+  ThirdPartyEmotesUsed,
   _IsSubscriber,
   TwitchEmoteUsage,
 }

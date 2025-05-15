@@ -533,9 +533,7 @@ impl<'a> MessageParser<'a> {
 
     let third_party_emotes_used =
       self.parse_7tv_emotes_from_message_contents(&streamer_twitch_user_model, message_contents);
-    let third_party_emotes_used_serialized = (!third_party_emotes_used.is_empty())
-      .then_some(serde_json::to_string(&third_party_emotes_used).ok())
-      .flatten();
+    let third_party_emotes_used = serde_json::to_value(third_party_emotes_used)?;
     let emote_list =
       emote::Model::get_or_set_list(message_contents, emotes, database_connection).await?;
     let mut twitch_emotes_used: HashMap<i32, i32> = HashMap::new();
@@ -546,7 +544,7 @@ impl<'a> MessageParser<'a> {
     }
 
     let twitch_emotes_used =
-      (!twitch_emotes_used.is_empty()).then_some(serde_json::to_string(&twitch_emotes_used)?);
+      (!twitch_emotes_used.is_empty()).then_some(serde_json::to_value(&twitch_emotes_used)?);
 
     let message = stream_message::ActiveModel {
       is_first_message: ActiveValue::Set(self.message.is_first_message() as i8),
@@ -556,7 +554,7 @@ impl<'a> MessageParser<'a> {
       twitch_user_id: ActiveValue::Set(sender_twitch_user_model.id),
       channel_id: ActiveValue::Set(streamer_twitch_user_model.id),
       stream_id: ActiveValue::Set(maybe_stream.map(|stream| stream.id)),
-      third_party_emotes_used: ActiveValue::Set(third_party_emotes_used_serialized),
+      third_party_emotes_used: ActiveValue::Set(Some(third_party_emotes_used)),
       is_subscriber: ActiveValue::Set(self.message.is_subscriber() as i8),
       twitch_emote_usage: ActiveValue::Set(twitch_emotes_used),
       ..Default::default()
@@ -692,6 +690,7 @@ mod tests {
   use chrono::{DateTime, TimeZone, Utc};
   use irc::proto::message::Tag as IrcTag;
   use irc::proto::{Command, Prefix};
+  use serde_json::json;
 
   #[tokio::test]
   async fn parse_timeout_expected_value() {
@@ -1225,12 +1224,12 @@ mod tests {
       twitch_user_id: ActiveValue::Set(3),
       channel_id: ActiveValue::Set(1),
       stream_id: ActiveValue::Set(None),
-      third_party_emotes_used: ActiveValue::Set(Some("{\"waaa\":1}".to_string())),
+      third_party_emotes_used: ActiveValue::Set(Some(json!({"waaa": 1}))),
       is_subscriber: ActiveValue::Set(1_i8),
-      twitch_emote_usage: ActiveValue::Set(Some("{\"1\":1,\"2\":1}".to_string())),
+      twitch_emote_usage: ActiveValue::Set(Some(json!({"1": 1, "2": 1}))),
     };
     let expected_active_model_v2 = stream_message::ActiveModel {
-      twitch_emote_usage: ActiveValue::Set(Some("{\"2\":1,\"1\":1}".to_string())),
+      twitch_emote_usage: ActiveValue::Set(Some(json!({"2": 1, "1": 1}))),
       ..expected_active_model_v1.clone()
     };
 

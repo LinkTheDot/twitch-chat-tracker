@@ -15,11 +15,9 @@ pub struct Model {
   pub twitch_user_id: i32,
   pub channel_id: i32,
   pub stream_id: Option<i32>,
-  #[sea_orm(column_type = "Text", nullable)]
-  pub third_party_emotes_used: Option<String>,
+  pub third_party_emotes_used: Option<Json>,
   pub is_subscriber: i8,
-  #[sea_orm(column_type = "Text", nullable)]
-  pub twitch_emote_usage: Option<String>,
+  pub twitch_emote_usage: Option<Json>,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

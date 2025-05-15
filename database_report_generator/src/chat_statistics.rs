@@ -6,6 +6,7 @@ use entities::donation_event;
 use entities::sea_orm_active_enums::EventType;
 use entities::stream_message;
 use entities::subscription_event;
+use entity_extensions::prelude::StreamMessageExtensions;
 use sea_orm::*;
 use std::collections::HashMap;
 use subscriptions::Subscriptions;
@@ -152,33 +153,11 @@ impl ChatStatistics {
         continue;
       };
 
-      let twitch_emotes_used = message.twitch_emote_usage.as_deref().unwrap_or("{}");
-      let twitch_emotes_used =
-        match serde_json::from_str::<HashMap<String, usize>>(twitch_emotes_used) {
-          Ok(twitch_emotes_used) => twitch_emotes_used.values().sum::<usize>(),
-          Err(error) => {
-            tracing::error!(
-              "Failed to parse the Twitch emotes used for a message. Message ID: {}. Reason: {:?}",
-              message.id,
-              error
-            );
-            continue;
-          }
-        };
-
-      let third_party_emotes = message.third_party_emotes_used.as_deref().unwrap_or("{}");
-      let third_party_emotes_used =
-        match serde_json::from_str::<HashMap<String, usize>>(third_party_emotes) {
-          Ok(third_party_emotes) => third_party_emotes.values().sum::<usize>(),
-          Err(error) => {
-            tracing::error!(
-              "Failed to parse the third party emotes for message. Message ID: {}. Reason: {:?}",
-              message.id,
-              error
-            );
-            continue;
-          }
-        };
+      let twitch_emotes_used = message.get_twitch_emotes_used().values().sum::<usize>();
+      let third_party_emotes_used = message
+        .get_third_party_emotes_used()
+        .values()
+        .sum::<usize>();
 
       let total_emotes_used = twitch_emotes_used + third_party_emotes_used;
 

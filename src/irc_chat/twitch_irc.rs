@@ -217,35 +217,122 @@ impl TwitchIrc {
 #[cfg(test)]
 mod tests {
   use super::*;
-  use irc::proto::message::Tag;
+  use irc::proto::message::Tag as IrcTag;
 
-  /// Used to manually configure IRC messages from Twitch to
+  /// Used to manually test raw IRC messages from Twitch to
   /// check if the parser is working as intended.
   #[tokio::test]
   #[ignore]
   async fn manual_message_testing() {
+    crate::logging::setup_logging_config().unwrap();
     let message = IrcMessage {
       tags: Some(vec![
-        Tag("display-name".into(), Some("Day_Mi_In".into())),
-        Tag("first-msg".into(), Some("0".into())),
-        Tag("emote-only".into(), Some("0".into())),
-        Tag("room-id".into(), Some("578762718".into())),
-        Tag("subscriber".into(), Some("0".into())),
-        Tag("tmi-sent-ts".into(), Some("1743616116564".into())),
-        Tag("user-id".into(), Some("766207899".into())),
+        IrcTag("display-name".into(), Some("Person012345".into())),
+        IrcTag("login".into(), Some("person012345".into())),
+        IrcTag("msg-id".into(), Some("submysterygift".into())),
+        IrcTag("msg-param-mass-gift-count".into(), Some("5".into())),
+        IrcTag(
+          "msg-param-origin-id".into(),
+          Some("12191707449440932532".into()),
+        ),
+        IrcTag("msg-param-sub-plan".into(), Some("1000".into())),
+        IrcTag("room-id".into(), Some("578762718".into())),
+        IrcTag("tmi-sent-ts".into(), Some("1737671067307".into())),
+        IrcTag("user-id".into(), Some("35678963".into())),
       ]),
-      prefix: Some(Prefix::Nickname(
-        "day_mi_in".into(),
-        "day_mi_in".into(),
-        "day_mi_in.tmi.twitch.tv".into(),
-      )),
-      command: Command::PRIVMSG(
-        "#fallenshadow".into(),
-        "syadouShumo ... syadouKuru... syadouINSANESHUMO... syadouPANIK syadouPattheshadow".into(),
-      ),
+      prefix: Some(Prefix::ServerName("tmi.twitch.tv".into())),
+      command: Command::Raw("USERNOTICE".into(), vec!["#fallenshadow".into()]),
     };
     let third_party_emote_lists = EmoteListStorage::new().await.unwrap();
 
+    MessageParser::new(&message, &third_party_emote_lists)
+      .unwrap()
+      .unwrap()
+      .parse()
+      .await
+      .unwrap();
+
+    let message = IrcMessage {
+      tags: Some(vec![
+        IrcTag("display-name".into(), Some("Person012345".into())),
+        IrcTag("login".into(), Some("person012345".into())),
+        IrcTag("msg-id".into(), Some("subgift".into())),
+        IrcTag("msg-param-months".into(), Some("2".into())),
+        IrcTag(
+          "msg-param-origin-id".into(),
+          Some("12191707449440932532".into()),
+        ),
+        IrcTag("msg-param-recipient-id".into(), Some("98884038".into())),
+        IrcTag(
+          "msg-param-sub-plan-name".into(),
+          Some("shondophrenics".into()),
+        ),
+        IrcTag("msg-param-sub-plan".into(), Some("1000".into())),
+        IrcTag("room-id".into(), Some("578762718".into())),
+        IrcTag("tmi-sent-ts".into(), Some("1737671067950".into())),
+        IrcTag("user-id".into(), Some("35678963".into())),
+      ]),
+      prefix: Some(Prefix::ServerName("tmi.twitch.tv".into())),
+      command: Command::Raw("USERNOTICE".into(), vec!["#fallenshadow".into()]),
+    };
+    MessageParser::new(&message, &third_party_emote_lists)
+      .unwrap()
+      .unwrap()
+      .parse()
+      .await
+      .unwrap();
+    let message = IrcMessage {
+      tags: Some(vec![
+        IrcTag("display-name".into(), Some("Person012345".into())),
+        IrcTag("login".into(), Some("person012345".into())),
+        IrcTag("msg-id".into(), Some("subgift".into())),
+        IrcTag("msg-param-months".into(), Some("1".into())),
+        IrcTag(
+          "msg-param-origin-id".into(),
+          Some("12191707449440932532".into()),
+        ),
+        IrcTag("msg-param-recipient-id".into(), Some("104530457".into())),
+        IrcTag(
+          "msg-param-sub-plan-name".into(),
+          Some("shondophrenics".into()),
+        ),
+        IrcTag("msg-param-sub-plan".into(), Some("1000".into())),
+        IrcTag("room-id".into(), Some("578762718".into())),
+        IrcTag("tmi-sent-ts".into(), Some("1737671067958".into())),
+        IrcTag("user-id".into(), Some("35678963".into())),
+      ]),
+      prefix: Some(Prefix::ServerName("tmi.twitch.tv".into())),
+      command: Command::Raw("USERNOTICE".into(), vec!["#fallenshadow".into()]),
+    };
+    MessageParser::new(&message, &third_party_emote_lists)
+      .unwrap()
+      .unwrap()
+      .parse()
+      .await
+      .unwrap();
+    let message = IrcMessage {
+      tags: Some(vec![
+        IrcTag("display-name".into(), Some("Person012345".into())),
+        IrcTag("login".into(), Some("person012345".into())),
+        IrcTag("msg-id".into(), Some("subgift".into())),
+        IrcTag("msg-param-months".into(), Some("1".into())),
+        IrcTag(
+          "msg-param-origin-id".into(),
+          Some("12191707449440932532".into()),
+        ),
+        IrcTag("msg-param-recipient-id".into(), Some("26789197".into())),
+        IrcTag(
+          "msg-param-sub-plan-name".into(),
+          Some("shondophrenics".into()),
+        ),
+        IrcTag("msg-param-sub-plan".into(), Some("1000".into())),
+        IrcTag("room-id".into(), Some("578762718".into())),
+        IrcTag("tmi-sent-ts".into(), Some("1737671067968".into())),
+        IrcTag("user-id".into(), Some("35678963".into())),
+      ]),
+      prefix: Some(Prefix::ServerName("tmi.twitch.tv".into())),
+      command: Command::Raw("USERNOTICE".into(), vec!["#fallenshadow".into()]),
+    };
     MessageParser::new(&message, &third_party_emote_lists)
       .unwrap()
       .unwrap()

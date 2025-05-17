@@ -108,6 +108,12 @@ impl TwitchIrcMessage {
     tags.display_name().is_some() && matches!(message.command, Command::PRIVMSG(_, _))
   }
 
+  /// Returns true if the message contained is a gift sub that contains 
+  /// data for the gift sub recipient.
+  pub fn gift_sub_has_recipient(&self) -> bool {
+    self.gift_sub_recipient_twitch_id().is_some()
+  }
+
   pub fn command(&self) -> &Command {
     &self.command
   }
@@ -130,6 +136,14 @@ impl TwitchIrcMessage {
     } else {
       None
     }
+  }
+
+  pub fn gift_sub_recipient_months_subscribed(&self) -> Option<&str> {
+    self.tags.gift_sub_recipient_months_subscribed()
+  }
+
+  pub fn gift_sub_recipient_twitch_id(&self) -> Option<&str> {
+    self.tags.gift_sub_recipient_twitch_id()
   }
 
   pub fn bits(&self) -> Option<&str> {

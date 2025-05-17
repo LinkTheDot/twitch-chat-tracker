@@ -15,6 +15,14 @@ pub struct TwitchIrcTagValues {
   #[serde(rename = "msg-param-mass-gift-count")]
   gift_sub_count: Option<String>,
 
+  /// Comes with the `subgift` message id. Individual gift sub notification messages will have this.
+  #[serde(rename = "msg-param-months")]
+  gift_sub_recipient_months_subscribed: Option<String>,
+
+  /// Comes with the `subgift` message id. Individual gift sub notification messages will have this.
+  #[serde(rename = "msg-param-recipient-id")]
+  gift_sub_recipient_twitch_id: Option<String>,
+
   #[serde(rename = "bits")]
   bits: Option<String>,
 
@@ -155,6 +163,14 @@ impl TwitchIrcTagValues {
     }
   }
 
+  pub fn gift_sub_recipient_months_subscribed(&self) -> Option<&str> {
+    self.gift_sub_recipient_months_subscribed.as_deref()
+  }
+
+  pub fn gift_sub_recipient_twitch_id(&self) -> Option<&str> {
+    self.gift_sub_recipient_twitch_id.as_deref()
+  }
+
   pub fn bits(&self) -> Option<&str> {
     self.bits.as_deref()
   }
@@ -248,6 +264,8 @@ mod tests {
       IrcTag("user-id".into(), Some("69420".into())),
       IrcTag("room-id".into(), Some("02496".into())),
       IrcTag("msg-param-cumulative-months".into(), Some("15".into())),
+      IrcTag("msg-param-months".into(), Some("3".into())),
+      IrcTag("msg-param-recipient-id".into(), Some("1111".into())),
     ];
     let irc_message = IrcMessage {
       tags: Some(tags),
@@ -284,5 +302,7 @@ mod tests {
     assert_eq!(message.user_id(), Some("69420"));
     assert_eq!(message.room_id(), Some("02496"));
     assert_eq!(message.months_subscribed(), Some("15"));
+    assert_eq!(message.gift_sub_recipient_months_subscribed(), Some("3"));
+    assert_eq!(message.gift_sub_recipient_twitch_id(), Some("1111"));
   }
 }

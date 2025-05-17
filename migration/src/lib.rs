@@ -22,6 +22,7 @@ mod m20250402_182948_create_user_name_change_table;
 mod m20250419_164430_change_stream_message_content_to_utf8mb4;
 mod m20250419_220750_add_twitch_origin_id_column_to_donation_event_table;
 mod m20250514_231010_change_stream_message_emote_columns_to_json_from_strings;
+mod m20250516_214316_create_bridge_table_for_gift_sub_donation_receivers;
 
 pub struct Migrator;
 
@@ -51,6 +52,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20250419_164430_change_stream_message_content_to_utf8mb4::Migration),
             Box::new(m20250419_220750_add_twitch_origin_id_column_to_donation_event_table::Migration),
             Box::new(m20250514_231010_change_stream_message_emote_columns_to_json_from_strings::Migration),
+            Box::new(m20250516_214316_create_bridge_table_for_gift_sub_donation_receivers::Migration),
         ]
   }
 }

@@ -22,6 +22,8 @@ pub struct Model {
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
 pub enum Relation {
+  #[sea_orm(has_many = "super::gift_sub_recipient::Entity")]
+  GiftSubRecipient,
   #[sea_orm(
     belongs_to = "super::stream::Entity",
     from = "Column::StreamId",
@@ -54,6 +56,12 @@ pub enum Relation {
     on_delete = "SetNull"
   )]
   UnknownUser,
+}
+
+impl Related<super::gift_sub_recipient::Entity> for Entity {
+  fn to() -> RelationDef {
+    Relation::GiftSubRecipient.def()
+  }
 }
 
 impl Related<super::stream::Entity> for Entity {

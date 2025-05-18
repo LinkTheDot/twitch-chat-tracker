@@ -198,18 +198,29 @@ impl AppQueryConditions {
     }
   }
 
-  pub fn from_month(month: Option<usize>) -> Result<Self, AppError> {
+  pub fn from_month(month: Option<usize>, streamer_twitch_user_id: i32) -> Result<Self, AppError> {
     let (start_date, end_date) = get_month_range(month)?;
 
     Ok(Self {
       messages: Condition::all()
-        .add(stream_message::Column::Timestamp.between(start_date, end_date)),
-      timeouts: Condition::all().add(user_timeout::Column::Timestamp.between(start_date, end_date)),
+        .add(stream_message::Column::Timestamp.between(start_date, end_date))
+        .add(stream_message::Column::TwitchUserId.eq(streamer_twitch_user_id)),
+
+      timeouts: Condition::all()
+        .add(user_timeout::Column::Timestamp.between(start_date, end_date))
+        .add(stream_message::Column::TwitchUserId.eq(streamer_twitch_user_id)),
+
       donations: Condition::all()
-        .add(donation_event::Column::Timestamp.between(start_date, end_date)),
+        .add(donation_event::Column::Timestamp.between(start_date, end_date))
+        .add(stream_message::Column::TwitchUserId.eq(streamer_twitch_user_id)),
+
       subscriptions: Condition::all()
-        .add(subscription_event::Column::Timestamp.between(start_date, end_date)),
-      raids: Condition::all().add(raid::Column::Timestamp.between(start_date, end_date)),
+        .add(subscription_event::Column::Timestamp.between(start_date, end_date))
+        .add(stream_message::Column::TwitchUserId.eq(streamer_twitch_user_id)),
+
+      raids: Condition::all()
+        .add(raid::Column::Timestamp.between(start_date, end_date))
+        .add(stream_message::Column::TwitchUserId.eq(streamer_twitch_user_id)),
     })
   }
 

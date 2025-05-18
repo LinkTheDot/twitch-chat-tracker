@@ -22,19 +22,22 @@ pub const EMOTE_DOMINANCE: f32 = 0.7;
 /// Returns a list of the name and report string.
 pub async fn generate_reports(
   query_conditions: AppQueryConditions,
-  _streamer_twitch_user_id: i32,
+  streamer_twitch_user_id: i32,
 ) -> Result<Vec<(&'static str, String)>, AppError> {
   let general_stats_report = get_chat_statistics_template(&query_conditions, false)
     .await
     .unwrap();
-  let monthly_general_stats_report = get_chat_statistics_template(&query_conditions, false)
-    .await
-    .unwrap();
+  let monthly_general_stats_report = get_chat_statistics_template(
+    &AppQueryConditions::from_month(Some(Utc::now().month() as usize), streamer_twitch_user_id)?,
+    false,
+  )
+  .await
+  .unwrap();
   let general_stats_with_donations_report = get_chat_statistics_template(&query_conditions, true)
     .await
     .unwrap();
   let monthly_general_with_donations_stats_report = get_chat_statistics_template(
-    &AppQueryConditions::from_month(Some(Utc::now().month() as usize))?,
+    &AppQueryConditions::from_month(Some(Utc::now().month() as usize), streamer_twitch_user_id)?,
     true,
   )
   .await
@@ -59,7 +62,7 @@ pub async fn generate_reports(
 
   // Update to account for using the streamer login name instead of stream id
   let donator_monthly_rankings_result = get_donation_rankings_for_streamer_and_month(
-    _streamer_twitch_user_id,
+    streamer_twitch_user_id,
     Args::get_year(),
     Args::get_month(),
   )

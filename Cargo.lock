@@ -2410,7 +2410,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "query-interface-backend"
+name = "query_interface_backend"
 version = "0.1.0"
 dependencies = [
  "app_config",

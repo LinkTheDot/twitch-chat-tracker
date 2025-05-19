@@ -3,6 +3,7 @@ use crate::irc_chat::twitch_irc::TwitchIrc;
 use std::time::Duration;
 use tokio::{sync::mpsc, task::JoinHandle};
 
+#[allow(unreachable_code)]
 pub async fn run_main_process(
   message_result_processor_sender: mpsc::UnboundedSender<JoinHandle<Result<(), AppError>>>,
 ) {
@@ -44,4 +45,6 @@ pub async fn run_main_process(
       _ => (),
     }
   }
+
+  panic!("Main processes ended expectedly.");
 }

@@ -12,7 +12,6 @@ members = [
   "entity_extensions",
   "migration", 
   "update_changed_names",
-  "query-interface-backend", 
 ]
 
 [dependencies]

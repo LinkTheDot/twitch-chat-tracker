@@ -8,11 +8,15 @@ use std::{sync::Arc, time::Duration};
 use tokio::{sync::mpsc, task::JoinHandle, time::timeout};
 use tokio_stream::StreamExt;
 
+const MESSAGE_WAIT_TIME: Duration = Duration::new(10, 0);
+
 pub struct TwitchIrc {
   irc_client: Client,
   irc_client_stream: Option<ClientStream>,
   third_party_emote_lists: Arc<EmoteListStorage>,
   message_result_processor_sender: mpsc::UnboundedSender<JoinHandle<Result<(), AppError>>>,
+  /// Temporary counter for debugging the app not working randomly at night.
+  no_message_count: usize,
 }
 
 impl TwitchIrc {
@@ -29,6 +33,7 @@ impl TwitchIrc {
       irc_client_stream: Some(irc_client_stream),
       third_party_emote_lists: Arc::new(third_party_emote_lists),
       message_result_processor_sender,
+      no_message_count: 0,
     })
   }
 
@@ -146,13 +151,21 @@ impl TwitchIrc {
   /// If no message is received within 10 seconds the function ends without doing anything.
   pub async fn next_message(&mut self) -> Result<(), AppError> {
     let future = self.get_mut_client_stream()?.next();
-    let message_result = timeout(Duration::from_secs(10), future).await;
+    let message_result = timeout(MESSAGE_WAIT_TIME, future).await;
 
     let Ok(Some(message_result)) = message_result else {
       tracing::debug!("Did not recieve a message.");
+      self.no_message_count += 1;
+
+      if self.no_message_count % 600 == 0 {
+        tracing::warn!("It has been one hour with no messages.");
+      }
 
       return Ok(());
     };
+
+    self.no_message_count = 0;
+
     let message = message_result?;
 
     self.process_message(message).await
@@ -164,7 +177,7 @@ impl TwitchIrc {
 
       return Ok(());
     }
-
+;
     let third_party_emote_lists = self.third_party_emote_lists.clone();
 
     let process_message_future =

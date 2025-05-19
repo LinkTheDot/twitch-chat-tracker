@@ -24,24 +24,22 @@ pub async fn generate_reports(
   query_conditions: AppQueryConditions,
   streamer_twitch_user_id: i32,
 ) -> Result<Vec<(&'static str, String)>, AppError> {
+  let monthly_condition =
+    AppQueryConditions::from_month(Some(Utc::now().month() as usize), streamer_twitch_user_id)?;
+
   let general_stats_report = get_chat_statistics_template(&query_conditions, false)
     .await
     .unwrap();
-  let monthly_general_stats_report = get_chat_statistics_template(
-    &AppQueryConditions::from_month(Some(Utc::now().month() as usize), streamer_twitch_user_id)?,
-    false,
-  )
-  .await
-  .unwrap();
+  let monthly_general_stats_report = get_chat_statistics_template(&monthly_condition, false)
+    .await
+    .unwrap();
   let general_stats_with_donations_report = get_chat_statistics_template(&query_conditions, true)
     .await
     .unwrap();
-  let monthly_general_with_donations_stats_report = get_chat_statistics_template(
-    &AppQueryConditions::from_month(Some(Utc::now().month() as usize), streamer_twitch_user_id)?,
-    true,
-  )
-  .await
-  .unwrap();
+  let monthly_general_with_donations_stats_report =
+    get_chat_statistics_template(&monthly_condition, true)
+      .await
+      .unwrap();
   let (unfiltered_chat_report, emote_filtered_chat_report) =
     get_messages_sent_ranking(&query_conditions).await.unwrap();
 
@@ -60,7 +58,6 @@ pub async fn generate_reports(
     ),
   ];
 
-  // Update to account for using the streamer login name instead of stream id
   let donator_monthly_rankings_result = get_donation_rankings_for_streamer_and_month(
     streamer_twitch_user_id,
     Args::get_year(),

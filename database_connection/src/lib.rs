@@ -2,6 +2,7 @@ use anyhow::anyhow;
 use app_config::secret_string::Secret;
 use app_config::AppConfig;
 use migration::{Migrator, MigratorTrait, SchemaManager};
+pub use sea_orm::DatabaseConnection;
 use sea_orm::*;
 use tokio::sync::OnceCell;
 

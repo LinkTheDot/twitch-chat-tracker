@@ -38,6 +38,19 @@ pub async fn update_channel_live_statuses(tracked_channels: TrackedChannels) {
         }
       }
 
+      Err(AppError::TungsteniteError(tungstenite::error::Error::Io(error))) => {
+        tracing::error!("Received a fatal IO error: {:?}.", error);
+
+        if let Err(error) = websocket_config.restart(database_connection).await {
+          tracing::error!(
+            "Failed to restart the websocket config. Reason: {}. Exiting the program",
+            error
+          );
+
+          std::process::exit(1);
+        }
+      }
+
       Err(error) => {
         tracing::error!("Failed to process a message: {}", error);
       }

@@ -158,7 +158,7 @@ impl TwitchIrc {
       self.no_message_count += 1;
 
       if self.no_message_count % 600 == 0 {
-        tracing::warn!("It has been one hour with no messages.");
+        tracing::warn!("It has been one hour with no messages on the IRC client.");
       }
 
       return Ok(());
@@ -176,8 +176,7 @@ impl TwitchIrc {
       self.irc_client.send_pong(url)?;
 
       return Ok(());
-    }
-;
+    };
     let third_party_emote_lists = self.third_party_emote_lists.clone();
 
     let process_message_future =

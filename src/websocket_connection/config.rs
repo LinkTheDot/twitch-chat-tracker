@@ -1,6 +1,6 @@
 use crate::{
-  channel::tracked_channels::TrackedChannels, errors::AppError, irc_chat::message_parser::MessageParser,
-  websocket_connection::subscriptions::EventSubscription,
+  channel::tracked_channels::TrackedChannels, errors::AppError,
+  irc_chat::message_parser::MessageParser, websocket_connection::subscriptions::EventSubscription,
 };
 use app_config::{secret_string::Secret, AppConfig};
 use database_connection::get_database_connection;
@@ -55,7 +55,6 @@ pub struct TwitchWebsocketConfig {
 }
 
 impl TwitchWebsocketConfig {
-
   pub async fn new(
     tracked_channels: TrackedChannels,
     database_connection: &sea_orm::DatabaseConnection,
@@ -270,15 +269,14 @@ impl TwitchWebsocketConfig {
     )
     .await;
 
-    if self.update_keep_alive() {
-      return Err(AppError::WebsocketTimeout);
-    }
-
     let Ok(Some(message_result)) = message_result else {
       tracing::debug!("Did not recieve a message.");
 
       return Ok(());
     };
+
+    self.update_keep_alive()?;
+
     let message = message_result?;
 
     if message.is_close() {
@@ -302,14 +300,7 @@ impl TwitchWebsocketConfig {
     };
 
     if message["metadata"]["message_type"] == "session_reconnect" {
-      let mut reconnect_url = message["payload"]["session"]["reconnect_url"].to_string();
-
-      if reconnect_url.starts_with('"') {
-        reconnect_url.remove(0);
-      }
-      if reconnect_url.ends_with('"') {
-        reconnect_url.pop();
-      }
+      let reconnect_url = Self::reconnect_url_from_message_payload(&message);
 
       return self.reconnect_with_url(reconnect_url).await;
     }
@@ -359,18 +350,31 @@ impl TwitchWebsocketConfig {
     Ok(())
   }
 
-  /// Returns true if the duration in the keep alive timer is larger than [`KEEP_ALIVE_DURATION`](TwitchWebsocketConfig::KEEP_ALIVE_DURATION)
+  fn reconnect_url_from_message_payload(message: &Value) -> String {
+    let mut reconnect_url = message["payload"]["session"]["reconnect_url"].to_string();
+
+    if reconnect_url.starts_with('"') {
+      reconnect_url.remove(0);
+    }
+    if reconnect_url.ends_with('"') {
+      reconnect_url.pop();
+    }
+
+    reconnect_url
+  }
+
+  /// Returns AppError::WebsocketTimeout if the duration in the keep alive timer is larger than [`KEEP_ALIVE_DURATION`](TwitchWebsocketConfig::KEEP_ALIVE_DURATION)
   ///
   /// This should be called after every message. In the case where no events are received, Twitch will send a keep alive message: https://dev.twitch.tv/docs/eventsub/handling-websocket-events/#keepalive-message
-  fn update_keep_alive(&mut self) -> bool {
+  fn update_keep_alive(&mut self) -> Result<(), AppError> {
     if self.keep_alive_timer.elapsed()
       > Duration::from_secs(KEEP_ALIVE_DURATION + KEEP_ALIVE_GRACE_PERIOD)
     {
-      return true;
+      return Err(AppError::WebsocketTimeout);
     } else {
       self.keep_alive_timer = Instant::now();
     }
 
-    false
+    Ok(())
   }
 }

@@ -5,6 +5,7 @@ metadata:
   namespace: default
 spec:
   schedule: "* 23 * * mon"
+  startingDeadlineSeconds: 600
   jobTemplate:
     spec:
       template:

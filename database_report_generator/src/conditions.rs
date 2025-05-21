@@ -204,23 +204,23 @@ impl AppQueryConditions {
     Ok(Self {
       messages: Condition::all()
         .add(stream_message::Column::Timestamp.between(start_date, end_date))
-        .add(stream_message::Column::TwitchUserId.eq(streamer_twitch_user_id)),
+        .add(stream_message::Column::ChannelId.eq(streamer_twitch_user_id)),
 
       timeouts: Condition::all()
         .add(user_timeout::Column::Timestamp.between(start_date, end_date))
-        .add(stream_message::Column::TwitchUserId.eq(streamer_twitch_user_id)),
+        .add(user_timeout::Column::TwitchUserId.eq(streamer_twitch_user_id)),
 
       donations: Condition::all()
         .add(donation_event::Column::Timestamp.between(start_date, end_date))
-        .add(stream_message::Column::TwitchUserId.eq(streamer_twitch_user_id)),
+        .add(donation_event::Column::DonatorTwitchUserId.eq(streamer_twitch_user_id)),
 
       subscriptions: Condition::all()
         .add(subscription_event::Column::Timestamp.between(start_date, end_date))
-        .add(stream_message::Column::TwitchUserId.eq(streamer_twitch_user_id)),
+        .add(subscription_event::Column::ChannelId.eq(streamer_twitch_user_id)),
 
       raids: Condition::all()
         .add(raid::Column::Timestamp.between(start_date, end_date))
-        .add(stream_message::Column::TwitchUserId.eq(streamer_twitch_user_id)),
+        .add(raid::Column::TwitchUserId.eq(streamer_twitch_user_id)),
     })
   }
 

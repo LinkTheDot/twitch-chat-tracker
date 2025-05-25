@@ -18,7 +18,7 @@ Total chats: {total_chats}
 Total chats with < {emote_message_threshold}% emotes to words: {non-emote_dominant_chats}
 Subscribed|Unsubscribed chats: {subscriber_chat_percentage}|{unsubscribed_chat_percentage}
 Average word count in messages: {average_message_length}
-New subscribers: {new_subscribers}
+Brand new subscribers: {new_subscribers}
 "#;
 
 const DONATION_STATS_TEMPLATE: &str = r#"

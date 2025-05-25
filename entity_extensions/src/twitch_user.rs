@@ -13,7 +13,7 @@ use url::Url;
 const HELIX_USER_QUERY_URL: &str = "https://api.twitch.tv/helix/users";
 const JARO_NAME_SIMILARITY_THRESHOLD: f64 = 0.85;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum ChannelIdentifier<S: AsRef<str>> {
   Login(S),
   TwitchID(S),
@@ -29,6 +29,10 @@ impl<'a> From<ChannelIdentifier<&'a str>> for &'a str {
 }
 
 pub trait TwitchUserExtensions {
+  async fn get_by_identifier<S: AsRef<str>>(
+    identifier: ChannelIdentifier<S>,
+    database_connection: &DatabaseConnection,
+  ) -> Result<Option<twitch_user::Model>, EntityExtensionError>;
   async fn get_or_set_by_name(
     login_name: &str,
     database_connection: &DatabaseConnection,
@@ -52,6 +56,30 @@ pub trait TwitchUserExtensions {
 }
 
 impl TwitchUserExtensions for twitch_user::Model {
+  async fn get_by_identifier<S: AsRef<str>>(
+    identifier: ChannelIdentifier<S>,
+    database_connection: &DatabaseConnection,
+  ) -> Result<Option<twitch_user::Model>, EntityExtensionError> {
+    match identifier {
+      ChannelIdentifier::Login(user_login) => {
+        // -
+        twitch_user::Entity::find()
+          .filter(twitch_user::Column::LoginName.eq(user_login.as_ref()))
+          .one(database_connection)
+          .await
+          .map_err(Into::into)
+      }
+      ChannelIdentifier::TwitchID(twitch_id) => {
+        // -
+        twitch_user::Entity::find()
+          .filter(twitch_user::Column::TwitchId.eq(twitch_id.as_ref()))
+          .one(database_connection)
+          .await
+          .map_err(Into::into)
+      }
+    }
+  }
+
   /// Retrieves the user model from the database if it exists.
   /// Otherwise creates the user entry for the database and returns the resulting model.                 
   ///

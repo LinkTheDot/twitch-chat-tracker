@@ -5,11 +5,14 @@ edition = "2024"
 
 [dependencies]
 entities = { path = "../entities" }
+entity_extensions = { path = "../entity_extensions" }
 app_config = { path = "../app_config" }
-axum = { version = "0.8.4", features = [] }
-sqlx = { version = "0.8.5", features = ["mysql", "runtime-tokio"] }
+database_connection = { path = "../database_connection" }
+axum = { version = "0.8.4", features = ["macros"] }
+sqlx = { version = "0.8.6", features = ["mysql", "runtime-tokio"] }
 tokio = { version = "1.45.0", features = ["full"] }
-tracing = "0.1.41"
-serde = { version = "1", features = ["derive"] }
-serde_json = "1"
+tracing = "0.1"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
 thiserror = "2.0.12"
+sea-orm = { version = "1.1.*", features = ["sqlx-mysql", "runtime-tokio", "macros"] } 

@@ -27,11 +27,13 @@ pub struct AppConfig {
   #[setting(default = 0)]
   queries_per_minute: usize,
 
-  #[setting(required)]
+  /// Required for the main app.
   twitch_nickname: Option<String>,
-  #[setting(required, env = "TWITCH_ACCESS_TOKEN")]
+  /// Required for the main app.
+  #[setting(env = "TWITCH_ACCESS_TOKEN")]
   access_token: Option<Secret>,
-  #[setting(required, env = "TWITCH_CLIENT_ID")]
+  /// Required for the main app.
+  #[setting(env = "TWITCH_CLIENT_ID")]
   client_id: Option<Secret>,
 
   #[setting(default = "root", env = "DATABASE_USERNAME")]
@@ -43,7 +45,7 @@ pub struct AppConfig {
 
   /// We're not dealing with sensitive data here. So configuring a default is fine.
   #[setting(default = "password", env = "DATABASE_PASSWORD")]
-  sql_user_password: Secret,
+  sql_user_password: Option<Secret>,
 
   /// Obtained from https://pastebin.com/doc_api#1
   #[setting(env = "PASTEBIN_API_KEY")]
@@ -139,7 +141,7 @@ impl AppConfig {
   }
 
   pub fn sql_user_password() -> &'static Secret {
-    &Self::get_or_set().sql_user_password
+    Self::get_or_set().sql_user_password.as_ref().unwrap()
   }
 
   /// Obtained from https://pastebin.com/doc_api#1

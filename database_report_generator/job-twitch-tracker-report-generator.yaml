@@ -15,10 +15,6 @@ spec:
           image: homelab.local:5000/twitch-tracker-report-generator:latest
           imagePullPolicy: Always
           env:
-            - name: TWITCH_ACCESS_TOKEN
-              value: "Not-needed"
-            - name: TWITCH_CLIENT_ID
-              value: "Not-needed"
             - name: PASTEBIN_API_KEY
               valueFrom:
                 secretKeyRef:

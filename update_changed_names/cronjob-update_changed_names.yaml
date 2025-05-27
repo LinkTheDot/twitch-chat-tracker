@@ -4,10 +4,12 @@ metadata:
   name: update-twitch-name-changes
   namespace: default
 spec:
-  schedule: "* 23 * * mon"
+  schedule: "0 23 * * mon"
   startingDeadlineSeconds: 600
   jobTemplate:
     spec:
+      parallelism: 1 
+      completions: 1 
       template:
         spec:
           containers:

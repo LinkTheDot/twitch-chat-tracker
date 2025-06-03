@@ -15,8 +15,6 @@ pub struct TwitchIrc {
   irc_client_stream: Option<ClientStream>,
   third_party_emote_lists: Arc<EmoteListStorage>,
   message_result_processor_sender: mpsc::UnboundedSender<JoinHandle<Result<(), AppError>>>,
-  /// Temporary counter for debugging the app not working randomly at night.
-  no_message_count: usize,
 }
 
 impl TwitchIrc {
@@ -33,7 +31,6 @@ impl TwitchIrc {
       irc_client_stream: Some(irc_client_stream),
       third_party_emote_lists: Arc::new(third_party_emote_lists),
       message_result_processor_sender,
-      no_message_count: 0,
     })
   }
 
@@ -107,8 +104,8 @@ impl TwitchIrc {
       password,
       use_tls: Some(true),
       channels: Self::get_channels(),
-      ping_timeout: Some(20),
-      ping_time: Some(60),
+      ping_timeout: Some(10),
+      ping_time: Some(10),
       ..Default::default()
     })
   }
@@ -155,16 +152,9 @@ impl TwitchIrc {
 
     let Ok(Some(message_result)) = message_result else {
       tracing::debug!("Did not recieve a message.");
-      self.no_message_count += 1;
-
-      if self.no_message_count % 600 == 0 {
-        tracing::warn!("It has been one hour with no messages on the IRC client.");
-      }
 
       return Ok(());
     };
-
-    self.no_message_count = 0;
 
     let message = message_result?;
 

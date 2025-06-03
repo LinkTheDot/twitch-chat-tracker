@@ -23,10 +23,7 @@ pub async fn run_main_process(
         tracing::error!("=== PING TIMEOUT ERROR ===");
 
         if let Err(error) = irc_client.reconnect().await {
-          tracing::error!(
-            "Failed to reconnected the IRC client. Reason: `{:?}`",
-            error
-          );
+          tracing::error!("Failed to reconnect the IRC client. Reason: `{:?}`", error);
 
           tokio::time::sleep(Duration::from_secs(10)).await;
         }

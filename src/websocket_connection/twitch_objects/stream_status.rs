@@ -9,6 +9,7 @@ pub struct TwitchStreamUpdateMessage {
 
 #[derive(Deserialize, Debug)]
 struct TwitchMetadata {
+  message_timestamp: DateTime<Utc>,
   message_id: String,
   #[serde(rename = "subscription_type")]
   subscription_event_type: StreamUpdateEventType,
@@ -17,7 +18,6 @@ struct TwitchMetadata {
 #[derive(Deserialize, Debug)]
 struct TwitchPayload {
   event: StreamOnlineEvent,
-  subscription: StreamOnlineSubscription,
 }
 
 #[derive(Deserialize, Debug)]
@@ -27,11 +27,6 @@ struct StreamOnlineEvent {
   #[serde(rename = "id")]
   stream_id: Option<String>,
   started_at: Option<DateTime<Utc>>,
-}
-
-#[derive(Deserialize, Debug)]
-struct StreamOnlineSubscription {
-  created_at: DateTime<Utc>,
 }
 
 #[derive(Debug, Clone, Copy, serde::Deserialize, PartialEq)]
@@ -74,8 +69,8 @@ impl TwitchStreamUpdateMessage {
   }
 
   /// The timestamp of when the event was created by Twitch.
-  pub fn get_subscription_created_at(&self) -> &DateTime<Utc> {
-    &self.payload.subscription.created_at
+  pub fn get_message_timestamp(&self) -> &DateTime<Utc> {
+    &self.metadata.message_timestamp
   }
 }
 
@@ -140,10 +135,10 @@ mod tests {
       .expect("Failed to parse expected started_at datetime");
     assert_eq!(message.get_started_at(), Some(expected_started_at));
 
-    let expected_created_at: DateTime<Utc> = "2025-05-08T00:02:17.4288984Z"
+    let expected_created_at: DateTime<Utc> = "2025-05-08T00:02:29.579998945Z"
       .parse()
       .expect("Failed to parse expected created_at datetime");
-    assert_eq!(message.get_subscription_created_at(), &expected_created_at);
+    assert_eq!(message.get_message_timestamp(), &expected_created_at);
   }
 
   #[test]
@@ -195,9 +190,9 @@ mod tests {
     assert_eq!(message.get_stream_id(), None);
     assert_eq!(message.get_started_at(), None);
 
-    let expected_created_at: DateTime<Utc> = "2025-05-05T16:29:04.47862776Z"
+    let expected_created_at: DateTime<Utc> = "2025-05-05T16:29:17.019680376Z"
       .parse()
       .expect("Failed to parse expected created_at datetime");
-    assert_eq!(message.get_subscription_created_at(), &expected_created_at);
+    assert_eq!(message.get_message_timestamp(), &expected_created_at);
   }
 }

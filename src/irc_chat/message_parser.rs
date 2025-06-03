@@ -728,7 +728,7 @@ impl<'a> MessageParser<'a> {
         },
       );
     };
-    let event_timestamp = stream_update_message.get_subscription_created_at();
+    let event_timestamp = stream_update_message.get_message_timestamp();
 
     let mut latest_stream_active_model = running_stream.into_active_model();
 

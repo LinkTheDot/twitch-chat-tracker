@@ -31,6 +31,11 @@ impl MigrationTrait for Migration {
     let column_name = "contents";
     let original_column_definition = "TEXT CHARACTER SET utf8mb3 COLLATE utf8mb3_general_ci NULL";
 
+    let sql_wipe_contents = format!(
+      "UPDATE {table} SET {column} = NULL;",
+      table = table_name,
+      column = column_name
+    );
     let sql = format!(
       "ALTER TABLE `{table}` MODIFY COLUMN `{column}` {definition};",
       table = table_name,
@@ -38,7 +43,8 @@ impl MigrationTrait for Migration {
       definition = original_column_definition
     );
 
-    db.execute_unprepared(&sql).await.map(|_| ())?;
+    db.execute_unprepared(&sql_wipe_contents).await?;
+    db.execute_unprepared(&sql).await?;
 
     Ok(())
   }

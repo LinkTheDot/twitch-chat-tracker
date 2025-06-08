@@ -2,7 +2,7 @@ use crate::templates::chat_messages::get_messages_sent_ranking;
 use crate::templates::chat_statistics::get_chat_statistics_template;
 use app_config::Args;
 use chrono::{Datelike, Utc};
-use conditions::AppQueryConditions;
+use conditions::query_conditions::AppQueryConditions;
 use errors::AppError;
 use templates::donation_rankings::get_donation_rankings_for_streamer_and_month;
 

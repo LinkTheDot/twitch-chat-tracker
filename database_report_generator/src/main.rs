@@ -1,7 +1,7 @@
 use app_config::clap::Args;
 use database_connection::*;
 use database_report_generator::{
-  conditions::AppQueryConditionsBuilder, upload_reports::upload_reports,
+  conditions::query_conditions_builder::AppQueryConditionsBuilder, upload_reports::upload_reports,
 };
 use entities::{stream, twitch_user};
 use entity_extensions::twitch_user::*;

@@ -1,7 +1,7 @@
 #![allow(unused_assignments)]
 
 use crate::chat_statistics::ChatStatistics;
-use crate::conditions::AppQueryConditions;
+use crate::conditions::query_conditions::AppQueryConditions;
 use crate::errors::AppError;
 use database_connection::get_database_connection;
 use entities::*;

@@ -1,4 +1,4 @@
-use crate::conditions::AppQueryConditions;
+use crate::conditions::query_conditions::AppQueryConditions;
 use crate::errors::AppError;
 use crate::EMOTE_DOMINANCE;
 use database_connection::get_database_connection;

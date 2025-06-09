@@ -6,7 +6,7 @@ use entity_extensions::stream::StreamExtensions;
 use sea_orm::*;
 use sea_query::OnConflict;
 
-pub async fn update_channel_live_statuses(tracked_channels: TrackedChannels) {
+pub async fn update_channel_live_statuses(tracked_channels: TrackedChannels) -> ! {
   tracing::info!("Starting channel status update process.");
   let database_connection = get_database_connection().await;
 

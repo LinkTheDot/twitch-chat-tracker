@@ -32,12 +32,14 @@ impl MigrationTrait for Migration {
           .table(StreamMessage::Table)
           .modify_column(
             ColumnDef::new(StreamMessage::ThirdPartyEmotesUsed)
-              .string()
+              .null()
+              .text()
               .to_owned(),
           )
           .modify_column(
             ColumnDef::new(StreamMessage::TwitchEmoteUsage)
-              .string()
+              .null()
+              .text()
               .to_owned(),
           )
           .to_owned(),

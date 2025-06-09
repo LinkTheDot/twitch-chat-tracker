@@ -37,43 +37,13 @@ impl TwitchIrc {
   pub async fn reconnect(&mut self) -> Result<(), AppError> {
     tracing::warn!("Reconnecting the IRC client.");
 
-    if let Some(client_stream) = self.irc_client_stream.take() {
-      let messages = match client_stream.collect().await {
-        Ok(messages) => messages,
-        Err(error) => {
-          tracing::error!(
-            "Failed to retrieve remaining messages from the client stream: {}",
-            error
-          );
-
-          vec![]
-        }
-      };
-
-      if !messages.is_empty() {
-        for message in messages {
-          if let Err(error) = self.process_message(message).await {
-            tracing::error!(
-              "Failed to process a remaining message from the client stream. Reason: {}",
-              error
-            );
-          }
-        }
-      }
-    } else {
-      tracing::error!(
-        "IRC client stream was missing where it was expected. Skipping message processing."
-      );
-    }
-
-    self.irc_client_stream = None;
-
-    // If we fail to retrieve the client, it's best to exit the program entirely.
-    self.irc_client = Self::get_irc_client().await.unwrap();
+    self.irc_client = Self::get_irc_client().await?;
 
     let irc_client_stream = self.irc_client.stream()?;
 
     self.irc_client_stream = Some(irc_client_stream);
+
+    tracing::info!("Successfully reconnected the IRC client");
 
     Ok(())
   }

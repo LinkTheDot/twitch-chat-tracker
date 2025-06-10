@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8" />
+  <link rel="icon" href="%sveltekit.assets%/favicon.png" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  %sveltekit.head%
+</head>
+
+<body data-sveltekit-preload-data="hover">
+  <div style="display: contents">%sveltekit.body%</div>
+</body>
+
+</html>
+
+<script>
+  let selectedOption = "Option 1";
+  let textInput = state!("");
+
+  const options = ["Option 1", "Option 2"];
+
+  // Function to handle form submission or data processing
+  function handleSubmit() {
+    alert("Selected:", selectedOption, "Text:", textInput);
+    // Here you would typically send data to your Rust backend
+    // fetch('/api/endpoint', { method: 'POST', body: JSON.stringify({...}) })
+  }
+</script>
+
+<div class="container">
+  <div class="input-group">
+    <!-- Dropdown/Select -->
+    <div class="select-wrapper">
+      <select bind:value="{selectedOption}" class="select-input">
+        {#each options as option}
+        <option value="{option}">{option}</option>
+        {/each}
+      </select>
+      <div class="select-arrow">▼</div>
+    </div>
+
+    <!-- Text Input -->
+    <input type="text" bind:value="{textInput}" placeholder="Text Box" class="text-input" />
+  </div>
+
+  <!-- Optional: Add a submit button -->
+  <button on:click="{handleSubmit}" class="submit-btn">Submit</button>
+</div>
+
+<style>
+  .container {
+    padding: 2rem;
+    max-width: 800px;
+    margin: 0 auto;
+  }
+
+  .input-group {
+    display: flex;
+    gap: 1rem;
+    align-items: flex-start;
+    margin-bottom: 1rem;
+  }
+
+  .select-wrapper {
+    position: relative;
+    min-width: 120px;
+  }
+
+  .select-input {
+    width: 100%;
+    padding: 0.75rem 2rem 0.75rem 0.75rem;
+    border: 2px solid #333;
+    background: white;
+    font-size: 1rem;
+    appearance: none;
+    cursor: pointer;
+    outline: none;
+  }
+
+  .select-input:focus {
+    border-color: #007acc;
+  }
+
+  .select-arrow {
+    position: absolute;
+    right: 0.75rem;
+    top: 50%;
+    transform: translateY(-50%);
+    pointer-events: none;
+    font-size: 0.8rem;
+  }
+
+  .text-input {
+    flex: 1;
+    padding: 0.75rem;
+    border: 2px solid #333;
+    font-size: 1rem;
+    outline: none;
+  }
+
+  .text-input:focus {
+    border-color: #007acc;
+  }
+
+  .text-input::placeholder {
+    color: #666;
+    font-style: italic;
+  }
+
+  .submit-btn {
+    padding: 0.75rem 1.5rem;
+    background: #007acc;
+    color: white;
+    border: none;
+    cursor: pointer;
+    font-size: 1rem;
+    border-radius: 4px;
+    transition: background-color 0.2s;
+  }
+
+  .submit-btn:hover {
+    background: #005a99;
+  }
+
+  /* Responsive design */
+  @media (max-width: 640px) {
+    .input-group {
+      flex-direction: column;
+    }
+
+    .select-wrapper {
+      min-width: 100%;
+    }
+  }
+</style>
+
+<p>Gleeeb</p>

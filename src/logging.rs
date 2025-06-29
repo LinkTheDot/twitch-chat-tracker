@@ -1,6 +1,8 @@
-use app_config::AppConfig;
+use app_config::{log_level_wrapper::LoggingConfigLevel, AppConfig};
 use std::path::PathBuf;
 use tracing_subscriber::EnvFilter;
+
+const SEA_ORM_LOG_LEVEL: LoggingConfigLevel = LoggingConfigLevel::Warn;
 
 pub fn setup_logging_config() -> Result<(), Box<dyn std::error::Error>> {
   let Some(log_level) = AppConfig::log_level() else {
@@ -9,9 +11,15 @@ pub fn setup_logging_config() -> Result<(), Box<dyn std::error::Error>> {
     return Ok(());
   };
 
+  let filter_string = format!(
+    "{},sea_orm={seaorm_level},sea_orm_migration={seaorm_level},sqlx={seaorm_level}",
+    log_level,
+    seaorm_level = SEA_ORM_LOG_LEVEL
+  );
+  let env_filter = EnvFilter::new(filter_string);
+
   let subscriber_builder = tracing_subscriber::fmt()
-    .with_env_filter(EnvFilter::new("sea_orm=error"))
-    .with_env_filter(EnvFilter::new(log_level))
+    .with_env_filter(env_filter)
     .with_ansi(false);
 
   if let Some(logging_dir) = AppConfig::logging_dir() {

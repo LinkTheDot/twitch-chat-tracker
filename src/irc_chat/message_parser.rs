@@ -15,6 +15,9 @@ use irc::proto::Message as IrcMessage;
 use sea_orm::*;
 use serde_json::Value as JsonValue;
 use std::collections::HashMap;
+use streamlabs_donation::StreamlabsDonation;
+
+pub mod streamlabs_donation;
 
 pub struct MessageParser<'a> {
   message: TwitchIrcMessage,
@@ -421,32 +424,19 @@ impl<'a> MessageParser<'a> {
         command_string: format!("{:?}", self.message.command()),
       });
     };
-    let Some(mut donation_quantity) = message_contents.split(" ").nth(3).map(str::to_string) else {
+
+    let Some(parsed_donation_contents) =
+      StreamlabsDonation::parse_streamlabs_donation_value_from_message_content(message_contents)
+    else {
       return Err(AppError::FailedToParseValue {
-        value_name: "donation quantity",
+        value_name: "donation contents",
         location: "streamlabs donation parsing",
-        value: message_contents.to_string(),
-      });
-    };
-    donation_quantity = donation_quantity.replace("£", "");
-    donation_quantity = donation_quantity.replace("!", "");
-    let Ok(donation_quantity) = donation_quantity.parse::<f32>() else {
-      return Err(AppError::FailedToParseValue {
-        value_name: "donation quantity",
-        location: "streamlabs donation parsing",
-        value: message_contents.to_string(),
+        value: message_contents.to_owned(),
       });
     };
 
-    let Some(donator_display_name) = message_contents.split(" ").next() else {
-      return Err(AppError::FailedToParseValue {
-        value_name: "donation quantity",
-        location: "streamlabs donation parsing",
-        value: message_contents.to_string(),
-      });
-    };
     let donator = match twitch_user::Model::get_or_set_by_name(
-      donator_display_name,
+      parsed_donation_contents.donator_name,
       database_connection,
     )
     .await
@@ -455,12 +445,17 @@ impl<'a> MessageParser<'a> {
       Err(error) => {
         tracing::error!("Failed to get donator from a streamlabs donation. Reason: {:?}. Attempting guess based on known users.", error);
 
-        twitch_user::Model::guess_name(donator_display_name, database_connection).await?
+        twitch_user::Model::guess_name(parsed_donation_contents.donator_name, database_connection)
+          .await?
       }
     };
     let unknown_user = if donator.is_none() {
       Some(
-        unknown_user::Model::get_or_set_by_name(donator_display_name, database_connection).await?,
+        unknown_user::Model::get_or_set_by_name(
+          parsed_donation_contents.donator_name,
+          database_connection,
+        )
+        .await?,
       )
     } else {
       None
@@ -479,7 +474,7 @@ impl<'a> MessageParser<'a> {
 
     let donation_event = donation_event::ActiveModel {
       event_type: ActiveValue::Set(EventType::StreamlabsDonation),
-      amount: ActiveValue::Set(donation_quantity),
+      amount: ActiveValue::Set(parsed_donation_contents.amount),
       timestamp: ActiveValue::Set(*self.message.timestamp()),
       donator_twitch_user_id: ActiveValue::Set(donator.map(|donator| donator.id)),
       unknown_user_id: ActiveValue::Set(unknown_user.map(|user| user.id)),

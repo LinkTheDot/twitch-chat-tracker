@@ -199,112 +199,51 @@ mod tests {
     crate::logging::setup_logging_config().unwrap();
     let message = IrcMessage {
       tags: Some(vec![
-        IrcTag("display-name".into(), Some("Person012345".into())),
-        IrcTag("login".into(), Some("person012345".into())),
-        IrcTag("msg-id".into(), Some("submysterygift".into())),
-        IrcTag("msg-param-mass-gift-count".into(), Some("5".into())),
+        IrcTag("display-name".to_string(), Some("guty_52".to_string())),
         IrcTag(
-          "msg-param-origin-id".into(),
-          Some("12191707449440932532".into()),
+          "id".to_string(),
+          Some("139180bb-2a2f-44db-b976-ec7321604a58".to_string()),
         ),
-        IrcTag("msg-param-sub-plan".into(), Some("1000".into())),
-        IrcTag("room-id".into(), Some("578762718".into())),
-        IrcTag("tmi-sent-ts".into(), Some("1737671067307".into())),
-        IrcTag("user-id".into(), Some("35678963".into())),
+        IrcTag("login".to_string(), Some("guty_52".to_string())),
+        IrcTag("msg-id".to_string(), Some("subgift".to_string())),
+        IrcTag(
+          "msg-param-community-gift-id".to_string(),
+          Some("4484768729225257381".to_string()),
+        ),
+        IrcTag("msg-param-gift-months".to_string(), Some("1".to_string())),
+        IrcTag("msg-param-months".to_string(), Some("1".to_string())),
+        IrcTag(
+          "msg-param-origin-id".to_string(),
+          Some("4484768729225257381".to_string()),
+        ),
+        IrcTag(
+          "msg-param-recipient-display-name".to_string(),
+          Some("moons_advocate".to_string()),
+        ),
+        IrcTag(
+          "msg-param-recipient-id".to_string(),
+          Some("116819927".to_string()),
+        ),
+        IrcTag(
+          "msg-param-recipient-user-name".to_string(),
+          Some("moons_advocate".to_string()),
+        ),
+        IrcTag("msg-param-sender-count".to_string(), Some("0".to_string())),
+        IrcTag(
+          "msg-param-sub-plan-name".to_string(),
+          Some("shondophrenics".to_string()),
+        ),
+        IrcTag("msg-param-sub-plan".to_string(), Some("1000".to_string())),
+        IrcTag("room-id".to_string(), Some("578762718".to_string())),
+        IrcTag("subscriber".to_string(), Some("1".to_string())),
+        IrcTag("tmi-sent-ts".to_string(), Some("1749748509617".to_string())),
+        IrcTag("user-id".to_string(), Some("231787559".to_string())),
       ]),
       prefix: Some(Prefix::ServerName("tmi.twitch.tv".into())),
       command: Command::Raw("USERNOTICE".into(), vec!["#fallenshadow".into()]),
     };
     let third_party_emote_lists = EmoteListStorage::new().await.unwrap();
 
-    MessageParser::new(&message, &third_party_emote_lists)
-      .unwrap()
-      .unwrap()
-      .parse()
-      .await
-      .unwrap();
-
-    let message = IrcMessage {
-      tags: Some(vec![
-        IrcTag("display-name".into(), Some("Person012345".into())),
-        IrcTag("login".into(), Some("person012345".into())),
-        IrcTag("msg-id".into(), Some("subgift".into())),
-        IrcTag("msg-param-months".into(), Some("2".into())),
-        IrcTag(
-          "msg-param-origin-id".into(),
-          Some("12191707449440932532".into()),
-        ),
-        IrcTag("msg-param-recipient-id".into(), Some("98884038".into())),
-        IrcTag(
-          "msg-param-sub-plan-name".into(),
-          Some("shondophrenics".into()),
-        ),
-        IrcTag("msg-param-sub-plan".into(), Some("1000".into())),
-        IrcTag("room-id".into(), Some("578762718".into())),
-        IrcTag("tmi-sent-ts".into(), Some("1737671067950".into())),
-        IrcTag("user-id".into(), Some("35678963".into())),
-      ]),
-      prefix: Some(Prefix::ServerName("tmi.twitch.tv".into())),
-      command: Command::Raw("USERNOTICE".into(), vec!["#fallenshadow".into()]),
-    };
-    MessageParser::new(&message, &third_party_emote_lists)
-      .unwrap()
-      .unwrap()
-      .parse()
-      .await
-      .unwrap();
-    let message = IrcMessage {
-      tags: Some(vec![
-        IrcTag("display-name".into(), Some("Person012345".into())),
-        IrcTag("login".into(), Some("person012345".into())),
-        IrcTag("msg-id".into(), Some("subgift".into())),
-        IrcTag("msg-param-months".into(), Some("1".into())),
-        IrcTag(
-          "msg-param-origin-id".into(),
-          Some("12191707449440932532".into()),
-        ),
-        IrcTag("msg-param-recipient-id".into(), Some("104530457".into())),
-        IrcTag(
-          "msg-param-sub-plan-name".into(),
-          Some("shondophrenics".into()),
-        ),
-        IrcTag("msg-param-sub-plan".into(), Some("1000".into())),
-        IrcTag("room-id".into(), Some("578762718".into())),
-        IrcTag("tmi-sent-ts".into(), Some("1737671067958".into())),
-        IrcTag("user-id".into(), Some("35678963".into())),
-      ]),
-      prefix: Some(Prefix::ServerName("tmi.twitch.tv".into())),
-      command: Command::Raw("USERNOTICE".into(), vec!["#fallenshadow".into()]),
-    };
-    MessageParser::new(&message, &third_party_emote_lists)
-      .unwrap()
-      .unwrap()
-      .parse()
-      .await
-      .unwrap();
-    let message = IrcMessage {
-      tags: Some(vec![
-        IrcTag("display-name".into(), Some("Person012345".into())),
-        IrcTag("login".into(), Some("person012345".into())),
-        IrcTag("msg-id".into(), Some("subgift".into())),
-        IrcTag("msg-param-months".into(), Some("1".into())),
-        IrcTag(
-          "msg-param-origin-id".into(),
-          Some("12191707449440932532".into()),
-        ),
-        IrcTag("msg-param-recipient-id".into(), Some("26789197".into())),
-        IrcTag(
-          "msg-param-sub-plan-name".into(),
-          Some("shondophrenics".into()),
-        ),
-        IrcTag("msg-param-sub-plan".into(), Some("1000".into())),
-        IrcTag("room-id".into(), Some("578762718".into())),
-        IrcTag("tmi-sent-ts".into(), Some("1737671067968".into())),
-        IrcTag("user-id".into(), Some("35678963".into())),
-      ]),
-      prefix: Some(Prefix::ServerName("tmi.twitch.tv".into())),
-      command: Command::Raw("USERNOTICE".into(), vec!["#fallenshadow".into()]),
-    };
     MessageParser::new(&message, &third_party_emote_lists)
       .unwrap()
       .unwrap()

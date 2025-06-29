@@ -3996,6 +3996,7 @@ dependencies = [
  "futures",
  "futures-util",
  "irc",
+ "regex",
  "reqwest",
  "sea-orm",
  "serde",

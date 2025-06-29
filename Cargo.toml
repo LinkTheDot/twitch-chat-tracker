@@ -36,6 +36,7 @@ tungstenite = "0.26.2"
 tokio-tungstenite = { version = "0.26.2", features = ["native-tls"] }
 futures-util = { version = "0.3.31", features = [] }
 futures = { version = "0.3.31", features = [] }
+regex = "1.11.1"
 
 [dev-dependencies]
 entity_extensions = { path = "entity_extensions", features = ["__test_hook"] }

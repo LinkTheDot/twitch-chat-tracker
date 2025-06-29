@@ -34,7 +34,7 @@ impl EmoteList {
   }
 
   pub async fn get_list(channel: &twitch_user::Model) -> Result<Self, AppError> {
-    tracing::info!("Getting 7tv emote list for channel {:?}", channel);
+    tracing::info!("Getting emote list for channel {:?}", channel);
     let _7tv = Self::get_7tv_list(channel).await?;
 
     Ok(Self {
@@ -142,7 +142,6 @@ impl EmoteList {
   }
 
   async fn _7tv_emote_list(query_url: Url) -> Result<HashSet<String>, AppError> {
-    tracing::info!("querying emote set for url: {:?}", query_url);
     let reqwest_client = reqwest::Client::new();
     let response = reqwest_client.get(query_url).send().await?;
     let response_body = response.text().await?;

@@ -1,4 +1,5 @@
 use super::twitch_message_type::TwitchMessageType;
+use crate::irc_chat::message_parser::streamlabs_donation::StreamlabsDonation;
 use crate::irc_chat::mirrored_twitch_objects::tag_values::TwitchIrcTagValues;
 use crate::{errors::AppError, irc_chat::sub_tier::SubTier};
 use chrono::{DateTime, Utc};
@@ -89,13 +90,7 @@ impl TwitchIrcMessage {
       return false;
     };
 
-    let Some(mut donation_quantity) = contents.split(" ").nth(3).map(str::to_string) else {
-      return false;
-    };
-    donation_quantity = donation_quantity.replace("£", "");
-    donation_quantity = donation_quantity.replace("!", "");
-
-    donation_quantity.parse::<f32>().is_ok()
+    StreamlabsDonation::parse_streamlabs_donation_value_from_message_content(contents).is_some()
   }
 
   fn is_raid(tags: &TwitchIrcTagValues) -> bool {
@@ -108,7 +103,7 @@ impl TwitchIrcMessage {
     tags.display_name().is_some() && matches!(message.command, Command::PRIVMSG(_, _))
   }
 
-  /// Returns true if the message contained is a gift sub that contains 
+  /// Returns true if the message contained is a gift sub that contains
   /// data for the gift sub recipient.
   pub fn gift_sub_has_recipient(&self) -> bool {
     self.gift_sub_recipient_twitch_id().is_some()

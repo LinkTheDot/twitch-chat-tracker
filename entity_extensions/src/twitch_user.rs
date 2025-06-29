@@ -147,9 +147,9 @@ impl TwitchUserExtensions for twitch_user::Model {
       .one(database_connection)
       .await?;
 
-    if cfg!(test) || cfg!(feature = "__test_hook") {
-      return Ok(user_model.unwrap());
-    }
+    // if cfg!(test) || cfg!(feature = "__test_hook") {
+    //   return Ok(user_model.unwrap());
+    // }
 
     if let Some(user_model) = user_model {
       return Ok(user_model);
@@ -171,9 +171,9 @@ impl TwitchUserExtensions for twitch_user::Model {
   async fn query_helix_for_channels_from_list<S: AsRef<str>>(
     channels: &[ChannelIdentifier<S>],
   ) -> Result<Vec<twitch_user::ActiveModel>, EntityExtensionError> {
-    if channels.is_empty() || cfg!(feature = "__test_hook") || cfg!(test) {
-      return Ok(vec![]);
-    }
+    // if channels.is_empty() || cfg!(feature = "__test_hook") || cfg!(test) {
+    //   return Ok(vec![]);
+    // }
 
     let mut query_url = Url::parse(HELIX_USER_QUERY_URL)?;
     let reqwest_client = reqwest::Client::new();

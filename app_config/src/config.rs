@@ -21,7 +21,7 @@ pub struct AppConfig {
   #[setting(default = "daily")]
   logging_roll_appender: RollingAppenderRotation,
 
-  #[setting(extend, merge = append_vec, validate = min_length(1), validate = max_length(100), env = "TRACKED_CHANNELS")]
+  #[setting(merge = append_vec, validate = min_length(1), validate = max_length(100), env = "TRACKED_CHANNELS")]
   channels: Vec<String>,
 
   #[setting(default = 0)]
@@ -67,17 +67,6 @@ impl AppConfig {
       .unwrap()
       .config;
 
-    if config.queries_per_minute == 0 {
-      let max_queries_per_minute =
-        (RATE_LIMIT / config.channels.len().max(1)).min(MAX_QUERIES_PER_MINUTE);
-
-      config.queries_per_minute = max_queries_per_minute;
-    }
-
-    if config.channels.len() * config.queries_per_minute > RATE_LIMIT {
-      panic!("The amount of channels being queried each minute exceeds the limit of 800. channel_count * quieries_per_minute must be <= 800.");
-    }
-
     if cfg!(test) || cfg!(feature = "__test_hook") {
       config.channels = Self::TEST_CHANNELS
         .iter()
@@ -85,7 +74,37 @@ impl AppConfig {
         .collect();
     }
 
-    config
+    config //
+      .extend_channels_from_environment()
+      .set_ratelimit()
+  }
+
+  fn extend_channels_from_environment(mut self) -> Self {
+    if let Ok(env_channels) = std::env::var("TRACKED_CHANNELS") {
+      let additional: Vec<String> = env_channels
+        .split(',')
+        .filter_map(|name| (!name.is_empty()).then_some(name.trim().to_string()))
+        .collect();
+
+      self.channels.extend(additional);
+    }
+
+    self
+  }
+
+  fn set_ratelimit(mut self) -> Self {
+    if self.queries_per_minute == 0 {
+      let max_queries_per_minute =
+        (RATE_LIMIT / self.channels.len().max(1)).min(MAX_QUERIES_PER_MINUTE);
+
+      self.queries_per_minute = max_queries_per_minute;
+    }
+
+    if self.channels.len() * self.queries_per_minute > RATE_LIMIT {
+      panic!("The amount of channels being queried each minute exceeds the limit of 800. channel_count * quieries_per_minute must be <= 800.");
+    }
+
+    self
   }
 
   fn get_or_set() -> &'static Self {

@@ -6,6 +6,10 @@ use std::collections::HashMap;
 
 #[derive(Debug, Deserialize, Default)]
 pub struct TwitchIrcTagValues {
+  /// The source of a unique message to differientiate from duplicates during times like shared chats.
+  #[serde(rename = "source-id")]
+  message_source_id: Option<String>,
+
   #[serde(rename = "login")]
   login_name: Option<String>,
 
@@ -45,6 +49,8 @@ pub struct TwitchIrcTagValues {
   #[serde(rename = "emotes")]
   emotes: Option<String>,
 
+  /// Determines the identifier for the message.
+  /// Raid, giftsub, etc.
   #[serde(rename = "msg-id")]
   message_id: Option<String>,
 
@@ -134,6 +140,10 @@ impl TwitchIrcTagValues {
       self.subscription_plan = Some(SubTier::One);
       self.months_subscribed = Some(2.to_string());
     }
+  }
+
+  pub fn message_source_id(&self) -> Option<&str> {
+    self.message_source_id.as_deref()
   }
 
   pub fn login_name(&self) -> Option<&str> {

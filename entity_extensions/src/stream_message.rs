@@ -68,6 +68,7 @@ mod tests {
       third_party_emotes_used: Some(json!({"GAGAGA": 1})),
       is_subscriber: 1,
       twitch_emote_usage: Some(json!({"7": 1})),
+      origin_id: Some("159ba37c-c6aa-4fdd-bc62-c5fadbab0770".into()),
     };
 
     let twitch_emotes_used = stream_message_instance.get_twitch_emotes_used();
@@ -94,6 +95,7 @@ mod tests {
       third_party_emotes_used: None,
       is_subscriber: 1,
       twitch_emote_usage: None,
+      origin_id: Some("159ba37c-c6aa-4fdd-bc62-c5fadbab0770".into()),
     };
 
     let twitch_emotes_used = stream_message_instance.get_twitch_emotes_used();

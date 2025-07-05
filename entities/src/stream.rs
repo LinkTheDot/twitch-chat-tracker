@@ -10,7 +10,7 @@ pub struct Model {
   pub id: i32,
   #[sea_orm(unique)]
   pub twitch_stream_id: u64,
-  pub start_timestamp: DateTimeUtc,
+  pub start_timestamp: Option<DateTimeUtc>,
   pub end_timestamp: Option<DateTimeUtc>,
   pub twitch_user_id: i32,
 }

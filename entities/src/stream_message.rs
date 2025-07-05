@@ -19,6 +19,8 @@ pub struct Model {
   pub third_party_emotes_used: Option<Json>,
   pub is_subscriber: i8,
   pub twitch_emote_usage: Option<Json>,
+  #[sea_orm(unique)]
+  pub origin_id: Option<String>,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

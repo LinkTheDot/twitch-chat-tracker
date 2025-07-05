@@ -1,7 +1,7 @@
 use super::mirrored_twitch_objects::message::TwitchIrcMessage;
 use super::mirrored_twitch_objects::twitch_message_type::TwitchMessageType;
 use crate::channel::third_party_emote_list_storage::EmoteListStorage;
-use crate::errors::AppError;
+use crate::errors::{AppError, DbErrExtension};
 use crate::websocket_connection::twitch_objects::stream_status::{
   StreamUpdateEventType, TwitchStreamUpdateMessage,
 };
@@ -44,11 +44,17 @@ impl<'a> MessageParser<'a> {
 
     match self.message.message_type() {
       TwitchMessageType::UserMessage => {
-        self
+        let result = self
           .parse_user_message(database_connection)
           .await?
           .insert(database_connection)
-          .await?;
+          .await;
+
+        if let Err(error) = result {
+          if !error.is_unique_constraint_violation() {
+            return Err(error.into());
+          }
+        }
       }
       TwitchMessageType::Bits => {
         self
@@ -553,6 +559,12 @@ impl<'a> MessageParser<'a> {
       });
     }
 
+    let Some(message_source_id) = self.message.message_source_id() else {
+      return Err(AppError::MissingExpectedValue {
+        expected_value_name: "unique message id",
+        location: "user message parser",
+      });
+    };
     let emotes = self.message.emotes().unwrap_or("");
     let Command::PRIVMSG(_, message_contents) = self.message.command() else {
       return Err(AppError::IncorrectCommandWhenParsingMessage {
@@ -596,16 +608,17 @@ impl<'a> MessageParser<'a> {
       (!twitch_emotes_used.is_empty()).then_some(serde_json::to_value(&twitch_emotes_used)?);
 
     let message = stream_message::ActiveModel {
-      is_first_message: ActiveValue::Set(self.message.is_first_message() as i8),
-      timestamp: ActiveValue::Set(*self.message.timestamp()),
-      emote_only: ActiveValue::Set(self.message.message_is_only_emotes() as i8),
-      contents: ActiveValue::Set(Some(message_contents.to_owned())),
-      twitch_user_id: ActiveValue::Set(sender_twitch_user_model.id),
-      channel_id: ActiveValue::Set(streamer_twitch_user_model.id),
-      stream_id: ActiveValue::Set(maybe_stream.map(|stream| stream.id)),
-      third_party_emotes_used: ActiveValue::Set(Some(third_party_emotes_used)),
-      is_subscriber: ActiveValue::Set(self.message.is_subscriber() as i8),
-      twitch_emote_usage: ActiveValue::Set(twitch_emotes_used),
+      is_first_message: Set(self.message.is_first_message() as i8),
+      timestamp: Set(*self.message.timestamp()),
+      emote_only: Set(self.message.message_is_only_emotes() as i8),
+      contents: Set(Some(message_contents.to_owned())),
+      twitch_user_id: Set(sender_twitch_user_model.id),
+      channel_id: Set(streamer_twitch_user_model.id),
+      stream_id: Set(maybe_stream.map(|stream| stream.id)),
+      third_party_emotes_used: Set(Some(third_party_emotes_used)),
+      is_subscriber: Set(self.message.is_subscriber() as i8),
+      twitch_emote_usage: Set(twitch_emotes_used),
+      origin_id: Set(Some(message_source_id.to_string())),
       ..Default::default()
     };
 
@@ -701,7 +714,7 @@ impl<'a> MessageParser<'a> {
 
     Ok(stream::ActiveModel {
       twitch_stream_id: ActiveValue::Set(stream_id),
-      start_timestamp: ActiveValue::Set(start_time),
+      start_timestamp: ActiveValue::Set(Some(start_time)),
       twitch_user_id: ActiveValue::Set(streamer.id),
       ..Default::default()
     })
@@ -1414,20 +1427,21 @@ mod tests {
       .unwrap();
 
     let expected_active_model_v1 = stream_message::ActiveModel {
-      id: ActiveValue::NotSet,
-      is_first_message: ActiveValue::Set(0_i8),
-      timestamp: ActiveValue::Set(timestamp_from_string("1740956922774")),
-      emote_only: ActiveValue::Set(0_i8),
-      contents: ActiveValue::Set(Some("waaa <3 syadouStanding".to_string())),
-      twitch_user_id: ActiveValue::Set(3),
-      channel_id: ActiveValue::Set(1),
-      stream_id: ActiveValue::Set(None),
-      third_party_emotes_used: ActiveValue::Set(Some(json!({"waaa": 1}))),
-      is_subscriber: ActiveValue::Set(1_i8),
-      twitch_emote_usage: ActiveValue::Set(Some(json!({"1": 1, "2": 1}))),
+      id: NotSet,
+      is_first_message: Set(0_i8),
+      timestamp: Set(timestamp_from_string("1740956922774")),
+      emote_only: Set(0_i8),
+      contents: Set(Some("waaa <3 syadouStanding".to_string())),
+      twitch_user_id: Set(3),
+      channel_id: Set(1),
+      stream_id: Set(None),
+      third_party_emotes_used: Set(Some(json!({"waaa": 1}))),
+      is_subscriber: Set(1_i8),
+      twitch_emote_usage: Set(Some(json!({"1": 1, "2": 1}))),
+      origin_id: Set(Some("159ba37c-c6aa-4fdd-bc62-c5fadbab0770".into())),
     };
     let expected_active_model_v2 = stream_message::ActiveModel {
-      twitch_emote_usage: ActiveValue::Set(Some(json!({"2": 1, "1": 1}))),
+      twitch_emote_usage: Set(Some(json!({"2": 1, "1": 1}))),
       ..expected_active_model_v1.clone()
     };
 
@@ -1454,6 +1468,10 @@ mod tests {
       IrcTag("subscriber".into(), Some("1".into())),
       IrcTag("display-name".into(), Some("LinkTheDot".into())),
       IrcTag("login".into(), Some("linkthedot".into())),
+      IrcTag(
+        "source-id".into(),
+        Some("159ba37c-c6aa-4fdd-bc62-c5fadbab0770".into()),
+      ),
     ];
 
     let message = IrcMessage {
@@ -1584,9 +1602,11 @@ mod tests {
       .append_query_results([vec![stream::Model {
         id: 1,
         twitch_stream_id: 1,
-        start_timestamp: DateTime::parse_from_rfc3339("2025-05-08T00:02:29.532137847Z")
-          .unwrap()
-          .to_utc(),
+        start_timestamp: Some(
+          DateTime::parse_from_rfc3339("2025-05-08T00:02:29.532137847Z")
+            .unwrap()
+            .to_utc(),
+        ),
         end_timestamp: None,
         twitch_user_id: 1,
       }]])
@@ -1595,22 +1615,22 @@ mod tests {
     let expected_online_active_model = stream::ActiveModel {
       id: ActiveValue::NotSet,
       twitch_stream_id: ActiveValue::Set(19136881),
-      start_timestamp: ActiveValue::Set(
+      start_timestamp: ActiveValue::Set(Some(
         DateTime::parse_from_rfc3339("2025-05-08T00:02:29.532137847Z")
           .unwrap()
           .to_utc(),
-      ),
+      )),
       end_timestamp: ActiveValue::NotSet,
       twitch_user_id: ActiveValue::Set(1),
     };
     let expected_offline_active_model = stream::ActiveModel {
       id: ActiveValue::Unchanged(1),
       twitch_stream_id: ActiveValue::Unchanged(1),
-      start_timestamp: ActiveValue::Unchanged(
+      start_timestamp: ActiveValue::Unchanged(Some(
         DateTime::parse_from_rfc3339("2025-05-08T00:02:29.532137847Z")
           .unwrap()
           .to_utc(),
-      ),
+      )),
       end_timestamp: ActiveValue::Set(Some(
         DateTime::parse_from_rfc3339("2025-05-08T08:02:29.579998945Z")
           .unwrap()

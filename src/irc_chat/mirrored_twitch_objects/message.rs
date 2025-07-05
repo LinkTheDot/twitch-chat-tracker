@@ -117,6 +117,10 @@ impl TwitchIrcMessage {
     self.message_type
   }
 
+  pub fn message_source_id(&self) -> Option<&str> {
+    self.tags.message_source_id()
+  }
+
   pub fn login_name(&self) -> Option<&str> {
     self.tags.login_name()
   }

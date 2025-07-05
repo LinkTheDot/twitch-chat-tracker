@@ -7,7 +7,7 @@ use sea_orm::*;
 pub struct StreamDto {
   pub id: i32,
   pub twitch_stream_id: u64,
-  pub start_timestamp: DateTimeUtc,
+  pub start_timestamp: Option<DateTimeUtc>,
   pub end_timestamp: Option<DateTimeUtc>,
   pub twitch_user: twitch_user::Model,
 }

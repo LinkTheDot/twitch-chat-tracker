@@ -1,21 +1,25 @@
+mod sea_orm_db_error_extensions;
+
+pub use sea_orm_db_error_extensions::*;
+
 #[derive(Debug, thiserror::Error)]
 pub enum AppError {
   #[error("")]
   ChannelQueriesPerMinuteExceeded,
 
-  #[error("{}", .0)]
+  #[error("{0}")]
   UrlParseError(#[from] url::ParseError),
 
-  #[error("{}", .0)]
+  #[error("{0}")]
   ReqwestError(#[from] reqwest::Error),
 
-  #[error("{}", .0)]
+  #[error("{0}")]
   SerdeError(#[from] serde_json::Error),
 
-  #[error("{}", .0)]
+  #[error("{0}")]
   EntityExtensionError(#[from] entity_extensions::errors::EntityExtensionError),
 
-  #[error("{}", .0)]
+  #[error("{0}")]
   TungsteniteError(#[from] tungstenite::error::Error),
 
   #[error("Remaining Helix API requests is 0.")]
@@ -39,7 +43,7 @@ pub enum AppError {
   #[error("Attempted to repeat a GET request for a request that could not be cloned. Request: `{}`", .0)]
   RequestCouldNotBeCloned(String),
 
-  #[error("{}", .0)]
+  #[error("{0}")]
   SeaOrmDbError(#[from] sea_orm::error::DbErr),
 
   #[error("Attempted to retrieve the global third party emote list, but couldn't find it.")]
@@ -158,6 +162,9 @@ pub enum AppError {
   #[error("Received an unknown value when parsing the event type for a websocket stream update message. Got: {:?}", value)]
   UnknownEventTypeValueInStreamUpdateMessage { value: String },
 
-  #[error("Failed to retrieve an active stream for user `{}` where one was expected.", streamer_id)]
+  #[error(
+    "Failed to retrieve an active stream for user `{}` where one was expected.",
+    streamer_id
+  )]
   FailedToFindActiveStreamForAUserWhereOneWasExpected { streamer_id: i32 },
 }

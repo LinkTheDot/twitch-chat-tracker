@@ -91,7 +91,7 @@ async fn update_active_streams(
 
     let active_model = stream::ActiveModel {
       twitch_stream_id: ActiveValue::Set(stream_twitch_id),
-      start_timestamp: ActiveValue::Set(stream_start_time),
+      start_timestamp: ActiveValue::Set(Some(stream_start_time)),
       twitch_user_id: ActiveValue::Set(streamer.id),
       ..Default::default()
     };

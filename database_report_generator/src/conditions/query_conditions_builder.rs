@@ -1,9 +1,22 @@
-use crate::errors::AppError;
-use sea_orm::*;
-use entities::*;
 use crate::conditions::query_conditions::AppQueryConditions;
-use chrono::{DateTime, Datelike,  NaiveDate, NaiveTime, Utc};
+use crate::errors::AppError;
+use chrono::{DateTime, Datelike, NaiveDate, NaiveTime, Utc};
+use entities::*;
+use sea_orm::*;
 
+/// Creates a method for building a condition based on data of the passed in data.
+///
+/// # Example
+/// ```Rust
+///   generate_condition_getter! {
+///     module: stream_message,
+///     get_stream_column: StreamId,
+///     get_timestamp_column: Timestamp,
+///     get_user_column: ChannelId,
+///   }
+/// ```
+///
+/// Takes the module to build off of, and the names of columns needed to build the getter.
 macro_rules! generate_condition_getter {
   {
     module: $condition_module:ident,

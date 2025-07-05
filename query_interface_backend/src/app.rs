@@ -20,11 +20,4 @@ impl InterfaceConfig {
   pub fn database_connection(&self) -> &DatabaseConnection {
     &self.database_connection
   }
-
-  // async fn router() -> Router {
-  //   Router::new()
-  //     .with_state(get_database_connection().await)
-  // .route("/users", get(crate::routes::users::get_users))
-  // .apply_routes()
-  // }
 }

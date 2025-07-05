@@ -4,7 +4,7 @@ use app_config::Args;
 use chrono::{Datelike, Utc};
 use conditions::query_conditions::AppQueryConditions;
 use errors::AppError;
-use templates::donation_rankings::get_donation_rankings_for_streamer_and_month;
+use templates::donation_rankings::get_donation_rankings_for_streamer_and_date;
 
 pub mod chat_statistics;
 pub mod conditions;
@@ -58,7 +58,7 @@ pub async fn generate_reports(
     ),
   ];
 
-  let donator_monthly_rankings_result = get_donation_rankings_for_streamer_and_month(
+  let donator_monthly_rankings_result = get_donation_rankings_for_streamer_and_date(
     streamer_twitch_user_id,
     Args::get_year(),
     Args::get_month(),

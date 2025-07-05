@@ -128,7 +128,7 @@ impl TwitchUserExtensions for twitch_user::Model {
 
       return Ok(user_model);
     } else {
-      tracing::info!("Found a new channel from Helix: {:#?}", helix_channel);
+      tracing::trace!("Found a new channel from Helix: {:?}", helix_channel);
 
       attempt_insert(helix_channel, database_connection).await
     }

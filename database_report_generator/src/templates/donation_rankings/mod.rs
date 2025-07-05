@@ -19,7 +19,7 @@ const SUB_TIER_VALUE: [f32; 3] = [5.99, 9.99, 24.99];
 const REPORT_INFO: &str =
   r#"This report contains the donation rankings for streamer {STREAMER} during {DATE}."#;
 
-pub async fn get_donation_rankings_for_streamer_and_month(
+pub async fn get_donation_rankings_for_streamer_and_date(
   streamer_id: i32,
   year: Option<usize>,
   month: Option<usize>,

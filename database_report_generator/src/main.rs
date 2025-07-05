@@ -34,6 +34,11 @@ async fn main() {
   }
 }
 
+/// Returns the latest stream for the streamer based on arguments given to the program.
+///
+/// The stream id will take priority, then a streamer name will be checked.
+///
+/// The program will exit if no stream was found.
 async fn get_stream(database_connection: &DatabaseConnection) -> stream::Model {
   if let Some(stream_id) = Args::report_stream_id() {
     let stream = stream::Entity::find_by_id(stream_id)

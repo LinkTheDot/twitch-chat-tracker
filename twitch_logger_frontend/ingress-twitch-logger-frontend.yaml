@@ -1,0 +1,16 @@
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: twitch-logger-frontend-route
+  namespace: default
+spec:
+  entryPoints:
+    - web
+    # - websecure 
+  routes:
+    - kind: Rule
+      match: Host(`looank.com`)
+      services:
+        - kind: Service
+          name: twitch-logger-frontend
+          port: 80

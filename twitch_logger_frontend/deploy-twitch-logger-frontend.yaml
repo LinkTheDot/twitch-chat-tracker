@@ -17,4 +17,4 @@ spec:
           image: homelab.local:5000/twitch-logger-frontend
           imagePullPolicy: Always
           ports:
-          - containerPort: 3000
+          - containerPort: 80

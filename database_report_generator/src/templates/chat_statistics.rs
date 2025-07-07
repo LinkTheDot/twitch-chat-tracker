@@ -10,6 +10,7 @@ use human_time::ToHumanTimeString;
 use sea_orm::*;
 use std::collections::HashMap;
 use std::time::Duration;
+use tracing::instrument;
 
 const STATS_FILE_TEMPLATE: &str = r#"
 = Chat statistics =
@@ -31,6 +32,7 @@ Gift Subs: T1 - {tier_1_gift_subs} | T2 - {tier_2_gift_subs} | T3 - {tier_3_gift
 Total Subs: T1 - {total_tier_1_subs} | T2 - {total_tier_2_subs} | T3 - {total_tier_3_subs}
 "#;
 
+#[instrument(skip_all)]
 pub async fn get_chat_statistics_template(
   query_conditions: &AppQueryConditions,
   include_donations: bool,

@@ -1,5 +1,7 @@
-use app_config::AppConfig;
-use tracing_subscriber::EnvFilter;
+use app_config::{log_level_wrapper::LoggingConfigLevel, AppConfig};
+use tracing_subscriber::{fmt, EnvFilter};
+
+const SEA_ORM_LOG_LEVEL: LoggingConfigLevel = LoggingConfigLevel::Error;
 
 pub fn setup_logging_config() -> Result<(), Box<dyn std::error::Error>> {
   let Some(log_level) = AppConfig::log_level() else {
@@ -8,8 +10,17 @@ pub fn setup_logging_config() -> Result<(), Box<dyn std::error::Error>> {
     return Ok(());
   };
 
+  let filter_string = format!(
+    "{},sea_orm={seaorm_level},sea_orm_migration={seaorm_level},sqlx={seaorm_level}",
+    log_level,
+    seaorm_level = SEA_ORM_LOG_LEVEL
+  );
+  let env_filter = EnvFilter::new(filter_string);
+
   let subscriber_builder = tracing_subscriber::fmt()
-    .with_env_filter(EnvFilter::new(log_level))
+    .with_timer(fmt::time::uptime())
+    .with_span_events(fmt::format::FmtSpan::CLOSE)
+    .with_env_filter(env_filter)
     .with_ansi(false);
 
   println!("Logging to stdout.");

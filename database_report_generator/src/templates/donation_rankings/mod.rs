@@ -8,6 +8,7 @@ use sea_orm_active_enums::EventType;
 use top_donators::*;
 use top_donators_entry::*;
 use top_donators_tables::*;
+use tracing::instrument;
 
 mod donator_identifier;
 mod top_donators;
@@ -19,6 +20,7 @@ const SUB_TIER_VALUE: [f32; 3] = [5.99, 9.99, 24.99];
 const REPORT_INFO: &str =
   r#"This report contains the donation rankings for streamer {STREAMER} during {DATE}."#;
 
+#[instrument(skip_all)]
 pub async fn get_donation_rankings_for_streamer_and_date(
   streamer_id: i32,
   year: Option<usize>,

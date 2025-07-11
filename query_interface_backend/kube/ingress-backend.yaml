@@ -6,7 +6,7 @@ metadata:
 spec:
   entryPoints:
     - web
-    # - websecure 
+    - websecure 
   routes:
     - kind: Rule
       match: Host(`api.looank.com`)
@@ -14,3 +14,5 @@ spec:
         - kind: Service
           name: twitch-logger-query-interface-backend-service
           port: 8080
+  tls:
+    certResolver: dns-simple

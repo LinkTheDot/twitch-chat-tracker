@@ -559,12 +559,7 @@ impl<'a> MessageParser<'a> {
       });
     }
 
-    let Some(message_source_id) = self.message.message_source_id() else {
-      return Err(AppError::MissingExpectedValue {
-        expected_value_name: "unique message id",
-        location: "user message parser",
-      });
-    };
+    let message_source_id = self.message.message_source_id();    
     let emotes = self.message.emotes().unwrap_or("");
     let Command::PRIVMSG(_, message_contents) = self.message.command() else {
       return Err(AppError::IncorrectCommandWhenParsingMessage {
@@ -618,7 +613,7 @@ impl<'a> MessageParser<'a> {
       third_party_emotes_used: Set(Some(third_party_emotes_used)),
       is_subscriber: Set(self.message.is_subscriber() as i8),
       twitch_emote_usage: Set(twitch_emotes_used),
-      origin_id: Set(Some(message_source_id.to_string())),
+      origin_id: Set(message_source_id.map(|id| id.into())),
       ..Default::default()
     };
 

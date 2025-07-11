@@ -6,7 +6,7 @@ use std::collections::HashMap;
 
 #[derive(Debug, Deserialize, Default)]
 pub struct TwitchIrcTagValues {
-  /// The source of a unique message to differientiate from duplicates during times like shared chats.
+  /// The source of a unique message to differientiate from duplicates during shared chats
   #[serde(rename = "source-id")]
   message_source_id: Option<String>,
 

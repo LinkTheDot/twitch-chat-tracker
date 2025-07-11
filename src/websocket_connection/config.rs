@@ -256,23 +256,27 @@ impl TwitchWebsocketConfig {
   ///
   /// If the message was for `stream.offline` or `stream.online` events, they are parsed, and the database is updated.
   ///
+  /// Returns true if there was a message received. 
+  /// Otherwise, if [`keep_alive`](KEEP_ALIVE_DURATION) + [`grace`](KEEP_ALIVE_GRACE_PERIOD) 
+  /// seconds have passed, false is returned. 
+  ///
   /// Checks for:
   /// Keep alive: https://dev.twitch.tv/docs/eventsub/handling-websocket-events/#keepalive-message
   /// Reconnect: https://dev.twitch.tv/docs/eventsub/handling-websocket-events/#reconnect-message
   /// Revocation: https://dev.twitch.tv/docs/eventsub/handling-websocket-events/#revocation-message
   /// Close: https://dev.twitch.tv/docs/eventsub/handling-websocket-events/#close-message
-  pub async fn check_for_stream_message(&mut self) -> Result<(), AppError> {
-    let future = self.socket_stream.next();
+  pub async fn check_for_stream_message(&mut self) -> Result<bool, AppError> {
+    let check_message_future = self.socket_stream.next();
     let message_result = timeout(
       Duration::from_secs(KEEP_ALIVE_DURATION + KEEP_ALIVE_GRACE_PERIOD),
-      future,
+      check_message_future,
     )
     .await;
 
     let Ok(Some(message_result)) = message_result else {
       tracing::debug!("Did not recieve a message.");
 
-      return Ok(());
+      return Ok(false);
     };
 
     self.update_keep_alive()?;
@@ -288,7 +292,9 @@ impl TwitchWebsocketConfig {
     let message = message.to_text()?;
 
     if message.is_empty() {
-      return Ok(());
+      tracing::info!("Received an empty websocket message.");
+
+      return Ok(true);
     }
 
     let Ok(message) = serde_json::from_str::<Value>(message) else {
@@ -302,14 +308,18 @@ impl TwitchWebsocketConfig {
     if message["metadata"]["message_type"] == "session_reconnect" {
       let reconnect_url = Self::reconnect_url_from_message_payload(&message);
 
-      return self.reconnect_with_url(reconnect_url).await;
+      self.reconnect_with_url(reconnect_url).await?;
+
+      return Ok(true);
     }
 
     MessageParser::parse_websocket_stream_status_update_message(
       message,
       get_database_connection().await,
     )
-    .await
+    .await?;
+
+    Ok(true)
   }
 
   pub async fn restart(

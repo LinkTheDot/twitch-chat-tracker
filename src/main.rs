@@ -8,8 +8,6 @@ use app_config::AppConfig;
 
 #[tokio::main]
 async fn main() {
-  twitch_chat_logger::logging::setup_logging_config().unwrap();
-
   if AppConfig::channels().is_empty() {
     println!("No channels to track.");
 

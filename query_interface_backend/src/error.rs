@@ -27,16 +27,28 @@ pub enum AppError {
   FailedToFindDonationEventByID { donation_event_id: i32 },
 }
 
-pub trait IntoStatusError<T> {
-  fn into_status_error(self) -> Result<T, (StatusCode, String)>;
+impl axum::response::IntoResponse for AppError {
+  fn into_response(self) -> axum::response::Response {
+    let message = self.to_string();
+    let status = StatusCode::from(self);
+
+    tracing::error!("An error occurred: `{}`", message);
+
+    (status, axum::Json(message)).into_response()
+  }
 }
 
-impl<T, E> IntoStatusError<T> for Result<T, E>
-where
-  E: std::error::Error,
-{
-  /// Converts the Result<T, E> into Result<T, (INTERNAL_SERVER_ERROR, E as String)>
-  fn into_status_error(self) -> Result<T, (StatusCode, String)> {
-    self.map_err(|error| (StatusCode::INTERNAL_SERVER_ERROR, error.to_string()))
+impl From<AppError> for StatusCode {
+  fn from(error: AppError) -> StatusCode {
+    match error {
+      AppError::DbError(_) => StatusCode::INTERNAL_SERVER_ERROR,
+      AppError::EntityExtensionError(_) => StatusCode::INTERNAL_SERVER_ERROR,
+      AppError::NoQueryParameterFound => StatusCode::BAD_REQUEST,
+      AppError::CouldNotFindUserByTwitchId { .. } => StatusCode::NOT_FOUND,
+      AppError::CouldNotFindUserByLoginName { .. } => StatusCode::NOT_FOUND,
+      AppError::CouldNotFindUserByInternalID { .. } => StatusCode::NOT_FOUND,
+      AppError::FailedToFindStreamByID { .. } => StatusCode::NOT_FOUND,
+      AppError::FailedToFindDonationEventByID { .. } => StatusCode::NOT_FOUND,
+    }
   }
 }

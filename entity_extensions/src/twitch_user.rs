@@ -33,6 +33,10 @@ pub trait TwitchUserExtensions {
     identifier: ChannelIdentifier<S>,
     database_connection: &DatabaseConnection,
   ) -> Result<Option<twitch_user::Model>, EntityExtensionError>;
+  async fn get_list_by_incomplete_name<S: AsRef<str> + std::fmt::Debug>(
+    identifier: ChannelIdentifier<S>,
+    database_connection: &DatabaseConnection,
+  ) -> Result<Vec<twitch_user::Model>, EntityExtensionError>;
   async fn get_or_set_by_name(
     login_name: &str,
     database_connection: &DatabaseConnection,
@@ -56,6 +60,9 @@ pub trait TwitchUserExtensions {
 }
 
 impl TwitchUserExtensions for twitch_user::Model {
+  /// Retrieves the user based on the given identifier.
+  ///
+  /// Returns an error if the user was not found.
   async fn get_by_identifier<S: AsRef<str>>(
     identifier: ChannelIdentifier<S>,
     database_connection: &DatabaseConnection,
@@ -78,6 +85,46 @@ impl TwitchUserExtensions for twitch_user::Model {
           .map_err(Into::into)
       }
     }
+  }
+
+  /// Returns the list of users based on an incomplete login.
+  /// For example, if you pass in a login of "fall", then the list of every user with "fall" in their name is returned.
+  ///
+  /// An error is returned if there are no matches.
+  async fn get_list_by_incomplete_name<S: AsRef<str> + std::fmt::Debug>(
+    identifier: ChannelIdentifier<S>,
+    database_connection: &DatabaseConnection,
+  ) -> Result<Vec<twitch_user::Model>, EntityExtensionError> {
+    let user_list_result = match &identifier {
+      ChannelIdentifier::Login(approximate_login) => {
+        // -
+        twitch_user::Entity::find()
+          .filter(twitch_user::Column::LoginName.contains(approximate_login.as_ref()))
+          .all(database_connection)
+          .await
+          .map_err(Into::into)
+      }
+      ChannelIdentifier::TwitchID(twitch_id) => {
+        // -
+        twitch_user::Entity::find()
+          .filter(twitch_user::Column::TwitchId.eq(twitch_id.as_ref()))
+          .all(database_connection)
+          .await
+          .map_err(Into::into)
+      }
+    };
+
+    if let Ok(user_list) = &user_list_result {
+      if user_list.is_empty() {
+        return Err(EntityExtensionError::FailedToGetValue {
+          value_name: "user",
+          location: "get_list_by_incomplete_name",
+          additional_data: format!("{:?}", identifier),
+        });
+      }
+    }
+
+    user_list_result
   }
 
   /// Retrieves the user model from the database if it exists.
@@ -382,4 +429,99 @@ async fn attempt_insert(
   }
 
   result.map_err(Into::into)
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+
+  #[tokio::test]
+  async fn get_by_identifier_method_works_with_string_twitch_ids() {
+    let user_model = twitch_user::Model {
+      id: 1,
+      twitch_id: 578762718,
+      login_name: "fallenshadow".into(),
+      display_name: "fallenshadow".into(),
+    };
+    let mock_database = MockDatabase::new(DatabaseBackend::MySql)
+      .append_query_results([vec![user_model.clone()]])
+      .into_connection();
+
+    let twitch_id = ChannelIdentifier::TwitchID("578762718");
+
+    let result = twitch_user::Model::get_by_identifier(twitch_id, &mock_database)
+      .await
+      .unwrap();
+
+    assert_eq!(result, Some(user_model));
+  }
+
+  #[tokio::test]
+  async fn get_by_identifier_method_works_with_logins() {
+    let user_model = twitch_user::Model {
+      id: 1,
+      twitch_id: 578762718,
+      login_name: "fallenshadow".into(),
+      display_name: "fallenshadow".into(),
+    };
+    let mock_database = MockDatabase::new(DatabaseBackend::MySql)
+      .append_query_results([vec![user_model.clone()]])
+      .into_connection();
+
+    let login = ChannelIdentifier::Login("fallenshadow");
+
+    let result = twitch_user::Model::get_by_identifier(login, &mock_database)
+      .await
+      .unwrap();
+
+    assert_eq!(result, Some(user_model));
+  }
+
+  #[tokio::test]
+  async fn get_list_by_incomplete_name_works_for_list() {
+    let user_models = vec![
+      twitch_user::Model {
+        id: 1,
+        twitch_id: 578762718,
+        login_name: "fallenshadow".into(),
+        display_name: "fallenshadow".into(),
+      },
+      twitch_user::Model {
+        id: 2,
+        twitch_id: 795025340,
+        login_name: "shadowchama".into(),
+        display_name: "shadowchama".into(),
+      },
+    ];
+    let mock_database = MockDatabase::new(DatabaseBackend::MySql)
+      .append_query_results([user_models.clone()])
+      .into_connection();
+
+    let incomplete_login = ChannelIdentifier::Login("shadow");
+
+    let result = twitch_user::Model::get_list_by_incomplete_name(incomplete_login, &mock_database)
+      .await
+      .unwrap();
+
+    assert_eq!(result, user_models);
+  }
+
+  #[tokio::test]
+  async fn get_list_by_incomplete_name_returns_empty_list_with_no_results() {
+    let user_models: Vec<twitch_user::Model> = vec![];
+    let mock_database = MockDatabase::new(DatabaseBackend::MySql)
+      .append_query_results([user_models])
+      .into_connection();
+
+    let incomplete_login = ChannelIdentifier::Login("svrfkljnsrvbujklnsdtbujkln;dtbujnkl;dbtjnkl");
+
+    let result =
+      twitch_user::Model::get_list_by_incomplete_name(incomplete_login, &mock_database).await;
+
+    assert!(
+      matches!(result, Err(EntityExtensionError::FailedToGetValue { .. })),
+      "{:?}",
+      result
+    );
+  }
 }

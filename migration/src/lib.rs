@@ -24,6 +24,7 @@ mod m20250419_220750_add_twitch_origin_id_column_to_donation_event_table;
 mod m20250514_231010_change_stream_message_emote_columns_to_json_from_strings;
 mod m20250516_214316_create_bridge_table_for_gift_sub_donation_receivers;
 mod m20250705_165646_add_unique_id_column_to_messages;
+mod m20250713_194533_add_message_source_id_to_sharedchat_tables;
 
 pub struct Migrator;
 
@@ -55,6 +56,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20250514_231010_change_stream_message_emote_columns_to_json_from_strings::Migration),
             Box::new(m20250516_214316_create_bridge_table_for_gift_sub_donation_receivers::Migration),
             Box::new(m20250705_165646_add_unique_id_column_to_messages::Migration),
+            Box::new(m20250713_194533_add_message_source_id_to_sharedchat_tables::Migration),
         ]
   }
 }

@@ -17,6 +17,9 @@ use url::Url;
 
 const WEBSOCKET_URL: &str = "wss://eventsub.wss.twitch.tv/ws";
 const TWITCH_API_URL: &str = "https://api.twitch.tv";
+
+/// How long to wait between sending subscription events;
+const SUBSCRIPTION_WAIT_TIME: Duration = Duration::new(0, 250000000);
 const SUBSCRIPTION_PATH: &str = "helix/eventsub/subscriptions";
 // - Use the below constants for the Twitch CLI connection. -
 // const WEBSOCKET_URL: &str = "ws://127.0.0.1:8080/ws";
@@ -37,7 +40,7 @@ const SUBSCRIPTIONS: &[EventSubscription] = &[
   // https://dev.twitch.tv/docs/eventsub/eventsub-subscription-types/#streamoffline
   EventSubscription::new(None, "stream.offline", 1),
 ];
-const SUBSCRIPTION_FAIL_RETRY_DURATION: Duration = Duration::new(20, 0);
+const SUBSCRIPTION_FAIL_RETRY_BASE_DURATION: Duration = Duration::new(30, 0);
 
 /// In seconds.
 ///
@@ -123,7 +126,6 @@ impl TwitchWebsocketConfig {
       )
       .header("Content-Type", "application/json");
 
-    let mut futures = vec![];
     let subscription_bodies = EventSubscription::create_subscription_bodies_from_list(
       SUBSCRIPTIONS,
       tracked_channels,
@@ -135,27 +137,17 @@ impl TwitchWebsocketConfig {
       panic!("Tracked user count is too high. Exceeded 300 subscription limit.");
     }
 
-    for subscription in subscription_bodies {
-      let request = request.try_clone().unwrap();
-      // let request = request.try_clone().unwrap().json(&subscription);
-
-      let future_handle = tokio::spawn(async move {
-        (
-          subscription["type"].clone(),
-          Self::send_subscription(subscription, request).await,
-        )
-      });
-
-      futures.push(future_handle);
-    }
-
-    let results = futures::future::join_all(futures).await;
     let mut subscription_failed = false;
 
-    for result in results {
+    for subscription in subscription_bodies {
+      let request = request.try_clone().unwrap();
+      let subscription_type = &subscription["type"].clone();
+
+      let result = Self::send_subscription(subscription, request).await;
+
       match result {
-        Ok((_subscription_type, Ok(_response))) => {}
-        Ok((subscription_type, Err(response_error))) => {
+        Ok(_response) => {}
+        Err(response_error) => {
           tracing::error!(
             "Failed to process a POST request when subscribing to {}. Reason: {}",
             subscription_type,
@@ -164,15 +156,10 @@ impl TwitchWebsocketConfig {
 
           subscription_failed = true;
         }
-        Err(error) => {
-          tracing::error!(
-            "Failed to join a future when subscribing to a websocket. Reason: {}",
-            error
-          );
-
-          subscription_failed = true;
-        }
       }
+
+      tracing::info!("Sleeping for next subscription");
+      tokio::time::sleep(SUBSCRIPTION_WAIT_TIME).await;
     }
 
     Ok(subscription_failed)
@@ -199,7 +186,10 @@ impl TwitchWebsocketConfig {
           response
         );
 
-        tokio::time::sleep(SUBSCRIPTION_FAIL_RETRY_DURATION).await;
+        let sleep_multiplier = ((EVENT_SUBSCRIBE_RETRY_ATTEMPTS - attempts) + 1).max(0) as u32;
+        let sleep_duration = SUBSCRIPTION_FAIL_RETRY_BASE_DURATION * sleep_multiplier;
+
+        tokio::time::sleep(sleep_duration).await;
 
         attempts -= 1;
 
@@ -215,6 +205,7 @@ impl TwitchWebsocketConfig {
     })
   }
 
+  /// Extracts the session ID when connecting to Twitch's websocket servers.
   async fn get_session_id(
     socket_stream: &mut WebSocketStream<MaybeTlsStream<TcpStream>>,
   ) -> Option<String> {
@@ -256,9 +247,9 @@ impl TwitchWebsocketConfig {
   ///
   /// If the message was for `stream.offline` or `stream.online` events, they are parsed, and the database is updated.
   ///
-  /// Returns true if there was a message received. 
-  /// Otherwise, if [`keep_alive`](KEEP_ALIVE_DURATION) + [`grace`](KEEP_ALIVE_GRACE_PERIOD) 
-  /// seconds have passed, false is returned. 
+  /// Returns true if there was a message received.
+  /// Otherwise, if [`keep_alive`](KEEP_ALIVE_DURATION) + [`grace`](KEEP_ALIVE_GRACE_PERIOD)
+  /// seconds have passed, false is returned.
   ///
   /// Checks for:
   /// Keep alive: https://dev.twitch.tv/docs/eventsub/handling-websocket-events/#keepalive-message
@@ -292,8 +283,6 @@ impl TwitchWebsocketConfig {
     let message = message.to_text()?;
 
     if message.is_empty() {
-      tracing::info!("Received an empty websocket message.");
-
       return Ok(true);
     }
 

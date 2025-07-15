@@ -1,7 +1,7 @@
 use crate::errors::AppError;
 use tokio::{sync::mpsc, task::JoinHandle};
 
-pub async fn process_message_results(
+pub async fn process_irc_message_results(
   mut message_parsing_handle_receiver: mpsc::UnboundedReceiver<JoinHandle<Result<(), AppError>>>,
 ) {
   tracing::info!("Running message result process.");

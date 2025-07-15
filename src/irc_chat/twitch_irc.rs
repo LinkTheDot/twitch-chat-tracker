@@ -10,6 +10,15 @@ use tokio_stream::StreamExt;
 
 const MESSAGE_WAIT_TIME: Duration = Duration::new(10, 0);
 
+const TWITCH_IRC_SUBSCRIPTIONS: &str = "twitch.tv/tags twitch.tv/commands twitch.tv/membership";
+const TWITCH_IRC_URL: &str = "irc.chat.twitch.tv";
+const TWITCH_IRC_PORT: u16 = 6697;
+const USE_TLS: bool = true;
+/// In seconds.
+const PING_TIMEOUT: u32 = 10;
+/// In seconds.
+const PING_TIME: u32 = 10;
+
 pub struct TwitchIrc {
   irc_client: Client,
   irc_client_stream: Option<ClientStream>,
@@ -56,7 +65,7 @@ impl TwitchIrc {
     irc_client.send(Command::CAP(
       None,
       CapSubCommand::REQ,
-      Some("twitch.tv/tags twitch.tv/commands twitch.tv/membership".to_string()),
+      Some(TWITCH_IRC_SUBSCRIPTIONS.to_string()),
       None,
     ))?;
 
@@ -68,14 +77,14 @@ impl TwitchIrc {
     let password = Some("oauth:".to_string() + Secret::read_secret_string(password));
 
     Ok(Config {
-      server: Some("irc.chat.twitch.tv".to_string()),
+      server: Some(TWITCH_IRC_URL.to_string()),
       nickname: Some(AppConfig::twitch_nickname().to_owned()),
-      port: Some(6697),
+      port: Some(TWITCH_IRC_PORT),
       password,
-      use_tls: Some(true),
+      use_tls: Some(USE_TLS),
       channels: Self::get_channels(),
-      ping_timeout: Some(10),
-      ping_time: Some(10),
+      ping_timeout: Some(PING_TIMEOUT),
+      ping_time: Some(PING_TIME),
       ..Default::default()
     })
   }
@@ -175,11 +184,16 @@ impl TwitchIrc {
 
     let result = message_parser.parse().await;
 
-    if result.is_err() {
-      tracing::error!(
-        "Failed to process a message. Dumping contents to log.\n{:?}",
-        message
-      );
+    if let Err(error) = &result {
+      if !error.is_unique_constraint_violation() {
+        tracing::error!(
+          "Failed to process a message. Dumping contents to log.\n{:?}",
+          message
+        );
+      } else {
+        // Ignore the error if it's a unique constraint violation.
+        return Ok(());
+      }
     }
 
     result

@@ -11,3 +11,4 @@ bin/build_and_push_*
 bin/update
 src/manual_migrations*
 temp_*
+*.fsh

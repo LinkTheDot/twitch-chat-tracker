@@ -1,3 +1,4 @@
+mod extensions;
 mod sea_orm_db_error_extensions;
 
 pub use sea_orm_db_error_extensions::*;

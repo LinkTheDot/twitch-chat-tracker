@@ -13,7 +13,7 @@ async fn main() {
   if AppConfig::channels().is_empty() {
     println!("No channels to track.");
 
-    std::process::exit(0);
+    std::process::exit(1);
   }
 
   tracing::info!("Tracking channels {:?}", AppConfig::channels());

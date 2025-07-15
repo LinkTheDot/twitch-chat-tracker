@@ -10,35 +10,56 @@ pub struct TwitchIrcMessage {
   tags: TwitchIrcTagValues,
   command: Command,
   message_type: TwitchMessageType,
+  is_shared_chat: bool,
 }
 
 impl TwitchIrcMessage {
   pub const STREAMELEMENTS_TWITCH_ID: &str = "100135110";
+  const IGNORED_MESSAGE_IDS: &[&str] = &["bitsbadgetier", "announcement"];
 
   pub fn new(message: &IrcMessage) -> Result<Option<Self>, AppError> {
-    let Some(tags) = TwitchIrcTagValues::new(message)? else {
+    let Some(mut tags) = TwitchIrcTagValues::new(message)? else {
       return Ok(None);
     };
 
-    let Some(message_type) = Self::calculate_message_type(&tags, message) else {
-      return Err(AppError::FailedToParseValue {
-        value_name: "irc message message type",
-        location: "twitch irc message creation",
-        value: message.to_string(),
-      });
+    let is_shared_chat = tags.replace_values_for_sharedchat_message();
+
+    let message_type = match Self::calculate_message_type(&tags, message) {
+      Some(TwitchMessageType::Ignored) => return Ok(None), // Ignored message.
+      Some(message_type) => message_type,
+      _ => {
+        return Err(AppError::FailedToParseValue {
+          value_name: "irc message message type",
+          location: "twitch irc message creation",
+          value: message.to_string(),
+        });
+      }
     };
 
     Ok(Some(Self {
       tags,
       command: message.command.to_owned(),
       message_type,
+      is_shared_chat,
     }))
   }
 
+  /// Determines the type of message that was received (timeout, bits, gift sub, user message, etc.);
+  ///
+  /// If the message could not be parsed, None is returned.
+  /// If the message was an [`ignored tag`](Self::IGNORED_MESSAGE_IDS), Some(None) is returned.
+  ///
+  /// Otherwise Some(Some([`TwitchMessageType`](TwitchMessageType))) is returned.
   fn calculate_message_type(
     tags: &TwitchIrcTagValues,
     message: &IrcMessage,
   ) -> Option<TwitchMessageType> {
+    if let Some(message_id) = tags.message_id() {
+      if Self::IGNORED_MESSAGE_IDS.contains(&message_id) {
+        return Some(TwitchMessageType::Ignored);
+      }
+    }
+
     let result = match () {
       _ if Self::is_timeout(tags) => TwitchMessageType::Timeout,
       _ if Self::is_subscription(tags) => TwitchMessageType::Subscription,
@@ -62,7 +83,7 @@ impl TwitchIrcMessage {
       return false;
     };
 
-    ["sub", "resub", "giftpaidupgrade", "anongiftpaidupgrade"].contains(&message_id)
+    TwitchIrcTagValues::SUBSCRIPTION_TAG_MSG_IDS.contains(&message_id)
   }
 
   fn is_gift_sub(tags: &TwitchIrcTagValues) -> bool {
@@ -70,7 +91,7 @@ impl TwitchIrcMessage {
       return false;
     };
 
-    ["submysterygift", "giftpaidupgrade", "subgift"].contains(&message_id)
+    TwitchIrcTagValues::GIFT_SUB_TAG_MSG_IDS.contains(&message_id)
   }
 
   fn is_bits(tags: &TwitchIrcTagValues) -> bool {
@@ -94,13 +115,17 @@ impl TwitchIrcMessage {
   }
 
   fn is_raid(tags: &TwitchIrcTagValues) -> bool {
-    tags.message_id() == Some("raid")
+    tags.message_id() == Some(TwitchIrcTagValues::RAID_TAG_MSG_ID)
   }
 
   /// This should be checked last out of the list because true will be
   /// returned in most cases where the message was something else.
   fn is_user_message(tags: &TwitchIrcTagValues, message: &IrcMessage) -> bool {
     tags.display_name().is_some() && matches!(message.command, Command::PRIVMSG(_, _))
+  }
+
+  pub fn is_shared_chat(&self) -> bool {
+    self.is_shared_chat
   }
 
   /// Returns true if the message contained is a gift sub that contains

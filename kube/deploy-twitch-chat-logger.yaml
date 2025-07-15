@@ -32,4 +32,5 @@ spec:
             - name: DATABASE_HOST_ADDRESS
               value: "mysql"
             - name: TRACKED_CHANNELS
-              value: 'fallenshadow,shadowchama,linkthedot,inislein,ninaninin,kitanya_is_here,vividlyvivi,alicesawyer,lilyhops'
+              value: 'fallenshadow,shadowchama,linkthedot,kitanya_is_here,alicesawyer,inislein'
+              # ,ninaninin,vividlyvivi,lilyhops

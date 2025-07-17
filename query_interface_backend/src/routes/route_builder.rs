@@ -8,7 +8,11 @@ pub trait RouteBuilder {
 impl RouteBuilder for axum::Router<InterfaceConfig> {
   fn apply_routes(self) -> Self {
     self
-      .route("/users", get(crate::routes::users::get_users))
+      .route("/users", get(crate::routes::users::get_users::get_users))
+      .route(
+        "/users/name_changes",
+        get(crate::routes::users::name_changes::get_name_changes),
+      )
       .route(
         "/{channel}/donations/subscriptions",
         get(crate::routes::donations::subscriptions::get_subscriptions),

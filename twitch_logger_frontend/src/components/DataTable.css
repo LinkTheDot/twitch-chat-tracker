@@ -1,0 +1,35 @@
+.data-table-container {
+  max-height: 600px;
+  max-width: 75%;
+  overflow-y: auto;
+  border: 1px solid #eee;
+  margin: 0 auto;
+}
+
+.data-table-container table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.data-table-container th,
+.data-table-container td {
+  padding: 4px 15px;
+  text-align: left;
+}
+
+.data-table-container td {
+  border-bottom: 1px solid var(--secondary-background-color);
+}
+
+.data-table-container th {
+  position: sticky;
+  top: 0;
+  height: 35px;
+  background-color: var(--primary-background-color);
+  z-index: 10;
+  box-shadow: 0 2px 0 0 #ccc;
+}
+
+.data-table-container tbody tr:last-child td {
+  border-bottom: none;
+}

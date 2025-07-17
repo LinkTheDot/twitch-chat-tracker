@@ -1,29 +1,23 @@
 import { useState } from 'react'
 import './App.css'
+import { CategoryState } from './types/CategoryState';
+import QueryForm, { QueryFormData } from './components/QueryForm';
+import { UserResults } from './components/UserResults';
 
 export default function App() {
-  const [count, setCount] = useState(0)
-
-  const environment = process.env.NODE_ENV ?? "Unknown";
-  const backendUrl = import.meta.env.VITE_BACKEND_URL ?? 'Unknown';
-
-  function updateOnClick() {
-    setCount(count + 1);
-  }
-
-  console.log('VITE_BACKEND_URL = ' + import.meta.env.VITE_BACKEND_URL);
+  const [currentCategory, setCurrentCategory] = useState<CategoryState>(CategoryState.Users);
+  const [queryFormData, setQueryForm] = useState<QueryFormData>({
+    category: CategoryState.Users,
+    channelSearchQuery: "",
+    userSearchQuery: "",
+  });
 
   return (
     <>
-      <p>
-        Waow {count} in {environment} mode.
-      </p>
+      <QueryForm onSubmitQuery={setQueryForm} />
 
-      <p>
-        Data from {backendUrl}
-      </p>
 
-      <button onClick={updateOnClick}> Click {count} </button>
+      <UserResults queryResults={queryFormData} />
     </>
   )
 }

@@ -14,6 +14,12 @@ export enum UserRequestType {
 //
 // If you want to request multiple users, separate the values by a comma (,).
 export interface UserRequest {
-  request_type: UserRequestType,
-  user_identifier: string;
+  userRequestType: UserRequestType,
+  userIdentifier: string;
+}
+
+export interface UserResponse {
+  users: User[] | null,
+  error: any | null,
+  isLoading: boolean,
 }

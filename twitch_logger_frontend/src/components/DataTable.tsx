@@ -1,8 +1,9 @@
-import './DataTable.css'; 
+import './DataTable.css';
 
 export interface Column<T> {
   header_name: string;
-  header_value_key: keyof T;
+  header_value_key?: keyof T;
+  render?: (item: T) => React.ReactNode;
 }
 
 export interface DataTableProps<T> {
@@ -14,11 +15,15 @@ export interface DataTableProps<T> {
 
 export function DataTable<T>({ data, columns, rowKey, emptyMessage = "No results found." }: DataTableProps<T>) {
   if (!data || data.length === 0) {
-    return <p>{emptyMessage}</p>;
+    return (
+      <p className="nondata_message">
+        {emptyMessage}
+      </p>
+    );
   }
 
   return (
-    <div className="data-table-container"> {/* Use className instead of style */}
+    <div className="data-table-container">
       <table>
         <thead>
           <tr>
@@ -38,7 +43,9 @@ export function DataTable<T>({ data, columns, rowKey, emptyMessage = "No results
                   {
                     columns.map((column, colIndex) => (
                       <td key={`${rowKeyValue}-${column.header_name || colIndex}`}>
-                        { item[column.header_value_key] as React.ReactNode }
+                        {
+                          column.render ? column.render(item) : (column.header_value_key ? item[column.header_value_key] as React.ReactNode : '')
+                        }
                       </td>
                     ))
                   }

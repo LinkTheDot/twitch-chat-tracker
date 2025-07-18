@@ -33,3 +33,11 @@
 .data-table-container tbody tr:last-child td {
   border-bottom: none;
 }
+
+.nondata_message {
+  max-width: 300px;
+  margin: 20px auto;
+  text-align: center;
+  padding: 10px;
+  color: var(--primary-text-color);
+}

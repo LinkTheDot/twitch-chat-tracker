@@ -1,3 +1,5 @@
+import {Response} from './Response';
+
 export interface User {
   id: number;
   twitch_id: number;
@@ -18,8 +20,4 @@ export interface UserRequest {
   userIdentifier: string;
 }
 
-export interface UserResponse {
-  users: User[] | null,
-  error: any | null,
-  isLoading: boolean,
-}
+export interface UserResponse extends Response<User[]> {}

@@ -1,6 +1,5 @@
 import { DataTable, Column } from './DataTable';
 import { User, UserRequest, UserRequestType } from '../types/users';
-import { CategoryState } from '../types/CategoryState'; // Assuming CategoryState is used in QueryFormData
 import { getUsers } from '../services/users'; // Import the new custom hook
 import { QueryFormData } from '../components/QueryForm';
 
@@ -10,14 +9,15 @@ export interface UserResultsProps {
 }
 
 export function UserResults(props: UserResultsProps) {
-  const requestType = Number(props.queryResults.userSearchQuery) ? UserRequestType.TwitchId : UserRequestType.Name;
+  const identifier = props.queryResults.userSearchQuery || props.queryResults.channelSearchQuery;
+  const requestType = Number(identifier) ? UserRequestType.TwitchId : UserRequestType.Name;
 
   const userRequest: UserRequest = {
     userRequestType: requestType,
-    userIdentifier: props.queryResults.userSearchQuery || props.queryResults.channelSearchQuery
+    userIdentifier: identifier
   };
 
-  const { users, error, isLoading } = getUsers(userRequest);
+  const { value: users, error, isLoading } = getUsers(userRequest);
 
   const userColumns: Column<User>[] = [
     { header_name: 'Id', header_value_key: 'id' },
@@ -27,11 +27,11 @@ export function UserResults(props: UserResultsProps) {
   ];
 
   if (isLoading) {
-    return <div>Loading users...</div>;
+    return <div className="nondata_message">Loading users...</div>;
   }
 
   if (error) {
-    return <div>Error: {error.message || "Failed to fetch users."}</div>;
+    return <div className="nondata_message">Error: {error.message || "Failed to fetch users."}</div>;
   }
 
   return (

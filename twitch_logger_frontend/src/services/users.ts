@@ -23,9 +23,6 @@ export const getUsers = (userRequest: UserRequest): UserResponse => {
 
         const jsonResponse = await response.json();
 
-        // Logs the response if needed.
-        // console.log(JSON.stringify(jsonResponse, null, 2));
-
         setUsers(jsonResponse);
       } catch (err: any) {
         setError(err);
@@ -44,5 +41,5 @@ export const getUsers = (userRequest: UserRequest): UserResponse => {
 
   }, [userRequest.userRequestType, userRequest.userIdentifier]);
 
-  return { users, error, isLoading };
+  return { value: users, error, isLoading };
 };

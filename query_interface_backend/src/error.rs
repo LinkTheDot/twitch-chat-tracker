@@ -2,11 +2,17 @@ use axum::http::StatusCode;
 
 #[derive(Debug, thiserror::Error)]
 pub enum AppError {
-  #[error("{}", .0)]
+  #[error("{0}")]
   DbError(#[from] sea_orm::DbErr),
 
-  #[error("{}", .0)]
+  #[error("{0}")]
   EntityExtensionError(#[from] entity_extensions::errors::EntityExtensionError),
+
+  #[error("{0}")]
+  ReqwestError(#[from] reqwest::Error),
+
+  #[error("{0}")]
+  SerdeError(#[from] serde_json::Error),
 
   #[error("Failed to find a query parameter to use to find a user.")]
   NoQueryParameterFound,
@@ -25,6 +31,9 @@ pub enum AppError {
 
   #[error("Failed to find a donation event with the ID {}", donation_event_id)]
   FailedToFindDonationEventByID { donation_event_id: i32 },
+
+  #[error("Failed to parse response {}", response)]
+  FailedToParseResponse { response: String },
 }
 
 impl axum::response::IntoResponse for AppError {
@@ -43,12 +52,15 @@ impl From<AppError> for StatusCode {
     match error {
       AppError::DbError(_) => StatusCode::INTERNAL_SERVER_ERROR,
       AppError::EntityExtensionError(_) => StatusCode::INTERNAL_SERVER_ERROR,
+      AppError::ReqwestError(_) => StatusCode::INTERNAL_SERVER_ERROR,
+      AppError::SerdeError(_) => StatusCode::INTERNAL_SERVER_ERROR,
       AppError::NoQueryParameterFound => StatusCode::BAD_REQUEST,
       AppError::CouldNotFindUserByTwitchId { .. } => StatusCode::NOT_FOUND,
       AppError::CouldNotFindUserByLoginName { .. } => StatusCode::NOT_FOUND,
       AppError::CouldNotFindUserByInternalID { .. } => StatusCode::NOT_FOUND,
       AppError::FailedToFindStreamByID { .. } => StatusCode::NOT_FOUND,
       AppError::FailedToFindDonationEventByID { .. } => StatusCode::NOT_FOUND,
+      AppError::FailedToParseResponse { .. } => StatusCode::INTERNAL_SERVER_ERROR,
     }
   }
 }

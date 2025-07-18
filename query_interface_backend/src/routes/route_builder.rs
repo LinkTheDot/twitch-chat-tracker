@@ -14,6 +14,10 @@ impl RouteBuilder for axum::Router<InterfaceConfig> {
         get(crate::routes::users::name_changes::get_name_changes),
       )
       .route(
+        "/users/following",
+        get(crate::routes::users::following::get_following),
+      )
+      .route(
         "/{channel}/donations/subscriptions",
         get(crate::routes::donations::subscriptions::get_subscriptions),
       )

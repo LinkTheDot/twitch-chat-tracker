@@ -14,6 +14,10 @@ export function GiftedSubscriptionResults(props: GiftedSubscriptionResultsProps)
       render: (item) => item.donation_event.timestamp
     },
     {
+      header_name: 'Channel Name',
+      render: (item) => item.donation_event.donation_receiver.login_name
+    },
+    {
       header_name: 'Recipient Name',
       render: (item) => item.recipient_twitch_user.login_name
     },
@@ -28,7 +32,7 @@ export function GiftedSubscriptionResults(props: GiftedSubscriptionResultsProps)
   ];
 
   return (
-    <div>
+    <div className="gifted_subscriptions_data_table">
       {props.gifted_subscriptions && (
         <DataTable
           data={props.gifted_subscriptions}

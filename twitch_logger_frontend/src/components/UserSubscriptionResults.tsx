@@ -1,5 +1,6 @@
 import { UserSubscription } from "../types/Subscriptions";
 import { Column, DataTable } from "./DataTable";
+import "./UserSubscriptionResponse.css";
 
 export interface UserSubscriptionResultsProps {
   subscriptions: UserSubscription[],
@@ -22,7 +23,7 @@ export function UserSubscriptionResults(props: UserSubscriptionResultsProps) {
   ];
 
   return (
-    <div>
+    <div className="user_subscriptions_data_table">
       {props.subscriptions && (
         <DataTable
           data={props.subscriptions}

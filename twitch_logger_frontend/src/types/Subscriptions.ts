@@ -27,6 +27,7 @@ export interface DonationEvent {
   timestamp: string;
   donator: User;
   subscription_tier: number
+  donation_receiver: User;
 }
 
 export enum SubscriptionRequestType {
@@ -40,4 +41,4 @@ export interface SubscriptionRequest {
   channel: string
 }
 
-export interface SubscriptionResponse extends Response<Subscriptions> {}
+export interface SubscriptionResponse extends Response<Subscriptions> { }

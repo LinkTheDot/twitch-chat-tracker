@@ -9,7 +9,7 @@ spec:
     - websecure 
   routes:
     - kind: Rule
-      match: Host(`looank.com`)
+      match: Host(`tracker.looank.com`)
       services:
         - kind: Service
           name: twitch-logger-frontend
@@ -17,4 +17,4 @@ spec:
   tls:
     certResolver: dns-simple
     domains:
-      - main: looank.com
+      - main: tracker.looank.com

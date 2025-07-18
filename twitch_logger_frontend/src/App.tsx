@@ -5,6 +5,7 @@ import QueryForm, { QueryFormData } from './components/QueryForm';
 import { UserResults } from './components/UserResults';
 import { NameChangeResults } from './components/NameChangesResults';
 import { SubscriptionResults } from './components/SubscriptionResults';
+import { FollowingResults } from './components/FollowingResults';
 
 export default function App() {
   const [currentCategory, setCurrentCategory] = useState<CategoryState>(CategoryState.Users);
@@ -29,6 +30,10 @@ export default function App() {
 
       {queryFormData.category == CategoryState.Subscriptions && (
         <SubscriptionResults queryResults={queryFormData} />
+      )}
+
+      {queryFormData.category == CategoryState.Following && (
+        <FollowingResults queryResults={queryFormData} />
       )}
     </>
   )

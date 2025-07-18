@@ -66,4 +66,42 @@ impl GiftSubRecipientDto {
       .await
       .map_err(Into::into)
   }
+
+  pub async fn get_list_from_recipient_and_filter(
+    gift_sub_recipient: twitch_user::Model,
+    filter_for_channel: Option<twitch_user::Model>,
+    database_connection: &DatabaseConnection,
+  ) -> Result<Vec<Self>, AppError> {
+    let mut gift_subs_received_query = gift_sub_recipient::Entity::find().find_also_related(donation_event::Entity);
+      
+    if let Some(filter_for_channel) = filter_for_channel {
+      gift_subs_received_query = gift_subs_received_query
+        .filter(donation_event::Column::DonationReceiverTwitchUserId.eq(filter_for_channel.id));
+    }
+
+    let gift_subs_received_with_donation_events = gift_subs_received_query
+      .filter(gift_sub_recipient::Column::TwitchUserId.eq(gift_sub_recipient.id))
+      .all(database_connection).await?;
+
+    let mut end_list = vec![];
+
+    for (recipient, related_donation_event) in gift_subs_received_with_donation_events {
+      let Some(related_donation_event) = related_donation_event else {
+        tracing::warn!("Donation receipient (ID: {}) is missing a related donation event.", recipient.id);
+        continue;
+      };
+      let donation_event_dto = DonationEventDto::from_donation_event(related_donation_event, database_connection).await?;
+
+      let recipient = GiftSubRecipientDto {
+        id: recipient.id,
+        recipient_months_subscribed: recipient.recipient_months_subscribed,
+        recipient_twitch_user: Some(gift_sub_recipient.clone()),
+        donation_event: donation_event_dto,
+      };
+
+      end_list.push(recipient);
+    }
+
+    Ok(end_list)
+  }
 }

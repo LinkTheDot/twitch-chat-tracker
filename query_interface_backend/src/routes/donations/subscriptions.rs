@@ -2,7 +2,7 @@ use crate::data_transfer_objects::gift_sub_recipient::GiftSubRecipientDto;
 use crate::data_transfer_objects::subscription_event::SubscriptionEventDto;
 use crate::{app::InterfaceConfig, error::*};
 use axum::extract::{Path, Query, State};
-use entities::{gift_sub_recipient, subscription_event, twitch_user};
+use entities::{subscription_event, twitch_user};
 use entity_extensions::prelude::TwitchUserExtensions;
 use entity_extensions::twitch_user::ChannelIdentifier;
 use sea_orm::*;
@@ -30,8 +30,18 @@ pub async fn get_subscriptions(
 
   let database_connection = interface_config.database_connection();
 
+  let channel = if let Some(Path(channel_name)) = channel {
+    twitch_user::Model::get_by_identifier(
+      ChannelIdentifier::Login(&channel_name),
+      database_connection,
+    )
+    .await?
+  }
+  else {
+    None
+  };
   let (user, subscription_event_query_conditions) =
-    get_subscription_query_condition(&query_payload, channel, database_connection).await?;
+    get_subscription_query_condition(&query_payload, &channel, database_connection).await?;
   let subscription_events = subscription_event::Entity::find()
     .filter(subscription_event_query_conditions)
     .all(database_connection)
@@ -41,12 +51,8 @@ pub async fn get_subscriptions(
     SubscriptionEventDto::from_subscription_event_list(subscription_events, database_connection)
       .await?;
 
-  let gifted_subscriptions = gift_sub_recipient::Entity::find()
-    .filter(gift_sub_recipient::Column::TwitchUserId.eq(user.id))
-    .all(database_connection)
-    .await?;
   let gifted_subscription_dtos =
-    GiftSubRecipientDto::from_gift_sub_recipient_list(gifted_subscriptions, database_connection)
+    GiftSubRecipientDto::get_list_from_recipient_and_filter(user, channel, database_connection)
       .await?;
 
   let subscription_response = SubscriptionResponse {
@@ -59,7 +65,7 @@ pub async fn get_subscriptions(
 
 async fn get_subscription_query_condition(
   query_payload: &SubscriptionQuery,
-  channel_name: Option<Path<String>>,
+  channel: &Option<twitch_user::Model>,
   database_connection: &DatabaseConnection,
 ) -> Result<(twitch_user::Model, Condition), AppError> {
   let user_identifier = query_payload.get_identifier()?;
@@ -74,18 +80,7 @@ async fn get_subscription_query_condition(
   let mut condition =
     Condition::all().add(subscription_event::Column::SubscriberTwitchUserId.eq(user.id));
 
-  if let Some(Path(channel_name)) = channel_name {
-    let Some(channel) = twitch_user::Model::get_by_identifier(
-      ChannelIdentifier::Login(&channel_name),
-      database_connection,
-    )
-    .await?
-    else {
-      return Err(AppError::CouldNotFindUserByLoginName {
-        login: channel_name,
-      });
-    };
-
+  if let Some(channel) = &channel {
     condition = condition.add(subscription_event::Column::ChannelId.eq(channel.id));
   }
 

@@ -54,7 +54,7 @@ const QueryForm: React.FC<QueryFormProps> = ({ onSubmitQuery }) => {
 
       <input
         type="text"
-        placeholder="Channel Search (optional)"
+        placeholder="Channel Filter (optional)"
         value={formData.channelSearchQuery}
         onChange={handleChannelSearchChange}
         className="query-form-input form-channel-query-input query-form-text-input"

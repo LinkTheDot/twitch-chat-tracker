@@ -1,6 +1,7 @@
 .data-table-container {
   max-height: 600px;
-  max-width: 75%;
+  width: 75%;
+  max-width: 1000px;
   overflow-y: auto;
   border: 1px solid #eee;
   margin: 0 auto;

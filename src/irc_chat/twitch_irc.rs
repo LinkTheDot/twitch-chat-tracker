@@ -24,6 +24,8 @@ pub struct TwitchIrc {
   irc_client_stream: Option<ClientStream>,
   third_party_emote_lists: Arc<EmoteListStorage>,
   message_result_processor_sender: mpsc::UnboundedSender<JoinHandle<Result<(), AppError>>>,
+  /// Temporary counter for debugging the app not working randomly at night.
+  no_message_count: usize,
 }
 
 impl TwitchIrc {
@@ -40,6 +42,7 @@ impl TwitchIrc {
       irc_client_stream: Some(irc_client_stream),
       third_party_emote_lists: Arc::new(third_party_emote_lists),
       message_result_processor_sender,
+      no_message_count: 0,
     })
   }
 
@@ -163,6 +166,7 @@ impl TwitchIrc {
 
     Ok(())
   }
+
 
   async fn create_and_run_mesage_parser(
     message: IrcMessage,

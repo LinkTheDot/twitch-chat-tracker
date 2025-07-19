@@ -7,6 +7,9 @@ pub enum TwitchMessageType {
   StreamlabsDonation,
   Raid,
   UserMessage,
+
+  /// If the message was a tag that is ignored.
+  Ignored,
 }
 
 impl std::fmt::Display for TwitchMessageType {

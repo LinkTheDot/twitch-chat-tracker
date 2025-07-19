@@ -13,7 +13,7 @@ use url::Url;
 const HELIX_USER_QUERY_URL: &str = "https://api.twitch.tv/helix/users";
 const JARO_NAME_SIMILARITY_THRESHOLD: f64 = 0.85;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum ChannelIdentifier<S: AsRef<str>> {
   Login(S),
   TwitchID(S),
@@ -29,6 +29,14 @@ impl<'a> From<ChannelIdentifier<&'a str>> for &'a str {
 }
 
 pub trait TwitchUserExtensions {
+  async fn get_by_identifier<S: AsRef<str>>(
+    identifier: ChannelIdentifier<S>,
+    database_connection: &DatabaseConnection,
+  ) -> Result<Option<twitch_user::Model>, EntityExtensionError>;
+  async fn get_list_by_incomplete_name<S: AsRef<str> + std::fmt::Debug>(
+    identifier: ChannelIdentifier<S>,
+    database_connection: &DatabaseConnection,
+  ) -> Result<Vec<twitch_user::Model>, EntityExtensionError>;
   async fn get_or_set_by_name(
     login_name: &str,
     database_connection: &DatabaseConnection,
@@ -52,6 +60,73 @@ pub trait TwitchUserExtensions {
 }
 
 impl TwitchUserExtensions for twitch_user::Model {
+  /// Retrieves the user based on the given identifier.
+  ///
+  /// Returns an error if the user was not found.
+  async fn get_by_identifier<S: AsRef<str>>(
+    identifier: ChannelIdentifier<S>,
+    database_connection: &DatabaseConnection,
+  ) -> Result<Option<twitch_user::Model>, EntityExtensionError> {
+    match identifier {
+      ChannelIdentifier::Login(user_login) => {
+        // -
+        twitch_user::Entity::find()
+          .filter(twitch_user::Column::LoginName.eq(user_login.as_ref()))
+          .one(database_connection)
+          .await
+          .map_err(Into::into)
+      }
+      ChannelIdentifier::TwitchID(twitch_id) => {
+        // -
+        twitch_user::Entity::find()
+          .filter(twitch_user::Column::TwitchId.eq(twitch_id.as_ref()))
+          .one(database_connection)
+          .await
+          .map_err(Into::into)
+      }
+    }
+  }
+
+  /// Returns the list of users based on an incomplete login.
+  /// For example, if you pass in a login of "fall", then the list of every user with "fall" in their name is returned.
+  ///
+  /// An error is returned if there are no matches.
+  async fn get_list_by_incomplete_name<S: AsRef<str> + std::fmt::Debug>(
+    identifier: ChannelIdentifier<S>,
+    database_connection: &DatabaseConnection,
+  ) -> Result<Vec<twitch_user::Model>, EntityExtensionError> {
+    let user_list_result = match &identifier {
+      ChannelIdentifier::Login(approximate_login) => {
+        // -
+        twitch_user::Entity::find()
+          .filter(twitch_user::Column::LoginName.contains(approximate_login.as_ref()))
+          .all(database_connection)
+          .await
+          .map_err(Into::into)
+      }
+      ChannelIdentifier::TwitchID(twitch_id) => {
+        // -
+        twitch_user::Entity::find()
+          .filter(twitch_user::Column::TwitchId.eq(twitch_id.as_ref()))
+          .all(database_connection)
+          .await
+          .map_err(Into::into)
+      }
+    };
+
+    if let Ok(user_list) = &user_list_result {
+      if user_list.is_empty() {
+        return Err(EntityExtensionError::FailedToGetValue {
+          value_name: "user",
+          location: "get_list_by_incomplete_name",
+          additional_data: format!("{:?}", identifier),
+        });
+      }
+    }
+
+    user_list_result
+  }
+
   /// Retrieves the user model from the database if it exists.
   /// Otherwise creates the user entry for the database and returns the resulting model.                 
   ///
@@ -100,7 +175,7 @@ impl TwitchUserExtensions for twitch_user::Model {
 
       return Ok(user_model);
     } else {
-      tracing::info!("Found a new channel from Helix: {:#?}", helix_channel);
+      tracing::trace!("Found a new channel from Helix: {:?}", helix_channel);
 
       attempt_insert(helix_channel, database_connection).await
     }
@@ -119,9 +194,9 @@ impl TwitchUserExtensions for twitch_user::Model {
       .one(database_connection)
       .await?;
 
-    if cfg!(test) || cfg!(feature = "__test_hook") {
-      return Ok(user_model.unwrap());
-    }
+    // if cfg!(test) || cfg!(feature = "__test_hook") {
+    //   return Ok(user_model.unwrap());
+    // }
 
     if let Some(user_model) = user_model {
       return Ok(user_model);
@@ -143,9 +218,9 @@ impl TwitchUserExtensions for twitch_user::Model {
   async fn query_helix_for_channels_from_list<S: AsRef<str>>(
     channels: &[ChannelIdentifier<S>],
   ) -> Result<Vec<twitch_user::ActiveModel>, EntityExtensionError> {
-    if channels.is_empty() || cfg!(feature = "__test_hook") || cfg!(test) {
-      return Ok(vec![]);
-    }
+    // if channels.is_empty() || cfg!(feature = "__test_hook") || cfg!(test) {
+    //   return Ok(vec![]);
+    // }
 
     let mut query_url = Url::parse(HELIX_USER_QUERY_URL)?;
     let reqwest_client = reqwest::Client::new();
@@ -354,4 +429,99 @@ async fn attempt_insert(
   }
 
   result.map_err(Into::into)
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+
+  #[tokio::test]
+  async fn get_by_identifier_method_works_with_string_twitch_ids() {
+    let user_model = twitch_user::Model {
+      id: 1,
+      twitch_id: 578762718,
+      login_name: "fallenshadow".into(),
+      display_name: "fallenshadow".into(),
+    };
+    let mock_database = MockDatabase::new(DatabaseBackend::MySql)
+      .append_query_results([vec![user_model.clone()]])
+      .into_connection();
+
+    let twitch_id = ChannelIdentifier::TwitchID("578762718");
+
+    let result = twitch_user::Model::get_by_identifier(twitch_id, &mock_database)
+      .await
+      .unwrap();
+
+    assert_eq!(result, Some(user_model));
+  }
+
+  #[tokio::test]
+  async fn get_by_identifier_method_works_with_logins() {
+    let user_model = twitch_user::Model {
+      id: 1,
+      twitch_id: 578762718,
+      login_name: "fallenshadow".into(),
+      display_name: "fallenshadow".into(),
+    };
+    let mock_database = MockDatabase::new(DatabaseBackend::MySql)
+      .append_query_results([vec![user_model.clone()]])
+      .into_connection();
+
+    let login = ChannelIdentifier::Login("fallenshadow");
+
+    let result = twitch_user::Model::get_by_identifier(login, &mock_database)
+      .await
+      .unwrap();
+
+    assert_eq!(result, Some(user_model));
+  }
+
+  #[tokio::test]
+  async fn get_list_by_incomplete_name_works_for_list() {
+    let user_models = vec![
+      twitch_user::Model {
+        id: 1,
+        twitch_id: 578762718,
+        login_name: "fallenshadow".into(),
+        display_name: "fallenshadow".into(),
+      },
+      twitch_user::Model {
+        id: 2,
+        twitch_id: 795025340,
+        login_name: "shadowchama".into(),
+        display_name: "shadowchama".into(),
+      },
+    ];
+    let mock_database = MockDatabase::new(DatabaseBackend::MySql)
+      .append_query_results([user_models.clone()])
+      .into_connection();
+
+    let incomplete_login = ChannelIdentifier::Login("shadow");
+
+    let result = twitch_user::Model::get_list_by_incomplete_name(incomplete_login, &mock_database)
+      .await
+      .unwrap();
+
+    assert_eq!(result, user_models);
+  }
+
+  #[tokio::test]
+  async fn get_list_by_incomplete_name_returns_empty_list_with_no_results() {
+    let user_models: Vec<twitch_user::Model> = vec![];
+    let mock_database = MockDatabase::new(DatabaseBackend::MySql)
+      .append_query_results([user_models])
+      .into_connection();
+
+    let incomplete_login = ChannelIdentifier::Login("svrfkljnsrvbujklnsdtbujkln;dtbujnkl;dbtjnkl");
+
+    let result =
+      twitch_user::Model::get_list_by_incomplete_name(incomplete_login, &mock_database).await;
+
+    assert!(
+      matches!(result, Err(EntityExtensionError::FailedToGetValue { .. })),
+      "{:?}",
+      result
+    );
+  }
 }

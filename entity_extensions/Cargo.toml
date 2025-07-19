@@ -14,6 +14,7 @@ strsim = "0.11.1"
 thiserror = "2.0.12"
 app_config = { path = "../app_config" }
 entities = { path = "../entities" }
+tokio = { version = "1.46.1", features = ["macros"] }
 
 [features]
 __test_hook = []

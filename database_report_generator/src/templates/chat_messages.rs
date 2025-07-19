@@ -1,10 +1,11 @@
-use crate::conditions::AppQueryConditions;
+use crate::conditions::query_conditions::AppQueryConditions;
 use crate::errors::AppError;
 use crate::EMOTE_DOMINANCE;
 use database_connection::get_database_connection;
 use entities::{stream_message, twitch_user};
 use entity_extensions::prelude::StreamMessageExtensions;
 use sea_orm::*;
+use tracing::instrument;
 use std::collections::HashMap;
 use tabled::settings::Style;
 use tabled::{Table, Tabled};
@@ -27,6 +28,7 @@ struct RankingEntry {
 /// Returns the (Leaderboard, Non-emote_dominant_leaderboard) for a given stream.
 ///
 /// Takes a condition to filter the messages by.
+#[instrument(skip_all)]
 pub async fn get_messages_sent_ranking(
   query_conditions: &AppQueryConditions,
 ) -> Result<(String, String), AppError> {

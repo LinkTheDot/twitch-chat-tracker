@@ -14,6 +14,10 @@ pub async fn get_database_connection() -> &'static DatabaseConnection {
     .await
 }
 
+pub async fn get_owned_database_connection() -> DatabaseConnection {
+  get_connection().await.unwrap()
+}
+
 async fn get_connection() -> anyhow::Result<sea_orm::DatabaseConnection> {
   let database_connection = Database::connect(database_connection_string(None))
     .await

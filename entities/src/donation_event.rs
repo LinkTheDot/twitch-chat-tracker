@@ -2,8 +2,9 @@
 
 use super::sea_orm_active_enums::EventType;
 use sea_orm::entity::prelude::*;
+use serde::{Deserialize, Serialize};
 
-#[derive(Clone, Debug, PartialEq, DeriveEntityModel)]
+#[derive(Clone, Debug, PartialEq, DeriveEntityModel, Serialize, Deserialize)]
 #[sea_orm(table_name = "donation_event")]
 pub struct Model {
   #[sea_orm(primary_key)]
@@ -18,6 +19,8 @@ pub struct Model {
   pub subscription_tier: Option<i32>,
   pub unknown_user_id: Option<i32>,
   pub origin_id: Option<String>,
+  #[sea_orm(unique)]
+  pub source_id: Option<String>,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

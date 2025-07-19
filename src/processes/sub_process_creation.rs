@@ -1,7 +1,7 @@
 use crate::channel::tracked_channels::TrackedChannels;
 use crate::errors::AppError;
 use crate::processes::{
-  app_animation::run_animation, process_message_results, update_channel_live_statuses,
+  app_animation::run_animation, process_irc_message_results, update_channel_live_statuses,
 };
 use tokio::{sync::mpsc, task::JoinHandle};
 
@@ -12,11 +12,11 @@ use tokio::{sync::mpsc, task::JoinHandle};
 pub async fn create_sub_processes() -> mpsc::UnboundedSender<JoinHandle<Result<(), AppError>>> {
   tracing::info!("Creating sub processes.");
   let connected_channels = TrackedChannels::new().await.unwrap();
-  let (sender, receiver) = mpsc::unbounded_channel();
+  let (irc_message_processing_sender, irc_message_processing_receiver) = mpsc::unbounded_channel();
 
   tokio::spawn(run_animation());
   tokio::spawn(update_channel_live_statuses(connected_channels));
-  tokio::spawn(process_message_results(receiver));
+  tokio::spawn(process_irc_message_results(irc_message_processing_receiver));
 
-  sender
+  irc_message_processing_sender
 }

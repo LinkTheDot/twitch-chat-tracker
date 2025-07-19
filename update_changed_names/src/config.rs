@@ -47,7 +47,7 @@ impl DatabaseNameUpdateConfig<'_> {
 
     for (batch_number, user_batch) in user_list.chunks(self.chunk_limit).enumerate() {
       if batch_number < 22 {
-        continue
+        continue;
       }
 
       println!(
@@ -67,6 +67,8 @@ impl DatabaseNameUpdateConfig<'_> {
         );
 
         tokio::time::sleep(refresh_wait_time).await;
+
+        self.rate_limiter.reset_tokens();
       }
 
       let channel_list_query_result =

@@ -40,6 +40,11 @@ impl RateLimiter {
     self.last_refresh = Instant::now();
   }
 
+  /// Called when the full reset duration has been waited to reset the available tokens.
+  pub fn reset_tokens(&mut self) {
+    self.used_since_last_refresh = 0;
+  }
+
   pub fn tokens(&self) -> usize {
     if self.rate_per_minute > self.used_since_last_refresh {
       self.rate_per_minute - self.used_since_last_refresh

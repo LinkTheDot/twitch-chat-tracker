@@ -1,7 +1,7 @@
 #![allow(unused_assignments)]
 
 use crate::chat_statistics::ChatStatistics;
-use crate::conditions::AppQueryConditions;
+use crate::conditions::query_conditions::AppQueryConditions;
 use crate::errors::AppError;
 use database_connection::get_database_connection;
 use entities::*;
@@ -10,6 +10,7 @@ use human_time::ToHumanTimeString;
 use sea_orm::*;
 use std::collections::HashMap;
 use std::time::Duration;
+use tracing::instrument;
 
 const STATS_FILE_TEMPLATE: &str = r#"
 = Chat statistics =
@@ -18,7 +19,7 @@ Total chats: {total_chats}
 Total chats with < {emote_message_threshold}% emotes to words: {non-emote_dominant_chats}
 Subscribed|Unsubscribed chats: {subscriber_chat_percentage}|{unsubscribed_chat_percentage}
 Average word count in messages: {average_message_length}
-New subscribers: {new_subscribers}
+Brand new subscribers: {new_subscribers}
 "#;
 
 const DONATION_STATS_TEMPLATE: &str = r#"
@@ -31,6 +32,7 @@ Gift Subs: T1 - {tier_1_gift_subs} | T2 - {tier_2_gift_subs} | T3 - {tier_3_gift
 Total Subs: T1 - {total_tier_1_subs} | T2 - {total_tier_2_subs} | T3 - {total_tier_3_subs}
 "#;
 
+#[instrument(skip_all)]
 pub async fn get_chat_statistics_template(
   query_conditions: &AppQueryConditions,
   include_donations: bool,

@@ -6,7 +6,9 @@ use entity_extensions::stream::StreamExtensions;
 use sea_orm::*;
 use sea_query::OnConflict;
 
-pub async fn update_channel_live_statuses(tracked_channels: TrackedChannels) {
+const TIMEOUT_COUNT_UNTIL_RESET: usize = 5;
+
+pub async fn update_channel_live_statuses(tracked_channels: TrackedChannels) -> ! {
   tracing::info!("Starting channel status update process.");
   let database_connection = get_database_connection().await;
 
@@ -22,28 +24,61 @@ pub async fn update_channel_live_statuses(tracked_channels: TrackedChannels) {
     .await
     .unwrap();
 
+  let mut timedout_count = 0;
+
   tracing::info!("Running channel status update process.");
+
   loop {
     match websocket_config.check_for_stream_message().await {
       Err(AppError::WebsocketTimeout) => {
         tracing::error!("{}", AppError::WebsocketTimeout);
 
-        if let Err(error) = websocket_config.restart(database_connection).await {
-          tracing::error!(
-            "Failed to restart the websocket config. Reason: {}. Exiting the program",
-            error
-          );
+        restart_connection(&mut websocket_config, database_connection).await;
+      }
 
-          std::process::exit(1);
-        }
+      Err(AppError::TungsteniteError(tungstenite::error::Error::Io(error))) => {
+        tracing::error!("Received a fatal IO error: {:?}.", error);
+
+        restart_connection(&mut websocket_config, database_connection).await;
       }
 
       Err(error) => {
-        tracing::error!("Failed to process a message: {}", error);
+        tracing::error!("Failed to process a websocket message: {}", error);
+      }
+
+      Ok(false) => {
+        timedout_count += 1;
+
+        tracing::info!("No message was received.");
+
+        if timedout_count >= TIMEOUT_COUNT_UNTIL_RESET {
+          restart_connection(&mut websocket_config, database_connection).await;
+        } else {
+          continue;
+        }
       }
 
       Ok(_) => (),
     }
+
+    timedout_count = 0;
+  }
+}
+
+/// Attempts to restart the websocket connection.
+///
+/// Exits the program with an error if the connection could not be re-established.
+async fn restart_connection(
+  websocket_config: &mut TwitchWebsocketConfig,
+  database_connection: &DatabaseConnection,
+) {
+  if let Err(error) = websocket_config.restart(database_connection).await {
+    tracing::error!(
+      "Failed to restart the websocket config. Reason: {}. Exiting the program",
+      error
+    );
+
+    std::process::exit(1);
   }
 }
 
@@ -78,7 +113,7 @@ async fn update_active_streams(
 
     let active_model = stream::ActiveModel {
       twitch_stream_id: ActiveValue::Set(stream_twitch_id),
-      start_timestamp: ActiveValue::Set(stream_start_time),
+      start_timestamp: ActiveValue::Set(Some(stream_start_time)),
       twitch_user_id: ActiveValue::Set(streamer.id),
       ..Default::default()
     };

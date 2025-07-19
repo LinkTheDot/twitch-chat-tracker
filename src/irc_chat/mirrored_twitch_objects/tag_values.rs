@@ -6,6 +6,18 @@ use std::collections::HashMap;
 
 #[derive(Debug, Deserialize, Default)]
 pub struct TwitchIrcTagValues {
+  /// The source of a unique message to differientiate from duplicates during shared chats
+  #[serde(rename = "source-id")]
+  message_source_id: Option<String>,
+
+  /// The actual message id given when `msg-id=sharedchatnotice`.
+  #[serde(rename = "source-msg-id")]
+  source_message_id: Option<String>,
+
+  /// The actual room-id given when `msg-id=sharedchatnotice`.
+  #[serde(rename = "source-room-id")]
+  source_room_id: Option<String>,
+
   #[serde(rename = "login")]
   login_name: Option<String>,
 
@@ -45,6 +57,8 @@ pub struct TwitchIrcTagValues {
   #[serde(rename = "emotes")]
   emotes: Option<String>,
 
+  /// Determines the identifier for the message.
+  /// Raid, giftsub, etc.
   #[serde(rename = "msg-id")]
   message_id: Option<String>,
 
@@ -77,6 +91,16 @@ pub struct TwitchIrcTagValues {
 }
 
 impl TwitchIrcTagValues {
+  /// The msg-id tags that would indicate a message is a subcription.
+  pub const SUBSCRIPTION_TAG_MSG_IDS: &[&str] =
+    &["sub", "resub", "giftpaidupgrade", "anongiftpaidupgrade"];
+  /// The msg-id tags that would indicate a message is a gift subcription.
+  pub const GIFT_SUB_TAG_MSG_IDS: &[&str] = &["submysterygift", "giftpaidupgrade", "subgift"];
+  /// The msg-id tag that would indicate a message is a raid.
+  pub const RAID_TAG_MSG_ID: &str = "raid";
+  /// The msg-id tag that would indicate a message is a shared chat message.
+  pub const SHARED_CHAT_MSG_ID: &str = "sharedchatnotice";
+
   /// Creates the list of expected potential values from the irc message from Twitch.
   ///
   /// If IrcMessage::tags is None, Ok(None) is returned.
@@ -134,6 +158,33 @@ impl TwitchIrcTagValues {
       self.subscription_plan = Some(SubTier::One);
       self.months_subscribed = Some(2.to_string());
     }
+  }
+
+  /// In the event that the message is a shared chat (msg-id is `sharedchatnotice`), this method
+  /// will replace any original values with their shared chat varient.
+  ///
+  /// Values such as `msg-id` and `source-room-id`.
+  ///
+  /// True is returned if the message was a shared chat message.
+  /// Otherwise false is returned and nothing happens.
+  pub fn replace_values_for_sharedchat_message(&mut self) -> bool {
+    if self.message_id() != Some(Self::SHARED_CHAT_MSG_ID) {
+      return false;
+    }
+
+    if self.source_room_id.is_some() {
+      std::mem::swap(&mut self.room_id, &mut self.source_room_id);
+    }
+
+    if self.source_message_id.is_some() {
+      std::mem::swap(&mut self.message_id, &mut self.source_message_id);
+    }
+
+    true
+  }
+
+  pub fn message_source_id(&self) -> Option<&str> {
+    self.message_source_id.as_deref()
   }
 
   pub fn login_name(&self) -> Option<&str> {
@@ -232,6 +283,16 @@ impl TwitchIrcTagValues {
   /// to uniquely identify any given gift sub set.
   pub fn gift_sub_origin_id(&self) -> Option<&str> {
     self.gift_sub_origin_id.as_deref()
+  }
+
+  /// The original message id in the event of a shared chat.
+  pub fn source_message_id(&self) -> Option<&str> {
+    self.source_message_id.as_deref()
+  }
+
+  /// The original message id in the event of a shared chat.
+  pub fn source_room_id(&self) -> Option<&str> {
+    self.source_room_id.as_deref()
   }
 }
 

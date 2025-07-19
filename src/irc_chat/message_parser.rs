@@ -15,6 +15,9 @@ use irc::proto::Message as IrcMessage;
 use sea_orm::*;
 use serde_json::Value as JsonValue;
 use std::collections::HashMap;
+use streamlabs_donation::StreamlabsDonation;
+
+pub mod streamlabs_donation;
 
 pub struct MessageParser<'a> {
   message: TwitchIrcMessage,
@@ -100,6 +103,8 @@ impl<'a> MessageParser<'a> {
           .insert(database_connection)
           .await?;
       }
+
+      _ => (),
     };
 
     Ok(())
@@ -143,12 +148,13 @@ impl<'a> MessageParser<'a> {
         .await?;
 
     let timeout = user_timeout::ActiveModel {
-      duration: ActiveValue::Set(duration),
-      is_permanent: ActiveValue::Set(is_permanent as i8),
-      timestamp: ActiveValue::Set(*self.message.timestamp()),
-      channel_id: ActiveValue::Set(streamer.id),
-      stream_id: ActiveValue::Set(maybe_stream.map(|stream| stream.id)),
-      twitch_user_id: ActiveValue::Set(timedout_user.id),
+      duration: Set(duration),
+      is_permanent: Set(is_permanent as i8),
+      timestamp: Set(*self.message.timestamp()),
+      channel_id: Set(streamer.id),
+      stream_id: Set(maybe_stream.map(|stream| stream.id)),
+      twitch_user_id: Set(timedout_user.id),
+      source_id: Set(self.message.message_source_id().map(str::to_owned)),
       ..Default::default()
     };
 
@@ -204,12 +210,13 @@ impl<'a> MessageParser<'a> {
     };
 
     let subscription_event = subscription_event::ActiveModel {
-      months_subscribed: ActiveValue::Set(time_subbed),
-      timestamp: ActiveValue::Set(*self.message.timestamp()),
-      stream_id: ActiveValue::Set(maybe_stream.map(|stream| stream.id)),
-      subscriber_twitch_user_id: ActiveValue::Set(Some(donator.id)),
-      channel_id: ActiveValue::Set(streamer_model.id),
-      subscription_tier: ActiveValue::Set(Some(subscription_tier.into())),
+      months_subscribed: Set(time_subbed),
+      timestamp: Set(*self.message.timestamp()),
+      stream_id: Set(maybe_stream.map(|stream| stream.id)),
+      subscriber_twitch_user_id: Set(Some(donator.id)),
+      channel_id: Set(streamer_model.id),
+      subscription_tier: Set(Some(subscription_tier.into())),
+      source_id: Set(self.message.message_source_id().map(str::to_owned)),
       ..Default::default()
     };
 
@@ -280,14 +287,14 @@ impl<'a> MessageParser<'a> {
     };
 
     let donation_event = donation_event::ActiveModel {
-      event_type: ActiveValue::Set(EventType::GiftSubs),
-      amount: ActiveValue::Set(gift_amount),
-      timestamp: ActiveValue::Set(*self.message.timestamp()),
-      donator_twitch_user_id: ActiveValue::Set(Some(donator.id)),
-      donation_receiver_twitch_user_id: ActiveValue::Set(streamer_model.id),
-      stream_id: ActiveValue::Set(maybe_stream.map(|stream| stream.id)),
-      subscription_tier: ActiveValue::Set(Some(subscription_tier.into())),
-      origin_id: ActiveValue::Set(Some(origin_id.into())),
+      event_type: Set(EventType::GiftSubs),
+      amount: Set(gift_amount),
+      timestamp: Set(*self.message.timestamp()),
+      donator_twitch_user_id: Set(Some(donator.id)),
+      donation_receiver_twitch_user_id: Set(streamer_model.id),
+      stream_id: Set(maybe_stream.map(|stream| stream.id)),
+      subscription_tier: Set(Some(subscription_tier.into())),
+      origin_id: Set(Some(origin_id.into())),
       ..Default::default()
     };
 
@@ -379,12 +386,13 @@ impl<'a> MessageParser<'a> {
     };
 
     let donation_event = donation_event::ActiveModel {
-      event_type: ActiveValue::Set(EventType::Bits),
-      amount: ActiveValue::Set(bit_quantity),
-      timestamp: ActiveValue::Set(*self.message.timestamp()),
-      donator_twitch_user_id: ActiveValue::Set(Some(donator.id)),
-      donation_receiver_twitch_user_id: ActiveValue::Set(streamer_model.id),
-      stream_id: ActiveValue::Set(maybe_stream.map(|stream| stream.id)),
+      event_type: Set(EventType::Bits),
+      amount: Set(bit_quantity),
+      timestamp: Set(*self.message.timestamp()),
+      donator_twitch_user_id: Set(Some(donator.id)),
+      donation_receiver_twitch_user_id: Set(streamer_model.id),
+      stream_id: Set(maybe_stream.map(|stream| stream.id)),
+      source_id: Set(self.message.message_source_id().map(str::to_owned)),
       ..Default::default()
     };
 
@@ -421,32 +429,19 @@ impl<'a> MessageParser<'a> {
         command_string: format!("{:?}", self.message.command()),
       });
     };
-    let Some(mut donation_quantity) = message_contents.split(" ").nth(3).map(str::to_string) else {
+
+    let Some(parsed_donation_contents) =
+      StreamlabsDonation::parse_streamlabs_donation_value_from_message_content(message_contents)
+    else {
       return Err(AppError::FailedToParseValue {
-        value_name: "donation quantity",
+        value_name: "donation contents",
         location: "streamlabs donation parsing",
-        value: message_contents.to_string(),
-      });
-    };
-    donation_quantity = donation_quantity.replace("£", "");
-    donation_quantity = donation_quantity.replace("!", "");
-    let Ok(donation_quantity) = donation_quantity.parse::<f32>() else {
-      return Err(AppError::FailedToParseValue {
-        value_name: "donation quantity",
-        location: "streamlabs donation parsing",
-        value: message_contents.to_string(),
+        value: message_contents.to_owned(),
       });
     };
 
-    let Some(donator_display_name) = message_contents.split(" ").next() else {
-      return Err(AppError::FailedToParseValue {
-        value_name: "donation quantity",
-        location: "streamlabs donation parsing",
-        value: message_contents.to_string(),
-      });
-    };
     let donator = match twitch_user::Model::get_or_set_by_name(
-      donator_display_name,
+      parsed_donation_contents.donator_name,
       database_connection,
     )
     .await
@@ -455,12 +450,17 @@ impl<'a> MessageParser<'a> {
       Err(error) => {
         tracing::error!("Failed to get donator from a streamlabs donation. Reason: {:?}. Attempting guess based on known users.", error);
 
-        twitch_user::Model::guess_name(donator_display_name, database_connection).await?
+        twitch_user::Model::guess_name(parsed_donation_contents.donator_name, database_connection)
+          .await?
       }
     };
     let unknown_user = if donator.is_none() {
       Some(
-        unknown_user::Model::get_or_set_by_name(donator_display_name, database_connection).await?,
+        unknown_user::Model::get_or_set_by_name(
+          parsed_donation_contents.donator_name,
+          database_connection,
+        )
+        .await?,
       )
     } else {
       None
@@ -478,13 +478,14 @@ impl<'a> MessageParser<'a> {
       stream::Model::get_active_stream_for_user(&streamer_model, database_connection).await?;
 
     let donation_event = donation_event::ActiveModel {
-      event_type: ActiveValue::Set(EventType::StreamlabsDonation),
-      amount: ActiveValue::Set(donation_quantity),
-      timestamp: ActiveValue::Set(*self.message.timestamp()),
-      donator_twitch_user_id: ActiveValue::Set(donator.map(|donator| donator.id)),
-      unknown_user_id: ActiveValue::Set(unknown_user.map(|user| user.id)),
-      donation_receiver_twitch_user_id: ActiveValue::Set(streamer_model.id),
-      stream_id: ActiveValue::Set(maybe_stream.map(|stream| stream.id)),
+      event_type: Set(EventType::StreamlabsDonation),
+      amount: Set(parsed_donation_contents.amount),
+      timestamp: Set(*self.message.timestamp()),
+      donator_twitch_user_id: Set(donator.map(|donator| donator.id)),
+      unknown_user_id: Set(unknown_user.map(|user| user.id)),
+      donation_receiver_twitch_user_id: Set(streamer_model.id),
+      stream_id: Set(maybe_stream.map(|stream| stream.id)),
+      source_id: Set(self.message.message_source_id().map(str::to_owned)),
       ..Default::default()
     };
 
@@ -536,11 +537,11 @@ impl<'a> MessageParser<'a> {
       twitch_user::Model::get_or_set_by_twitch_id(raider_twitch_id, database_connection).await?;
 
     let raid_active_model = raid::ActiveModel {
-      timestamp: ActiveValue::Set(*self.message.timestamp()),
-      size: ActiveValue::Set(raid_size),
-      stream_id: ActiveValue::Set(maybe_stream.map(|stream| stream.id)),
-      twitch_user_id: ActiveValue::Set(streamer_twitch_user_model.id),
-      raider_twitch_user_id: ActiveValue::Set(Some(raider_twitch_user_model.id)),
+      timestamp: Set(*self.message.timestamp()),
+      size: Set(raid_size),
+      stream_id: Set(maybe_stream.map(|stream| stream.id)),
+      twitch_user_id: Set(streamer_twitch_user_model.id),
+      raider_twitch_user_id: Set(Some(raider_twitch_user_model.id)),
       ..Default::default()
     };
 
@@ -601,16 +602,17 @@ impl<'a> MessageParser<'a> {
       (!twitch_emotes_used.is_empty()).then_some(serde_json::to_value(&twitch_emotes_used)?);
 
     let message = stream_message::ActiveModel {
-      is_first_message: ActiveValue::Set(self.message.is_first_message() as i8),
-      timestamp: ActiveValue::Set(*self.message.timestamp()),
-      emote_only: ActiveValue::Set(self.message.message_is_only_emotes() as i8),
-      contents: ActiveValue::Set(Some(message_contents.to_owned())),
-      twitch_user_id: ActiveValue::Set(sender_twitch_user_model.id),
-      channel_id: ActiveValue::Set(streamer_twitch_user_model.id),
-      stream_id: ActiveValue::Set(maybe_stream.map(|stream| stream.id)),
-      third_party_emotes_used: ActiveValue::Set(Some(third_party_emotes_used)),
-      is_subscriber: ActiveValue::Set(self.message.is_subscriber() as i8),
-      twitch_emote_usage: ActiveValue::Set(twitch_emotes_used),
+      is_first_message: Set(self.message.is_first_message() as i8),
+      timestamp: Set(*self.message.timestamp()),
+      emote_only: Set(self.message.message_is_only_emotes() as i8),
+      contents: Set(Some(message_contents.to_owned())),
+      twitch_user_id: Set(sender_twitch_user_model.id),
+      channel_id: Set(streamer_twitch_user_model.id),
+      stream_id: Set(maybe_stream.map(|stream| stream.id)),
+      third_party_emotes_used: Set(Some(third_party_emotes_used)),
+      is_subscriber: Set(self.message.is_subscriber() as i8),
+      twitch_emote_usage: Set(twitch_emotes_used),
+      origin_id: Set(self.message.message_source_id().map(str::to_owned)),
       ..Default::default()
     };
 
@@ -705,9 +707,9 @@ impl<'a> MessageParser<'a> {
     };
 
     Ok(stream::ActiveModel {
-      twitch_stream_id: ActiveValue::Set(stream_id),
-      start_timestamp: ActiveValue::Set(start_time),
-      twitch_user_id: ActiveValue::Set(streamer.id),
+      twitch_stream_id: Set(stream_id),
+      start_timestamp: Set(Some(start_time)),
+      twitch_user_id: Set(streamer.id),
       ..Default::default()
     })
   }
@@ -728,11 +730,11 @@ impl<'a> MessageParser<'a> {
         },
       );
     };
-    let event_timestamp = stream_update_message.get_subscription_created_at();
+    let event_timestamp = stream_update_message.get_message_timestamp();
 
     let mut latest_stream_active_model = running_stream.into_active_model();
 
-    latest_stream_active_model.end_timestamp = ActiveValue::Set(Some(*event_timestamp));
+    latest_stream_active_model.end_timestamp = Set(Some(*event_timestamp));
 
     Ok(latest_stream_active_model)
   }
@@ -784,12 +786,13 @@ mod tests {
 
     let expected_active_model = user_timeout::ActiveModel {
       id: ActiveValue::NotSet,
-      duration: ActiveValue::Set(Some(600)),
-      is_permanent: ActiveValue::Set(0_i8),
-      timestamp: ActiveValue::Set(timestamp_from_string("1740956922774")),
-      channel_id: ActiveValue::Set(1),
-      stream_id: ActiveValue::Set(None),
-      twitch_user_id: ActiveValue::Set(2),
+      duration: Set(Some(600)),
+      is_permanent: Set(0_i8),
+      timestamp: Set(timestamp_from_string("1740956922774")),
+      channel_id: Set(1),
+      stream_id: Set(None),
+      twitch_user_id: Set(2),
+      source_id: Set(None),
     };
 
     assert_eq!(result, expected_active_model);
@@ -845,12 +848,13 @@ mod tests {
 
     let expected_active_model = subscription_event::ActiveModel {
       id: ActiveValue::NotSet,
-      months_subscribed: ActiveValue::Set(12),
-      timestamp: ActiveValue::Set(timestamp_from_string("1740956922774")),
-      channel_id: ActiveValue::Set(1),
-      stream_id: ActiveValue::Set(None),
-      subscriber_twitch_user_id: ActiveValue::Set(Some(3)),
-      subscription_tier: ActiveValue::Set(Some(1)),
+      months_subscribed: Set(12),
+      timestamp: Set(timestamp_from_string("1740956922774")),
+      channel_id: Set(1),
+      stream_id: Set(None),
+      subscriber_twitch_user_id: Set(Some(3)),
+      subscription_tier: Set(Some(1)),
+      source_id: Set(None),
     };
 
     assert_eq!(result, expected_active_model);
@@ -910,15 +914,16 @@ mod tests {
 
     let expected_active_model = donation_event::ActiveModel {
       id: ActiveValue::NotSet,
-      event_type: ActiveValue::Set(EventType::GiftSubs),
-      amount: ActiveValue::Set(5.0_f32),
-      timestamp: ActiveValue::Set(timestamp_from_string("1740956922774")),
-      donator_twitch_user_id: ActiveValue::Set(Some(3)),
-      donation_receiver_twitch_user_id: ActiveValue::Set(1),
-      stream_id: ActiveValue::Set(None),
-      subscription_tier: ActiveValue::Set(Some(1)),
+      event_type: Set(EventType::GiftSubs),
+      amount: Set(5.0_f32),
+      timestamp: Set(timestamp_from_string("1740956922774")),
+      donator_twitch_user_id: Set(Some(3)),
+      donation_receiver_twitch_user_id: Set(1),
+      stream_id: Set(None),
+      subscription_tier: Set(Some(1)),
       unknown_user_id: ActiveValue::NotSet,
-      origin_id: ActiveValue::Set(Some("1000".into())),
+      origin_id: Set(Some("1000".into())),
+      source_id: NotSet,
     };
 
     assert_eq!(result, Some(expected_active_model));
@@ -938,15 +943,16 @@ mod tests {
 
     let expected_active_model = donation_event::ActiveModel {
       id: ActiveValue::NotSet,
-      event_type: ActiveValue::Set(EventType::GiftSubs),
-      amount: ActiveValue::Set(1.0_f32),
-      timestamp: ActiveValue::Set(timestamp_from_string("1740956922774")),
-      donator_twitch_user_id: ActiveValue::Set(Some(3)),
-      donation_receiver_twitch_user_id: ActiveValue::Set(1),
-      stream_id: ActiveValue::Set(None),
-      subscription_tier: ActiveValue::Set(Some(1)),
+      event_type: Set(EventType::GiftSubs),
+      amount: Set(1.0_f32),
+      timestamp: Set(timestamp_from_string("1740956922774")),
+      donator_twitch_user_id: Set(Some(3)),
+      donation_receiver_twitch_user_id: Set(1),
+      stream_id: Set(None),
+      subscription_tier: Set(Some(1)),
       unknown_user_id: ActiveValue::NotSet,
-      origin_id: ActiveValue::Set(Some("1000".into())),
+      origin_id: Set(Some("1000".into())),
+      source_id: NotSet,
     };
 
     assert_eq!(result, Some(expected_active_model));
@@ -1008,6 +1014,7 @@ mod tests {
         subscription_tier: Some(1),
         unknown_user_id: None,
         origin_id: Some("1000".into()),
+        source_id: None,
       }]]);
 
     for iteration in 0..sub_count.unwrap_or(0) {
@@ -1142,18 +1149,20 @@ mod tests {
       subscription_tier: Some(1),
       unknown_user_id: None,
       origin_id: Some("1000".into()),
+      source_id: None,
     };
     let expected_active_model = donation_event::ActiveModel {
       id: ActiveValue::NotSet,
-      event_type: ActiveValue::Set(EventType::GiftSubs),
-      amount: ActiveValue::Set(3.0_f32),
-      timestamp: ActiveValue::Set(timestamp_from_string("1740956922774")),
-      donator_twitch_user_id: ActiveValue::Set(Some(3)),
-      donation_receiver_twitch_user_id: ActiveValue::Set(1),
-      stream_id: ActiveValue::Set(None),
-      subscription_tier: ActiveValue::Set(Some(1)),
+      event_type: Set(EventType::GiftSubs),
+      amount: Set(3.0_f32),
+      timestamp: Set(timestamp_from_string("1740956922774")),
+      donator_twitch_user_id: Set(Some(3)),
+      donation_receiver_twitch_user_id: Set(1),
+      stream_id: Set(None),
+      subscription_tier: Set(Some(1)),
       unknown_user_id: ActiveValue::NotSet,
-      origin_id: ActiveValue::Set(Some("1000".into())),
+      origin_id: Set(Some("1000".into())),
+      source_id: NotSet,
     };
     let (bulk_message, _) = get_gift_subs_template(None);
     let bulk_message_parser = MessageParser::new(&bulk_message, &third_party_emote_storage)
@@ -1216,15 +1225,16 @@ mod tests {
 
     let expected_active_model = donation_event::ActiveModel {
       id: ActiveValue::NotSet,
-      event_type: ActiveValue::Set(EventType::Bits),
-      amount: ActiveValue::Set(100000.0_f32),
-      timestamp: ActiveValue::Set(timestamp_from_string("1740956922774")),
-      donator_twitch_user_id: ActiveValue::Set(Some(3)),
-      donation_receiver_twitch_user_id: ActiveValue::Set(1),
-      stream_id: ActiveValue::Set(None),
+      event_type: Set(EventType::Bits),
+      amount: Set(100000.0_f32),
+      timestamp: Set(timestamp_from_string("1740956922774")),
+      donator_twitch_user_id: Set(Some(3)),
+      donation_receiver_twitch_user_id: Set(1),
+      stream_id: Set(None),
       subscription_tier: ActiveValue::NotSet,
       unknown_user_id: ActiveValue::NotSet,
       origin_id: ActiveValue::NotSet,
+      source_id: Set(None),
     };
 
     assert_eq!(result, expected_active_model);
@@ -1286,11 +1296,11 @@ mod tests {
 
     let expected_active_model = raid::ActiveModel {
       id: ActiveValue::NotSet,
-      timestamp: ActiveValue::Set(timestamp_from_string("1740956922774")),
-      size: ActiveValue::Set(69420),
-      stream_id: ActiveValue::Set(None),
-      twitch_user_id: ActiveValue::Set(1),
-      raider_twitch_user_id: ActiveValue::Set(Some(3)),
+      timestamp: Set(timestamp_from_string("1740956922774")),
+      size: Set(69420),
+      stream_id: Set(None),
+      twitch_user_id: Set(1),
+      raider_twitch_user_id: Set(Some(3)),
     };
 
     assert_eq!(result, expected_active_model);
@@ -1350,15 +1360,16 @@ mod tests {
 
     let expected_active_model = donation_event::ActiveModel {
       id: ActiveValue::NotSet,
-      event_type: ActiveValue::Set(EventType::StreamlabsDonation),
-      amount: ActiveValue::Set(143.0_f32),
-      timestamp: ActiveValue::Set(timestamp_from_string("1740956922774")),
-      donator_twitch_user_id: ActiveValue::Set(Some(3)),
-      donation_receiver_twitch_user_id: ActiveValue::Set(1),
-      stream_id: ActiveValue::Set(None),
+      event_type: Set(EventType::StreamlabsDonation),
+      amount: Set(143.0_f32),
+      timestamp: Set(timestamp_from_string("1740956922774")),
+      donator_twitch_user_id: Set(Some(3)),
+      donation_receiver_twitch_user_id: Set(1),
+      stream_id: Set(None),
       subscription_tier: ActiveValue::NotSet,
-      unknown_user_id: ActiveValue::Set(None),
+      unknown_user_id: Set(None),
       origin_id: ActiveValue::NotSet,
+      source_id: Set(None),
     };
 
     assert_eq!(result, expected_active_model);
@@ -1419,20 +1430,21 @@ mod tests {
       .unwrap();
 
     let expected_active_model_v1 = stream_message::ActiveModel {
-      id: ActiveValue::NotSet,
-      is_first_message: ActiveValue::Set(0_i8),
-      timestamp: ActiveValue::Set(timestamp_from_string("1740956922774")),
-      emote_only: ActiveValue::Set(0_i8),
-      contents: ActiveValue::Set(Some("waaa <3 syadouStanding".to_string())),
-      twitch_user_id: ActiveValue::Set(3),
-      channel_id: ActiveValue::Set(1),
-      stream_id: ActiveValue::Set(None),
-      third_party_emotes_used: ActiveValue::Set(Some(json!({"waaa": 1}))),
-      is_subscriber: ActiveValue::Set(1_i8),
-      twitch_emote_usage: ActiveValue::Set(Some(json!({"1": 1, "2": 1}))),
+      id: NotSet,
+      is_first_message: Set(0_i8),
+      timestamp: Set(timestamp_from_string("1740956922774")),
+      emote_only: Set(0_i8),
+      contents: Set(Some("waaa <3 syadouStanding".to_string())),
+      twitch_user_id: Set(3),
+      channel_id: Set(1),
+      stream_id: Set(None),
+      third_party_emotes_used: Set(Some(json!({"waaa": 1}))),
+      is_subscriber: Set(1_i8),
+      twitch_emote_usage: Set(Some(json!({"1": 1, "2": 1}))),
+      origin_id: Set(Some("159ba37c-c6aa-4fdd-bc62-c5fadbab0770".into())),
     };
     let expected_active_model_v2 = stream_message::ActiveModel {
-      twitch_emote_usage: ActiveValue::Set(Some(json!({"2": 1, "1": 1}))),
+      twitch_emote_usage: Set(Some(json!({"2": 1, "1": 1}))),
       ..expected_active_model_v1.clone()
     };
 
@@ -1459,6 +1471,10 @@ mod tests {
       IrcTag("subscriber".into(), Some("1".into())),
       IrcTag("display-name".into(), Some("LinkTheDot".into())),
       IrcTag("login".into(), Some("linkthedot".into())),
+      IrcTag(
+        "source-id".into(),
+        Some("159ba37c-c6aa-4fdd-bc62-c5fadbab0770".into()),
+      ),
     ];
 
     let message = IrcMessage {
@@ -1519,12 +1535,13 @@ mod tests {
 
     let expected_active_model = subscription_event::ActiveModel {
       id: ActiveValue::NotSet,
-      months_subscribed: ActiveValue::Set(2),
-      timestamp: ActiveValue::Set(timestamp_from_string("1740956922774")),
-      channel_id: ActiveValue::Set(1),
-      stream_id: ActiveValue::Set(None),
-      subscriber_twitch_user_id: ActiveValue::Set(Some(3)),
-      subscription_tier: ActiveValue::Set(Some(1)),
+      months_subscribed: Set(2),
+      timestamp: Set(timestamp_from_string("1740956922774")),
+      channel_id: Set(1),
+      stream_id: Set(None),
+      subscriber_twitch_user_id: Set(Some(3)),
+      subscription_tier: Set(Some(1)),
+      source_id: Set(None),
     };
 
     assert_eq!(result, expected_active_model);
@@ -1589,9 +1606,11 @@ mod tests {
       .append_query_results([vec![stream::Model {
         id: 1,
         twitch_stream_id: 1,
-        start_timestamp: DateTime::parse_from_rfc3339("2025-05-08T00:02:29.532137847Z")
-          .unwrap()
-          .to_utc(),
+        start_timestamp: Some(
+          DateTime::parse_from_rfc3339("2025-05-08T00:02:29.532137847Z")
+            .unwrap()
+            .to_utc(),
+        ),
         end_timestamp: None,
         twitch_user_id: 1,
       }]])
@@ -1599,24 +1618,24 @@ mod tests {
 
     let expected_online_active_model = stream::ActiveModel {
       id: ActiveValue::NotSet,
-      twitch_stream_id: ActiveValue::Set(19136881),
-      start_timestamp: ActiveValue::Set(
+      twitch_stream_id: Set(19136881),
+      start_timestamp: Set(Some(
         DateTime::parse_from_rfc3339("2025-05-08T00:02:29.532137847Z")
           .unwrap()
           .to_utc(),
-      ),
+      )),
       end_timestamp: ActiveValue::NotSet,
-      twitch_user_id: ActiveValue::Set(1),
+      twitch_user_id: Set(1),
     };
     let expected_offline_active_model = stream::ActiveModel {
       id: ActiveValue::Unchanged(1),
       twitch_stream_id: ActiveValue::Unchanged(1),
-      start_timestamp: ActiveValue::Unchanged(
+      start_timestamp: ActiveValue::Unchanged(Some(
         DateTime::parse_from_rfc3339("2025-05-08T00:02:29.532137847Z")
           .unwrap()
           .to_utc(),
-      ),
-      end_timestamp: ActiveValue::Set(Some(
+      )),
+      end_timestamp: Set(Some(
         DateTime::parse_from_rfc3339("2025-05-08T08:02:29.579998945Z")
           .unwrap()
           .to_utc(),

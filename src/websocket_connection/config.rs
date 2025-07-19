@@ -1,6 +1,6 @@
 use crate::{
-  channel::tracked_channels::TrackedChannels, errors::AppError, irc_chat::message_parser::MessageParser,
-  websocket_connection::subscriptions::EventSubscription,
+  channel::tracked_channels::TrackedChannels, errors::AppError,
+  irc_chat::message_parser::MessageParser, websocket_connection::subscriptions::EventSubscription,
 };
 use app_config::{secret_string::Secret, AppConfig};
 use database_connection::get_database_connection;
@@ -17,6 +17,9 @@ use url::Url;
 
 const WEBSOCKET_URL: &str = "wss://eventsub.wss.twitch.tv/ws";
 const TWITCH_API_URL: &str = "https://api.twitch.tv";
+
+/// How long to wait between sending subscription events;
+const SUBSCRIPTION_WAIT_TIME: Duration = Duration::new(0, 250000000);
 const SUBSCRIPTION_PATH: &str = "helix/eventsub/subscriptions";
 // - Use the below constants for the Twitch CLI connection. -
 // const WEBSOCKET_URL: &str = "ws://127.0.0.1:8080/ws";
@@ -37,7 +40,7 @@ const SUBSCRIPTIONS: &[EventSubscription] = &[
   // https://dev.twitch.tv/docs/eventsub/eventsub-subscription-types/#streamoffline
   EventSubscription::new(None, "stream.offline", 1),
 ];
-const SUBSCRIPTION_FAIL_RETRY_DURATION: Duration = Duration::new(20, 0);
+const SUBSCRIPTION_FAIL_RETRY_BASE_DURATION: Duration = Duration::new(30, 0);
 
 /// In seconds.
 ///
@@ -55,7 +58,6 @@ pub struct TwitchWebsocketConfig {
 }
 
 impl TwitchWebsocketConfig {
-
   pub async fn new(
     tracked_channels: TrackedChannels,
     database_connection: &sea_orm::DatabaseConnection,
@@ -124,7 +126,6 @@ impl TwitchWebsocketConfig {
       )
       .header("Content-Type", "application/json");
 
-    let mut futures = vec![];
     let subscription_bodies = EventSubscription::create_subscription_bodies_from_list(
       SUBSCRIPTIONS,
       tracked_channels,
@@ -136,27 +137,17 @@ impl TwitchWebsocketConfig {
       panic!("Tracked user count is too high. Exceeded 300 subscription limit.");
     }
 
-    for subscription in subscription_bodies {
-      let request = request.try_clone().unwrap();
-      // let request = request.try_clone().unwrap().json(&subscription);
-
-      let future_handle = tokio::spawn(async move {
-        (
-          subscription["type"].clone(),
-          Self::send_subscription(subscription, request).await,
-        )
-      });
-
-      futures.push(future_handle);
-    }
-
-    let results = futures::future::join_all(futures).await;
     let mut subscription_failed = false;
 
-    for result in results {
+    for subscription in subscription_bodies {
+      let request = request.try_clone().unwrap();
+      let subscription_type = &subscription["type"].clone();
+
+      let result = Self::send_subscription(subscription, request).await;
+
       match result {
-        Ok((_subscription_type, Ok(_response))) => {}
-        Ok((subscription_type, Err(response_error))) => {
+        Ok(_response) => {}
+        Err(response_error) => {
           tracing::error!(
             "Failed to process a POST request when subscribing to {}. Reason: {}",
             subscription_type,
@@ -165,15 +156,10 @@ impl TwitchWebsocketConfig {
 
           subscription_failed = true;
         }
-        Err(error) => {
-          tracing::error!(
-            "Failed to join a future when subscribing to a websocket. Reason: {}",
-            error
-          );
-
-          subscription_failed = true;
-        }
       }
+
+      tracing::info!("Sleeping for next subscription");
+      tokio::time::sleep(SUBSCRIPTION_WAIT_TIME).await;
     }
 
     Ok(subscription_failed)
@@ -200,7 +186,10 @@ impl TwitchWebsocketConfig {
           response
         );
 
-        tokio::time::sleep(SUBSCRIPTION_FAIL_RETRY_DURATION).await;
+        let sleep_multiplier = ((EVENT_SUBSCRIBE_RETRY_ATTEMPTS - attempts) + 1).max(0) as u32;
+        let sleep_duration = SUBSCRIPTION_FAIL_RETRY_BASE_DURATION * sleep_multiplier;
+
+        tokio::time::sleep(sleep_duration).await;
 
         attempts -= 1;
 
@@ -216,6 +205,7 @@ impl TwitchWebsocketConfig {
     })
   }
 
+  /// Extracts the session ID when connecting to Twitch's websocket servers.
   async fn get_session_id(
     socket_stream: &mut WebSocketStream<MaybeTlsStream<TcpStream>>,
   ) -> Option<String> {
@@ -257,28 +247,31 @@ impl TwitchWebsocketConfig {
   ///
   /// If the message was for `stream.offline` or `stream.online` events, they are parsed, and the database is updated.
   ///
+  /// Returns true if there was a message received.
+  /// Otherwise, if [`keep_alive`](KEEP_ALIVE_DURATION) + [`grace`](KEEP_ALIVE_GRACE_PERIOD)
+  /// seconds have passed, false is returned.
+  ///
   /// Checks for:
   /// Keep alive: https://dev.twitch.tv/docs/eventsub/handling-websocket-events/#keepalive-message
   /// Reconnect: https://dev.twitch.tv/docs/eventsub/handling-websocket-events/#reconnect-message
   /// Revocation: https://dev.twitch.tv/docs/eventsub/handling-websocket-events/#revocation-message
   /// Close: https://dev.twitch.tv/docs/eventsub/handling-websocket-events/#close-message
-  pub async fn check_for_stream_message(&mut self) -> Result<(), AppError> {
-    let future = self.socket_stream.next();
+  pub async fn check_for_stream_message(&mut self) -> Result<bool, AppError> {
+    let check_message_future = self.socket_stream.next();
     let message_result = timeout(
       Duration::from_secs(KEEP_ALIVE_DURATION + KEEP_ALIVE_GRACE_PERIOD),
-      future,
+      check_message_future,
     )
     .await;
-
-    if self.update_keep_alive() {
-      return Err(AppError::WebsocketTimeout);
-    }
 
     let Ok(Some(message_result)) = message_result else {
       tracing::debug!("Did not recieve a message.");
 
-      return Ok(());
+      return Ok(false);
     };
+
+    self.update_keep_alive()?;
+
     let message = message_result?;
 
     if message.is_close() {
@@ -290,7 +283,7 @@ impl TwitchWebsocketConfig {
     let message = message.to_text()?;
 
     if message.is_empty() {
-      return Ok(());
+      return Ok(true);
     }
 
     let Ok(message) = serde_json::from_str::<Value>(message) else {
@@ -302,23 +295,20 @@ impl TwitchWebsocketConfig {
     };
 
     if message["metadata"]["message_type"] == "session_reconnect" {
-      let mut reconnect_url = message["payload"]["session"]["reconnect_url"].to_string();
+      let reconnect_url = Self::reconnect_url_from_message_payload(&message);
 
-      if reconnect_url.starts_with('"') {
-        reconnect_url.remove(0);
-      }
-      if reconnect_url.ends_with('"') {
-        reconnect_url.pop();
-      }
+      self.reconnect_with_url(reconnect_url).await?;
 
-      return self.reconnect_with_url(reconnect_url).await;
+      return Ok(true);
     }
 
     MessageParser::parse_websocket_stream_status_update_message(
       message,
       get_database_connection().await,
     )
-    .await
+    .await?;
+
+    Ok(true)
   }
 
   pub async fn restart(
@@ -359,18 +349,31 @@ impl TwitchWebsocketConfig {
     Ok(())
   }
 
-  /// Returns true if the duration in the keep alive timer is larger than [`KEEP_ALIVE_DURATION`](TwitchWebsocketConfig::KEEP_ALIVE_DURATION)
+  fn reconnect_url_from_message_payload(message: &Value) -> String {
+    let mut reconnect_url = message["payload"]["session"]["reconnect_url"].to_string();
+
+    if reconnect_url.starts_with('"') {
+      reconnect_url.remove(0);
+    }
+    if reconnect_url.ends_with('"') {
+      reconnect_url.pop();
+    }
+
+    reconnect_url
+  }
+
+  /// Returns AppError::WebsocketTimeout if the duration in the keep alive timer is larger than [`KEEP_ALIVE_DURATION`](TwitchWebsocketConfig::KEEP_ALIVE_DURATION)
   ///
   /// This should be called after every message. In the case where no events are received, Twitch will send a keep alive message: https://dev.twitch.tv/docs/eventsub/handling-websocket-events/#keepalive-message
-  fn update_keep_alive(&mut self) -> bool {
+  fn update_keep_alive(&mut self) -> Result<(), AppError> {
     if self.keep_alive_timer.elapsed()
       > Duration::from_secs(KEEP_ALIVE_DURATION + KEEP_ALIVE_GRACE_PERIOD)
     {
-      return true;
+      return Err(AppError::WebsocketTimeout);
     } else {
       self.keep_alive_timer = Instant::now();
     }
 
-    false
+    Ok(())
   }
 }

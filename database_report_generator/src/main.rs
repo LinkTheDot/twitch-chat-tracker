@@ -1,7 +1,7 @@
 use app_config::clap::Args;
 use database_connection::*;
 use database_report_generator::{
-  conditions::AppQueryConditionsBuilder, upload_reports::upload_reports,
+  conditions::query_conditions_builder::AppQueryConditionsBuilder, upload_reports::upload_reports,
 };
 use entities::{stream, twitch_user};
 use entity_extensions::twitch_user::*;
@@ -34,6 +34,11 @@ async fn main() {
   }
 }
 
+/// Returns the latest stream for the streamer based on arguments given to the program.
+///
+/// The stream id will take priority, then a streamer name will be checked.
+///
+/// The program will exit if no stream was found.
 async fn get_stream(database_connection: &DatabaseConnection) -> stream::Model {
   if let Some(stream_id) = Args::report_stream_id() {
     let stream = stream::Entity::find_by_id(stream_id)

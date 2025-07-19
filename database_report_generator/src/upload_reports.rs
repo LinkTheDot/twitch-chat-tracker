@@ -14,7 +14,11 @@ pub async fn upload_reports<S1: AsRef<str>, S2: AsRef<str>>(
   stream: stream::Model,
   reports: Vec<(S1, S2)>,
 ) -> Result<(), AppError> {
-  let stream_start_time = stream.start_timestamp.format("%d-%m-%y").to_string();
+  let stream_start_time = stream
+    .start_timestamp
+    .unwrap()
+    .format("%d-%m-%y")
+    .to_string();
 
   for (report_name, report) in reports {
     let (report_name, report) = (report_name.as_ref(), report.as_ref());

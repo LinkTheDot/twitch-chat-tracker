@@ -31,3 +31,6 @@ spec:
               value: "/app/config/deploy_config.yml"
             - name: DATABASE_HOST_ADDRESS
               value: "mysql"
+            - name: TRACKED_CHANNELS
+              value: 'fallenshadow,shadowchama,linkthedot,kitanya_is_here,alicesawyer,inislein'
+              # ,ninaninin,vividlyvivi,lilyhops

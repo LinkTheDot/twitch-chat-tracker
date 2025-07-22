@@ -2,13 +2,14 @@ use crate::conditions::query_conditions::AppQueryConditions;
 use crate::errors::AppError;
 use crate::EMOTE_DOMINANCE;
 use database_connection::get_database_connection;
-use entities::{stream_message, twitch_user};
-use entity_extensions::prelude::StreamMessageExtensions;
+use entities::{emote_usage, stream_message, twitch_user};
+use num_traits::cast::ToPrimitive;
+use sea_orm::entity::prelude::Decimal;
 use sea_orm::*;
-use tracing::instrument;
 use std::collections::HashMap;
 use tabled::settings::Style;
 use tabled::{Table, Tabled};
+use tracing::instrument;
 
 const EMOTE_DOMINANCE_INFO: &str = "This table has omitted messages where more than {emote_message_threshold}% of the words were Twitch or third party emotes.";
 const USER_TAG_INFO: &str = r#"After a user's ranking will be indicators for both if they're subscribed and if they're a first time chatter.
@@ -33,12 +34,16 @@ pub async fn get_messages_sent_ranking(
   query_conditions: &AppQueryConditions,
 ) -> Result<(String, String), AppError> {
   let database_connection = get_database_connection().await;
+  tracing::info!("Getting messages.");
   let messages = stream_message::Entity::find()
     .filter(query_conditions.messages().clone())
     .all(database_connection)
     .await?;
   let messages: Vec<&stream_message::Model> = messages.iter().collect();
-  let emote_filtered_messages = emote_filtered_messages(messages.clone());
+  tracing::info!("Getting emote filtered messages.");
+  let emote_filtered_messages =
+    emote_filtered_messages(messages.clone(), database_connection).await?;
+  tracing::info!("Got emote filtered messages.");
 
   let unfiltered_rankings = get_rankings(messages).await?;
   let emote_filtered_rankings = get_rankings(emote_filtered_messages).await?;
@@ -144,28 +149,42 @@ async fn get_rankings(
   Ok(rankings)
 }
 
-fn emote_filtered_messages(messages: Vec<&stream_message::Model>) -> Vec<&stream_message::Model> {
-  messages
-    .into_iter()
-    .filter(|message| {
-      let Some(contents) = &message.contents else {
-        tracing::error!(
-          "Failed to get message with null contents. Message ID: {}",
-          message.id
-        );
-        return false;
-      };
-      let twitch_emotes_used = message.get_twitch_emotes_used().values().sum::<usize>();
-      let third_party_emotes_used = message
-        .get_third_party_emotes_used()
-        .values()
-        .sum::<usize>();
+async fn emote_filtered_messages<'a>(
+  messages: Vec<&'a stream_message::Model>,
+  database_connection: &DatabaseConnection,
+) -> Result<Vec<&'a stream_message::Model>, AppError> {
+  let mut end_list = vec![];
 
-      let total_emotes_used = twitch_emotes_used + third_party_emotes_used;
+  for message in messages {
+    let Some(contents) = &message.contents else {
+      tracing::error!(
+        "Failed to get message with null contents. Message ID: {}",
+        message.id
+      );
+      continue;
+    };
+    let word_count = contents.split_whitespace().count();
 
-      let message_word_count = contents.split(' ').count();
+    let sum_usage_query = format!(
+      "SELECT COALESCE(SUM({}), 0) AS total FROM {} WHERE {} = {}",
+      emote_usage::Column::UsageCount.to_string(),
+      emote_usage::Entity.to_string(),
+      emote_usage::Column::StreamMessageId.to_string(),
+      message.id
+    );
+    let sum_usage_statement = Statement::from_string(DatabaseBackend::MySql, sum_usage_query);
+    let Some(query_result) = database_connection.query_one(sum_usage_statement).await? else {
+      continue;
+    };
+    let total_emotes_used: Decimal = query_result.try_get("", "total")?;
+    let Some(total_emotes_used) = total_emotes_used.to_f32() else {
+      continue;
+    };
 
-      total_emotes_used as f32 / message_word_count as f32 <= EMOTE_DOMINANCE
-    })
-    .collect()
+    if total_emotes_used / word_count as f32 <= EMOTE_DOMINANCE {
+      end_list.push(message)
+    }
+  }
+
+  Ok(end_list)
 }

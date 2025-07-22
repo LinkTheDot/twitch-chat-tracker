@@ -121,6 +121,11 @@ impl AppQueryConditionsBuilder {
       donations: self.donation_event(),
       subscriptions: self.subscription_event(),
       raids: self.raid(),
+
+      stream_id: self.stream_id,
+      month_start: self.month_start,
+      month_end: self.month_end,
+      streamer_twitch_user_id: self.streamer_twitch_user_id,
     })
   }
 

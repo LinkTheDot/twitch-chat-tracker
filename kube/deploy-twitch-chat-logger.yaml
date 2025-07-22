@@ -30,7 +30,7 @@ spec:
             - name: CONFIG_PATH
               value: "/app/config/deploy_config.yml"
             - name: DATABASE_HOST_ADDRESS
-              value: "mysql"
+              value: "mysql" # resolves to the mysql service running in the cluster
             - name: TRACKED_CHANNELS
               value: 'fallenshadow,shadowchama,linkthedot,kitanya_is_here,alicesawyer,inislein'
               # ,ninaninin,vividlyvivi,lilyhops

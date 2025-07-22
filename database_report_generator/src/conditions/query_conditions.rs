@@ -11,6 +11,11 @@ pub struct AppQueryConditions {
   pub donations: Condition,
   pub subscriptions: Condition,
   pub raids: Condition,
+
+  pub stream_id: Option<i32>,
+  pub month_start: Option<DateTime<Utc>>,
+  pub month_end: Option<DateTime<Utc>>,
+  pub streamer_twitch_user_id: Option<i32>,
 }
 
 impl AppQueryConditions {
@@ -21,6 +26,11 @@ impl AppQueryConditions {
       donations: Condition::all().add(donation_event::Column::StreamId.eq(Some(stream_id))),
       subscriptions: Condition::all().add(subscription_event::Column::StreamId.eq(Some(stream_id))),
       raids: Condition::all().add(raid::Column::StreamId.eq(Some(stream_id))),
+
+      stream_id: Some(stream_id),
+      month_start: None,
+      month_end: None,
+      streamer_twitch_user_id: None,
     }
   }
 
@@ -47,6 +57,11 @@ impl AppQueryConditions {
       raids: Condition::all()
         .add(raid::Column::Timestamp.between(start_date, end_date))
         .add(raid::Column::TwitchUserId.eq(streamer_twitch_user_id)),
+
+      stream_id: None,
+      month_start: Some(start_date),
+      month_end: Some(end_date),
+      streamer_twitch_user_id: None,
     })
   }
 

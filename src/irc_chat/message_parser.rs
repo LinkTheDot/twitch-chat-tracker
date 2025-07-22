@@ -1,5 +1,6 @@
 use super::mirrored_twitch_objects::message::TwitchIrcMessage;
 use super::mirrored_twitch_objects::twitch_message_type::TwitchMessageType;
+use super::parse_results::stream_message::ParsedStreamMessage;
 use crate::channel::third_party_emote_list_storage::EmoteListStorage;
 use crate::errors::AppError;
 use crate::websocket_connection::twitch_objects::stream_status::{
@@ -10,11 +11,11 @@ use entities::sea_orm_active_enums::EventType;
 use entities::*;
 use entity_extensions::donation_event::DonationEventExtensions;
 use entity_extensions::prelude::*;
+use entity_extensions::stream_message::StreamMessageExtensions;
 use irc::client::prelude::*;
 use irc::proto::Message as IrcMessage;
 use sea_orm::*;
 use serde_json::Value as JsonValue;
-use std::collections::HashMap;
 use streamlabs_donation::StreamlabsDonation;
 
 pub mod streamlabs_donation;
@@ -44,10 +45,17 @@ impl<'a> MessageParser<'a> {
 
     match self.message.message_type() {
       TwitchMessageType::UserMessage => {
-        self
+        let parsed_stream_message = self
           .parse_user_message(database_connection)
           .await?
-          .insert(database_connection)
+          .insert_message(database_connection)
+          .await?;
+
+        let message_emote_usage = parsed_stream_message
+          .parse_emote_usage(self.third_party_emote_lists, database_connection)
+          .await?;
+
+        stream_message::Model::insert_many_emote_usages(message_emote_usage, database_connection)
           .await?;
       }
       TwitchMessageType::Bits => {
@@ -551,7 +559,7 @@ impl<'a> MessageParser<'a> {
   async fn parse_user_message(
     &self,
     database_connection: &DatabaseConnection,
-  ) -> Result<stream_message::ActiveModel, AppError> {
+  ) -> Result<ParsedStreamMessage, AppError> {
     if self.message.message_type() != TwitchMessageType::UserMessage {
       return Err(AppError::IncorrectMessageType {
         expected_type: TwitchMessageType::UserMessage,
@@ -586,22 +594,7 @@ impl<'a> MessageParser<'a> {
     let sender_twitch_user_model =
       twitch_user::Model::get_or_set_by_twitch_id(sender_twitch_id, database_connection).await?;
 
-    let third_party_emotes_used =
-      self.parse_7tv_emotes_from_message_contents(&streamer_twitch_user_model, message_contents);
-    let third_party_emotes_used = serde_json::to_value(third_party_emotes_used)?;
-    let emote_list =
-      emote::Model::get_or_set_list(message_contents, emotes, database_connection).await?;
-    let mut twitch_emotes_used: HashMap<i32, i32> = HashMap::new();
-
-    for (emote, positions) in emote_list {
-      let entry = twitch_emotes_used.entry(emote.id).or_default();
-      *entry += positions.len() as i32;
-    }
-
-    let twitch_emotes_used =
-      (!twitch_emotes_used.is_empty()).then_some(serde_json::to_value(&twitch_emotes_used)?);
-
-    let message = stream_message::ActiveModel {
+    let message_active_model = stream_message::ActiveModel {
       is_first_message: Set(self.message.is_first_message() as i8),
       timestamp: Set(*self.message.timestamp()),
       emote_only: Set(self.message.message_is_only_emotes() as i8),
@@ -609,35 +602,15 @@ impl<'a> MessageParser<'a> {
       twitch_user_id: Set(sender_twitch_user_model.id),
       channel_id: Set(streamer_twitch_user_model.id),
       stream_id: Set(maybe_stream.map(|stream| stream.id)),
-      third_party_emotes_used: Set(Some(third_party_emotes_used)),
       is_subscriber: Set(self.message.is_subscriber() as i8),
-      twitch_emote_usage: Set(twitch_emotes_used),
       origin_id: Set(self.message.message_source_id().map(str::to_owned)),
       ..Default::default()
     };
 
-    Ok(message)
-  }
+    let parsed_stream_message =
+      ParsedStreamMessage::new(message_active_model, emotes, streamer_twitch_user_model);
 
-  fn parse_7tv_emotes_from_message_contents(
-    &self,
-    channel: &twitch_user::Model,
-    message_contents: &str,
-  ) -> HashMap<String, usize> {
-    message_contents
-      .split(' ')
-      .filter_map(|word| {
-        self
-          .third_party_emote_lists
-          .channel_has_emote(channel, word)
-          .then_some(word.to_string())
-      })
-      .fold(HashMap::new(), |mut emote_and_frequency, emote_name| {
-        let entry = emote_and_frequency.entry(emote_name).or_default();
-        *entry += 1;
-
-        emote_and_frequency
-      })
+    Ok(parsed_stream_message)
   }
 
   /// Takes a [`JsonValue`](serde_json::Value) constructed from Twitch's Websocket connection for `stream.online` and `stream.offline` events.
@@ -765,10 +738,13 @@ impl<'a> MessageParser<'a> {
 
 #[cfg(test)]
 mod tests {
+  use crate::channel::third_party_emote_list::{self, EmoteList};
+
   use super::*;
   use chrono::{DateTime, TimeZone, Utc};
   use irc::proto::message::Tag as IrcTag;
   use irc::proto::{Command, Prefix};
+  use sea_orm_active_enums::ExternalService;
   use serde_json::json;
 
   #[tokio::test]
@@ -931,7 +907,7 @@ mod tests {
   #[tokio::test]
   async fn parse_gift_subs_no_sub_count_given() {
     let (giftsub_message, giftsub_mock_database) = get_gift_subs_template(None);
-    let third_party_emote_storage = EmoteListStorage::new().await.unwrap();
+    let third_party_emote_storage = EmoteListStorage::test_list().unwrap();
     let message_parser = MessageParser::new(&giftsub_message, &third_party_emote_storage)
       .unwrap()
       .unwrap();
@@ -1424,44 +1400,47 @@ mod tests {
       .unwrap()
       .unwrap();
 
-    let result = message_parser
+    let expected_emote_usage = vec![
+      emote_usage::ActiveModel {
+        stream_message_id: Set(1),
+        emote_id: Set(2),
+        usage_count: Set(1),
+      },
+      emote_usage::ActiveModel {
+        stream_message_id: Set(1),
+        emote_id: Set(1),
+        usage_count: Set(1),
+      },
+      emote_usage::ActiveModel {
+        stream_message_id: Set(1),
+        emote_id: Set(3),
+        usage_count: Set(2),
+      },
+    ];
+
+    let parsed_message = message_parser
       .parse_user_message(&user_message_mock_database)
       .await
       .unwrap();
 
-    let expected_active_model_v1 = stream_message::ActiveModel {
-      id: NotSet,
-      is_first_message: Set(0_i8),
-      timestamp: Set(timestamp_from_string("1740956922774")),
-      emote_only: Set(0_i8),
-      contents: Set(Some("waaa <3 syadouStanding".to_string())),
-      twitch_user_id: Set(3),
-      channel_id: Set(1),
-      stream_id: Set(None),
-      third_party_emotes_used: Set(Some(json!({"waaa": 1}))),
-      is_subscriber: Set(1_i8),
-      twitch_emote_usage: Set(Some(json!({"1": 1, "2": 1}))),
-      origin_id: Set(Some("159ba37c-c6aa-4fdd-bc62-c5fadbab0770".into())),
-    };
-    let expected_active_model_v2 = stream_message::ActiveModel {
-      twitch_emote_usage: Set(Some(json!({"2": 1, "1": 1}))),
-      ..expected_active_model_v1.clone()
-    };
+    let second_result = parsed_message
+      .insert_message(&user_message_mock_database)
+      .await
+      .unwrap();
 
-    assert!(
-      result == expected_active_model_v1 || result == expected_active_model_v2,
-      "result: \n{:?}\nexpected:\n{:?}\n{:?}",
-      result,
-      expected_active_model_v1,
-      expected_active_model_v2
-    );
+    let emote_usage = second_result
+      .parse_emote_usage(&third_party_emote_storage, &user_message_mock_database)
+      .await
+      .unwrap();
+
+    assert_eq!(emote_usage, expected_emote_usage);
   }
 
   fn get_user_message_template() -> (IrcMessage, DatabaseConnection) {
     let tags = vec![
       IrcTag(
         "emotes".into(),
-        Some("555555584:4-5/emotesv2_18a345125f024ec7a4fe0b51e6638e12:7-20".into()),
+        Some("555555584:4-5/emotesv2_18a345125f024ec7a4fe0b51e6638e12:7-20,22-34".into()),
       ),
       IrcTag("user-id".into(), Some("128831052".into())),
       IrcTag("room-id".into(), Some("578762718".into())),
@@ -1484,7 +1463,10 @@ mod tests {
         "linkthedot".into(),
         "linkthedot.tmi.twitch.tv".into(),
       )),
-      command: Command::PRIVMSG("#fallenshadow".into(), "waaa <3 syadouStanding".into()),
+      command: Command::PRIVMSG(
+        "#fallenshadow".into(),
+        "waaa <3 syadouStanding syadouStanding".into(),
+      ),
     };
 
     let mock_database = MockDatabase::new(DatabaseBackend::MySql)
@@ -1503,18 +1485,52 @@ mod tests {
           display_name: "LinkTheDot".into(),
         }],
       ])
-      .append_query_results([
-        vec![emote::Model {
-          id: 1,
-          twitch_id: "555555584".into(),
-          name: "<3".into(),
-        }],
-        vec![emote::Model {
-          id: 2,
-          twitch_id: "emotesv2_18a345125f024ec7a4fe0b51e6638e12".into(),
-          name: "syadouStanding".into(),
-        }],
-      ])
+      .append_exec_results([MockExecResult {
+        last_insert_id: 1,
+        rows_affected: 1,
+      }])
+      .append_query_results([vec![stream_message::Model {
+        id: 1,
+        is_first_message: 0_i8,
+        timestamp: timestamp_from_string("1740956922774"),
+        emote_only: 0_i8,
+        contents: Some("waaa <3 syadouStanding syadouStanding".to_string()),
+        twitch_user_id: 3,
+        channel_id: 1,
+        stream_id: None,
+        is_subscriber: 1_i8,
+        origin_id: Some("159ba37c-c6aa-4fdd-bc62-c5fadbab0770".into()),
+      }]])
+      .append_exec_results([MockExecResult {
+        last_insert_id: 1,
+        rows_affected: 1,
+      }])
+      .append_query_results([vec![emote::Model {
+        id: 1,
+        external_id: "555555584".into(),
+        name: "<3".into(),
+        external_service: ExternalService::Twitch,
+      }]])
+      .append_exec_results([MockExecResult {
+        last_insert_id: 3,
+        rows_affected: 1,
+      }])
+      .append_query_results([vec![emote::Model {
+        id: 3,
+        external_id: "emotesv2_18a345125f024ec7a4fe0b51e6638e12".into(),
+        name: "syadouStanding".into(),
+        external_service: ExternalService::Twitch,
+      }]])
+      .append_exec_results([MockExecResult {
+        last_insert_id: 3,
+        rows_affected: 0,
+      }])
+      .append_query_results([vec![emote::Model {
+        id: 3,
+        external_id: "emotesv2_18a345125f024ec7a4fe0b51e6638e12".into(),
+        name: "syadouStanding".into(),
+        external_service: ExternalService::Twitch,
+      }]])
       .into_connection();
 
     (message, mock_database)

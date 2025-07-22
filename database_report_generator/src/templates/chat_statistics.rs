@@ -5,7 +5,6 @@ use crate::conditions::query_conditions::AppQueryConditions;
 use crate::errors::AppError;
 use database_connection::get_database_connection;
 use entities::*;
-use entity_extensions::prelude::*;
 use human_time::ToHumanTimeString;
 use sea_orm::*;
 use std::collections::HashMap;
@@ -116,36 +115,36 @@ async fn get_top_n_emotes(
   database_connection: &DatabaseConnection,
   amount: Option<usize>,
 ) -> Result<Vec<(String, usize)>, AppError> {
-  // Yes I know I'm querying for all messages twice here. No I don't care.
-  let stream_messages = stream_message::Entity::find()
-    .filter(query_conditions.messages().clone())
+  let emotes_used: Vec<(emote_usage::Model, Option<emote::Model>)> = emote_usage::Entity::find()
+    .join(
+      JoinType::LeftJoin,
+      emote_usage::Relation::StreamMessage.def(),
+    )
+    .filter(query_conditions.messages().clone()) // Filter for the messages wanted because it's joined
+    .find_also_related(emote::Entity)
     .all(database_connection)
     .await?;
-  let twitch_emotes_used = stream::Model::get_all_twitch_emotes_used_with_condition(
-    query_conditions.messages().clone(),
-    database_connection,
-  )
-  .await?;
 
-  let mut emote_uses: HashMap<String, usize> = HashMap::new();
+  let emotes_used_totals: HashMap<String, usize> =
+    emotes_used
+      .into_iter()
+      .fold(HashMap::new(), |mut usage_totals, (emote_usage, emote)| {
+        let Some(emote) = emote else {
+          tracing::error!(
+            "Failed to get an emote from an emote_usage relation. Message id: {} | Emote id: {}",
+            emote_usage.stream_message_id,
+            emote_usage.emote_id,
+          );
+          return usage_totals;
+        };
 
-  for message in stream_messages {
-    let third_party_emotes_used = message.get_third_party_emotes_used();
+        let entry = usage_totals.entry(emote.name).or_default();
+        *entry += emote_usage.usage_count as usize;
 
-    for (third_party_emote_name, usage) in third_party_emotes_used {
-      let entry = emote_uses.entry(third_party_emote_name).or_default();
+        usage_totals
+      });
 
-      *entry += usage;
-    }
-  }
-
-  for (emote, usage) in twitch_emotes_used {
-    let entry = emote_uses.entry(emote.name).or_default();
-
-    *entry += usage;
-  }
-
-  let mut emote_uses: Vec<(String, usize)> = emote_uses.into_iter().collect();
+  let mut emote_uses: Vec<(String, usize)> = emotes_used_totals.into_iter().collect();
   emote_uses.sort_by_key(|(_, uses)| *uses);
   emote_uses.reverse();
 

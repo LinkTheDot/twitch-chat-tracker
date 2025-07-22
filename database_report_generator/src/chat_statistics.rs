@@ -1,10 +1,10 @@
 use crate::conditions::query_conditions::AppQueryConditions;
 use crate::errors::AppError;
+use crate::query_result_models::emote_usage_contents::EmoteUsageWithContents;
 use crate::EMOTE_DOMINANCE;
 use database_connection::get_database_connection;
 use entities::sea_orm_active_enums::EventType;
 use entities::*;
-use entity_extensions::prelude::StreamMessageExtensions;
 use sea_orm::*;
 use std::collections::HashMap;
 use subscriptions::Subscriptions;
@@ -42,7 +42,8 @@ impl ChatStatistics {
     Ok(Self {
       first_time_chatters: Self::first_time_chatters(&stream_messages),
       total_chats,
-      emote_dominant_chats: Self::emote_dominant_chats(&stream_messages).await?,
+      emote_dominant_chats: Self::emote_dominant_chats(query_conditions, database_connection)
+        .await?,
       average_word_length: Self::average_word_length(&stream_messages),
       subscribed_chat_percentage: Self::subscribed_chat_percentage(&stream_messages),
       raw_donations: Self::get_donation_event_total_amount(
@@ -139,34 +140,53 @@ impl ChatStatistics {
       .count() as i32
   }
 
-  async fn emote_dominant_chats(messages: &[stream_message::Model]) -> Result<i32, AppError> {
-    let mut emote_dominant_chats = 0;
+  async fn emote_dominant_chats(
+    query_conditions: &AppQueryConditions,
+    database_connection: &DatabaseConnection,
+  ) -> Result<i32, AppError> {
+    let emote_usage_with_contents = emote_usage::Entity::find()
+      .join(
+        JoinType::InnerJoin,
+        emote_usage::Relation::StreamMessage.def(),
+      )
+      .filter(query_conditions.messages().clone())
+      .select_only()
+      .columns([
+        emote_usage::Column::UsageCount,
+        emote_usage::Column::EmoteId,
+        emote_usage::Column::StreamMessageId,
+      ])
+      .column(stream_message::Column::Contents)
+      .into_model::<EmoteUsageWithContents>()
+      .all(database_connection)
+      .await?;
 
-    for message in messages {
-      let Some(contents) = &message.contents else {
-        tracing::error!(
-          "Failed to get message with null contents. Message ID: {}",
-          message.id
-        );
-        continue;
-      };
+    // id: (contents, total)
+    let messages_with_totals: HashMap<i32, (String, i32)> = emote_usage_with_contents
+      .into_iter()
+      .fold(HashMap::new(), |mut end_list, emote_usage| {
+        let Some(contents) = emote_usage.contents else {
+          return end_list;
+        };
+        let entry = end_list
+          .entry(emote_usage.stream_message_id)
+          .or_insert((contents, 0));
 
-      let twitch_emotes_used = message.get_twitch_emotes_used().values().sum::<usize>();
-      let third_party_emotes_used = message
-        .get_third_party_emotes_used()
-        .values()
-        .sum::<usize>();
+        entry.1 += emote_usage.usage_count;
 
-      let total_emotes_used = twitch_emotes_used + third_party_emotes_used;
+        end_list
+      });
 
-      let message_word_count = contents.split(' ').count();
+    Ok(
+      messages_with_totals
+        .into_iter()
+        .filter(|(_id, (contents, emote_usage))| {
+          let word_count = contents.split_whitespace().count() as f32;
 
-      if total_emotes_used as f32 / message_word_count as f32 <= EMOTE_DOMINANCE {
-        emote_dominant_chats += 1;
-      }
-    }
-
-    Ok(emote_dominant_chats)
+          *emote_usage as f32 / word_count <= EMOTE_DOMINANCE
+        })
+        .count() as i32,
+    )
   }
 
   fn average_word_length(messages: &[stream_message::Model]) -> f32 {

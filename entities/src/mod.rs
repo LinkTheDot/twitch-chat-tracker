@@ -4,6 +4,7 @@ pub mod prelude;
 
 pub mod donation_event;
 pub mod emote;
+pub mod emote_usage;
 pub mod gift_sub_recipient;
 pub mod raid;
 pub mod sea_orm_active_enums;

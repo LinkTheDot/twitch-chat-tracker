@@ -1,4 +1,5 @@
 use axum::http::StatusCode;
+use entity_extensions::twitch_user::ChannelIdentifier;
 
 #[derive(Debug, thiserror::Error)]
 pub enum AppError {
@@ -25,6 +26,11 @@ pub enum AppError {
 
   #[error("Could not find user. Interal ID: {}", internal_id)]
   CouldNotFindUserByInternalID { internal_id: i32 },
+
+  #[error("Could not find user. {:?}", identifier)]
+  CouldNotFindUserByIdentifier {
+    identifier: ChannelIdentifier<String>,
+  },
 
   #[error("Failed to find a stream with the ID {}", stream_id)]
   FailedToFindStreamByID { stream_id: i32 },
@@ -58,6 +64,7 @@ impl From<AppError> for StatusCode {
       AppError::CouldNotFindUserByTwitchId { .. } => StatusCode::NOT_FOUND,
       AppError::CouldNotFindUserByLoginName { .. } => StatusCode::NOT_FOUND,
       AppError::CouldNotFindUserByInternalID { .. } => StatusCode::NOT_FOUND,
+      AppError::CouldNotFindUserByIdentifier { .. } => StatusCode::NOT_FOUND,
       AppError::FailedToFindStreamByID { .. } => StatusCode::NOT_FOUND,
       AppError::FailedToFindDonationEventByID { .. } => StatusCode::NOT_FOUND,
       AppError::FailedToParseResponse { .. } => StatusCode::INTERNAL_SERVER_ERROR,

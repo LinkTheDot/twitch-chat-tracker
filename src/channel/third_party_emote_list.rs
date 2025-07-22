@@ -1,41 +1,60 @@
 use crate::errors::AppError;
 use app_config::AppConfig;
-use entities::twitch_user;
+use entities::*;
+use entity_extensions::emote::*;
+use sea_orm::DatabaseConnection;
+use sea_orm_active_enums::ExternalService;
 use serde_json::Value;
-use std::collections::HashSet;
+use std::collections::HashMap;
 use url::Url;
 
 const _7TV_API_URL: &str = "https://7tv.io/v3/";
 const _BTTV_API_URL: &str = "https://api.betterttv.net/3/cached/";
 const _FRANKER_FACE_Z_API_URL: &str = "https://api.betterttv.net/3/cached/frankerfacez/";
 
+// -= Global Emote Lists =-
 // https://7tv.io/v3/emote-sets/global
 // https://api.betterttv.net/3/cached/emotes/global
 // https://api.betterttv.net/3/cached/frankerfacez/emotes/global
 //
-// https://api.betterttv.net/3/cached/users/twitch/578762718
+// -= User Emote Lists =-
 // https://7tv.io/v3/users/twitch/578762718
+// https://api.betterttv.net/3/cached/users/twitch/578762718
 // https://api.frankerfacez.com/v1/room/id/578762718
+//
+// -= Fetch Image Urls =-
+// https://cdn.betterttv.net/emote/{id}/3x.webp
+// https://cdn.frankerfacez.com/emote/{id}/4
+// https://cdn.7tv.app/emote/{id}/4x.webp
 #[derive(Debug)]
 pub struct EmoteList {
   channel_name: String,
-  emote_list: HashSet<String>,
+  /// Key: emote_name | Value: EmoteModel
+  emote_list: HashMap<String, emote::Model>,
 }
 
 impl EmoteList {
   pub const GLOBAL_NAME: &str = "GLOBAL";
-  pub const TEST_EMOTES: &[&str] = &["glorp", "waaa", "glorpass"];
+  /// Conains the (name, id) for emotes
+  pub const TEST_EMOTES: &[(&str, &str)] = &[
+    ("glorp", "01H16FA16G0005EZED5J0EY7KN"),
+    ("waaa", "01FTCXPJ200001E12995B12626"),
+    ("glorpass", "01JAQC65ZG07ABT7PJ082ZTF9M"),
+  ];
 
   pub fn get_empty(channel_name: String) -> Self {
     Self {
       channel_name,
-      emote_list: HashSet::default(),
+      emote_list: HashMap::default(),
     }
   }
 
-  pub async fn get_list(channel: &twitch_user::Model) -> Result<Self, AppError> {
+  pub async fn get_list(
+    channel: &twitch_user::Model,
+    database_connection: &DatabaseConnection,
+  ) -> Result<Self, AppError> {
     tracing::info!("Getting emote list for channel {:?}", channel);
-    let _7tv = Self::get_7tv_list(channel).await?;
+    let _7tv = Self::get_7tv_list(channel, database_connection).await?;
 
     Ok(Self {
       channel_name: channel.login_name.to_owned(),
@@ -52,9 +71,20 @@ impl EmoteList {
       return None;
     }
 
-    let test_emotes: HashSet<String> = Self::TEST_EMOTES
+    let test_emotes: HashMap<String, emote::Model> = Self::TEST_EMOTES
       .iter()
-      .map(|emote_name| emote_name.to_string())
+      .enumerate()
+      .map(|(iteration, (emote_name, emote_id))| {
+        let emote = emote::Model {
+          id: iteration as i32 + 1,
+          external_id: emote_id.to_string(),
+          name: emote_name.to_string(),
+          external_service: ExternalService::SevenTv,
+        };
+
+        (emote_name.to_string(), emote)
+      })
+      // (emote_name.to_string(), emote_id.to_string()))
       .collect();
     let mut emote_lists = vec![];
 
@@ -73,16 +103,21 @@ impl EmoteList {
     Some(emote_lists)
   }
 
-  async fn get_7tv_list(channel: &twitch_user::Model) -> Result<HashSet<String>, AppError> {
+  async fn get_7tv_list(
+    channel: &twitch_user::Model,
+    database_connection: &DatabaseConnection,
+  ) -> Result<HashMap<String, emote::Model>, AppError> {
     let mut user_query_url = Url::parse(_7TV_API_URL)?;
     let channel_path = format!("users/twitch/{}", channel.twitch_id);
     user_query_url = user_query_url.join(&channel_path)?;
 
-    Self::_7tv_emote_list(user_query_url).await
+    Self::_7tv_emote_list(user_query_url, database_connection).await
   }
 
   // The global response body is formatted different from the regular users, so it lives in a separate method.
-  pub async fn get_global_emote_list() -> Result<Self, AppError> {
+  pub async fn get_global_emote_list(
+    database_connection: &DatabaseConnection,
+  ) -> Result<Self, AppError> {
     let mut _7tv_query_url = Url::parse(_7TV_API_URL)?;
     _7tv_query_url = _7tv_query_url.join("emote-sets/global")?;
     // let _7tv = Self::_7tv_emote_list(client, _7tv_query_url).await?;
@@ -107,7 +142,7 @@ impl EmoteList {
       if error_code.as_u64() == Some(12000) {
         return Ok(Self {
           channel_name: Self::GLOBAL_NAME.to_string(),
-          emote_list: HashSet::default(),
+          emote_list: HashMap::default(),
         });
       }
     }
@@ -120,20 +155,29 @@ impl EmoteList {
       ));
     };
 
-    let emote_list = emote_set
-      .iter()
-      .filter_map(|object| {
-        let Value::Object(emote_object_map) = object else {
-          return None;
-        };
+    let mut emote_list: HashMap<String, emote::Model> = HashMap::new();
 
-        let Value::String(emote_name) = emote_object_map.get("name")? else {
-          return None;
-        };
+    for emote_object in emote_set {
+      let Value::Object(emote_object_map) = emote_object else {
+        continue;
+      };
+      let Some(Value::String(emote_name)) = emote_object_map.get("name") else {
+        continue;
+      };
+      let Some(Value::String(emote_id)) = emote_object_map.get("id") else {
+        continue;
+      };
 
-        Some(emote_name.to_owned())
-      })
-      .collect();
+      let emote = emote::Model::get_or_set_third_party_emote_by_external_id(
+        emote_id,
+        emote_name,
+        ExternalService::SevenTv,
+        database_connection,
+      )
+      .await?;
+
+      emote_list.insert(emote_name.to_owned(), emote);
+    }
 
     Ok(Self {
       channel_name: Self::GLOBAL_NAME.to_string(),
@@ -141,7 +185,10 @@ impl EmoteList {
     })
   }
 
-  async fn _7tv_emote_list(query_url: Url) -> Result<HashSet<String>, AppError> {
+  async fn _7tv_emote_list(
+    query_url: Url,
+    database_connection: &DatabaseConnection,
+  ) -> Result<HashMap<String, emote::Model>, AppError> {
     let reqwest_client = reqwest::Client::new();
     let response = reqwest_client.get(query_url).send().await?;
     let response_body = response.text().await?;
@@ -160,7 +207,7 @@ impl EmoteList {
 
     if let Some(Value::Number(error_code)) = data.get("error_code") {
       if error_code.as_u64() == Some(12000) {
-        return Ok(HashSet::default());
+        return Ok(HashMap::default());
       }
     }
 
@@ -179,34 +226,49 @@ impl EmoteList {
       ));
     };
 
-    Ok(
-      emote_set
-        .iter()
-        .filter_map(|object| {
-          let Value::Object(emote_object_map) = object else {
-            return None;
-          };
+    let mut emotes: HashMap<String, emote::Model> = HashMap::new();
 
-          let Value::String(emote_name) = emote_object_map.get("name")? else {
-            return None;
-          };
+    for emote_object in emote_set {
+      let Value::Object(emote_object_map) = emote_object else {
+        continue;
+      };
+      let Some(Value::String(emote_name)) = emote_object_map.get("name") else {
+        continue;
+      };
+      let Some(Value::String(emote_id)) = emote_object_map.get("id") else {
+        continue;
+      };
 
-          Some(emote_name.to_owned())
-        })
-        .collect(),
-    )
+      let emote = emote::Model::get_or_set_third_party_emote_by_external_id(
+        emote_id,
+        emote_name,
+        ExternalService::SevenTv,
+        database_connection,
+      )
+      .await?;
+
+      emotes.insert(emote_name.to_owned(), emote);
+    }
+
+    Ok(emotes)
   }
 
   /// Returns the combined list of 7tv, bttv, and frankerfacez emotes.
-  pub fn emote_list(&self) -> &HashSet<String> {
+  ///
+  /// Key: Name | Value: ID
+  pub fn emote_list(&self) -> &HashMap<String, emote::Model> {
     &self.emote_list
   }
 
   pub fn contains(&self, value: &str) -> bool {
-    self.emote_list.contains(value)
+    self.emote_list.contains_key(value)
   }
 
   pub fn channel_name(&self) -> &str {
     &self.channel_name
+  }
+
+  pub fn get(&self, emote_name: &str) -> Option<&emote::Model> {
+    self.emote_list.get(emote_name)
   }
 }

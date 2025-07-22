@@ -1,28 +1,17 @@
 use crate::errors::EntityExtensionError;
-use crate::stream_message::StreamMessageExtensions;
 use app_config::AppConfig;
 use app_config::secret_string::Secret;
 use chrono::{DateTime, Utc};
-use entities::{emote, stream, stream_message, twitch_user};
+use entities::{stream, twitch_user};
 use reqwest::RequestBuilder;
 use sea_orm::*;
 use serde_json::Value;
-use std::collections::{HashMap, hash_map::Entry};
+use std::collections::HashMap;
 use url::Url;
 
 const HELIX_STREAM_QUERY_URL: &str = "https://api.twitch.tv/helix/streams";
 
 pub trait StreamExtensions {
-  async fn get_all_twitch_emotes_used(
-    &self,
-    database_connection: &DatabaseConnection,
-  ) -> Result<Vec<(emote::Model, usize)>, DbErr>;
-  /// Takes a condition to filter the stream messages by.
-  /// This can be something like only messages from a given stream or for messages within a certain time frame.
-  async fn get_all_twitch_emotes_used_with_condition(
-    message_condition: Condition,
-    database_connection: &DatabaseConnection,
-  ) -> Result<Vec<(emote::Model, usize)>, DbErr>;
   fn is_live(&self) -> bool;
   /// Returns a stream object if the user passed in is currently streaming.
   async fn get_active_stream_for_user(
@@ -42,55 +31,6 @@ pub trait StreamExtensions {
 }
 
 impl StreamExtensions for stream::Model {
-  async fn get_all_twitch_emotes_used(
-    &self,
-    database_connection: &DatabaseConnection,
-  ) -> Result<Vec<(emote::Model, usize)>, DbErr> {
-    let condition = Condition::all().add(stream_message::Column::StreamId.eq(self.id));
-
-    Self::get_all_twitch_emotes_used_with_condition(condition, database_connection).await
-  }
-
-  async fn get_all_twitch_emotes_used_with_condition(
-    message_condition: Condition,
-    database_connection: &DatabaseConnection,
-  ) -> Result<Vec<(emote::Model, usize)>, DbErr> {
-    let messages = stream_message::Entity::find()
-      .filter(message_condition)
-      .all(database_connection)
-      .await?;
-    let mut known_emotes: HashMap<i32, (emote::Model, usize)> = HashMap::new();
-
-    for message in messages {
-      for (emote_id, usage) in message.get_twitch_emotes_used() {
-        match known_emotes.entry(emote_id) {
-          Entry::Vacant(entry) => {
-            let Some(emote) = emote::Entity::find_by_id(emote_id)
-              .one(database_connection)
-              .await?
-            else {
-              tracing::error!(
-                "Failed to find emote by ID {:?} in message {:?}",
-                emote_id,
-                message.id
-              );
-              continue;
-            };
-
-            entry.insert((emote, usage));
-          }
-
-          Entry::Occupied(mut entry) => {
-            let (_, total_usage) = entry.get_mut();
-            *total_usage += usage;
-          }
-        }
-      }
-    }
-
-    Ok(known_emotes.into_values().collect())
-  }
-
   fn is_live(&self) -> bool {
     self.end_timestamp.is_none()
   }

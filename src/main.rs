@@ -4,6 +4,8 @@ use app_config::AppConfig;
 // Other Glorp ass: https://cdn.discordapp.com/emojis/1333507652591947847.webp?size=44&animated=true
 // Glorp pirate: https://cdn.discordapp.com/emojis/1335429586594562058.webp?size=44
 
+mod manual_migrations;
+
 #[tokio::main]
 async fn main() {
   twitch_chat_logger::logging::setup_logging_config().unwrap();

@@ -12,6 +12,7 @@ pub mod currency_exchangerate;
 pub mod errors;
 pub mod logging;
 pub mod pastebin;
+pub mod query_result_models;
 pub mod templates;
 pub mod upload_reports;
 
@@ -25,7 +26,7 @@ pub async fn generate_reports(
   streamer_twitch_user_id: i32,
 ) -> Result<Vec<(&'static str, String)>, AppError> {
   let monthly_condition =
-    AppQueryConditions::from_month(Some(Utc::now().month() as usize), streamer_twitch_user_id)?;
+    AppQueryConditions::from_month(Some(6), streamer_twitch_user_id)?;
 
   let general_stats_report = get_chat_statistics_template(&query_conditions, false)
     .await

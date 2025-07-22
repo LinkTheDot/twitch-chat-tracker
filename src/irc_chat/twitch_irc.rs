@@ -2,6 +2,7 @@ use crate::channel::third_party_emote_list_storage::EmoteListStorage;
 use crate::errors::AppError;
 use crate::irc_chat::message_parser::MessageParser;
 use app_config::{secret_string::Secret, AppConfig};
+use database_connection::get_database_connection;
 use irc::client::{prelude::*, ClientStream};
 use irc::proto::{CapSubCommand, Message as IrcMessage};
 use std::{sync::Arc, time::Duration};
@@ -24,8 +25,6 @@ pub struct TwitchIrc {
   irc_client_stream: Option<ClientStream>,
   third_party_emote_lists: Arc<EmoteListStorage>,
   message_result_processor_sender: mpsc::UnboundedSender<JoinHandle<Result<(), AppError>>>,
-  /// Temporary counter for debugging the app not working randomly at night.
-  no_message_count: usize,
 }
 
 impl TwitchIrc {
@@ -35,14 +34,16 @@ impl TwitchIrc {
     tracing::info!("Initializing Twitch IRC client.");
     let mut irc_client = Self::get_irc_client().await?;
     let irc_client_stream = irc_client.stream()?;
-    let third_party_emote_lists = EmoteListStorage::new().await?;
+    let database_connection = get_database_connection().await;
+    let third_party_emote_lists = EmoteListStorage::new(AppConfig::channels(), database_connection).await?;
+
+    tracing::info!("Third party emote lists: {:#?}", third_party_emote_lists);
 
     Ok(Self {
       irc_client,
       irc_client_stream: Some(irc_client_stream),
       third_party_emote_lists: Arc::new(third_party_emote_lists),
       message_result_processor_sender,
-      no_message_count: 0,
     })
   }
 
@@ -167,7 +168,6 @@ impl TwitchIrc {
     Ok(())
   }
 
-
   async fn create_and_run_mesage_parser(
     message: IrcMessage,
     third_party_emote_lists: Arc<EmoteListStorage>,
@@ -206,67 +206,67 @@ impl TwitchIrc {
 
 #[cfg(test)]
 mod tests {
-  use super::*;
-  use irc::proto::message::Tag as IrcTag;
+  // use super::*;
+  // use irc::proto::message::Tag as IrcTag;
 
   /// Used to manually test raw IRC messages from Twitch to
   /// check if the parser is working as intended.
   #[tokio::test]
   #[ignore]
   async fn manual_message_testing() {
-    crate::logging::setup_logging_config().unwrap();
-    let message = IrcMessage {
-      tags: Some(vec![
-        IrcTag("display-name".to_string(), Some("guty_52".to_string())),
-        IrcTag(
-          "id".to_string(),
-          Some("139180bb-2a2f-44db-b976-ec7321604a58".to_string()),
-        ),
-        IrcTag("login".to_string(), Some("guty_52".to_string())),
-        IrcTag("msg-id".to_string(), Some("subgift".to_string())),
-        IrcTag(
-          "msg-param-community-gift-id".to_string(),
-          Some("4484768729225257381".to_string()),
-        ),
-        IrcTag("msg-param-gift-months".to_string(), Some("1".to_string())),
-        IrcTag("msg-param-months".to_string(), Some("1".to_string())),
-        IrcTag(
-          "msg-param-origin-id".to_string(),
-          Some("4484768729225257381".to_string()),
-        ),
-        IrcTag(
-          "msg-param-recipient-display-name".to_string(),
-          Some("moons_advocate".to_string()),
-        ),
-        IrcTag(
-          "msg-param-recipient-id".to_string(),
-          Some("116819927".to_string()),
-        ),
-        IrcTag(
-          "msg-param-recipient-user-name".to_string(),
-          Some("moons_advocate".to_string()),
-        ),
-        IrcTag("msg-param-sender-count".to_string(), Some("0".to_string())),
-        IrcTag(
-          "msg-param-sub-plan-name".to_string(),
-          Some("shondophrenics".to_string()),
-        ),
-        IrcTag("msg-param-sub-plan".to_string(), Some("1000".to_string())),
-        IrcTag("room-id".to_string(), Some("578762718".to_string())),
-        IrcTag("subscriber".to_string(), Some("1".to_string())),
-        IrcTag("tmi-sent-ts".to_string(), Some("1749748509617".to_string())),
-        IrcTag("user-id".to_string(), Some("231787559".to_string())),
-      ]),
-      prefix: Some(Prefix::ServerName("tmi.twitch.tv".into())),
-      command: Command::Raw("USERNOTICE".into(), vec!["#fallenshadow".into()]),
-    };
-    let third_party_emote_lists = EmoteListStorage::new().await.unwrap();
-
-    MessageParser::new(&message, &third_party_emote_lists)
-      .unwrap()
-      .unwrap()
-      .parse()
-      .await
-      .unwrap();
+    // crate::logging::setup_logging_config().unwrap();
+    // let message = IrcMessage {
+    //   tags: Some(vec![
+    //     IrcTag("display-name".to_string(), Some("guty_52".to_string())),
+    //     IrcTag(
+    //       "id".to_string(),
+    //       Some("139180bb-2a2f-44db-b976-ec7321604a58".to_string()),
+    //     ),
+    //     IrcTag("login".to_string(), Some("guty_52".to_string())),
+    //     IrcTag("msg-id".to_string(), Some("subgift".to_string())),
+    //     IrcTag(
+    //       "msg-param-community-gift-id".to_string(),
+    //       Some("4484768729225257381".to_string()),
+    //     ),
+    //     IrcTag("msg-param-gift-months".to_string(), Some("1".to_string())),
+    //     IrcTag("msg-param-months".to_string(), Some("1".to_string())),
+    //     IrcTag(
+    //       "msg-param-origin-id".to_string(),
+    //       Some("4484768729225257381".to_string()),
+    //     ),
+    //     IrcTag(
+    //       "msg-param-recipient-display-name".to_string(),
+    //       Some("moons_advocate".to_string()),
+    //     ),
+    //     IrcTag(
+    //       "msg-param-recipient-id".to_string(),
+    //       Some("116819927".to_string()),
+    //     ),
+    //     IrcTag(
+    //       "msg-param-recipient-user-name".to_string(),
+    //       Some("moons_advocate".to_string()),
+    //     ),
+    //     IrcTag("msg-param-sender-count".to_string(), Some("0".to_string())),
+    //     IrcTag(
+    //       "msg-param-sub-plan-name".to_string(),
+    //       Some("shondophrenics".to_string()),
+    //     ),
+    //     IrcTag("msg-param-sub-plan".to_string(), Some("1000".to_string())),
+    //     IrcTag("room-id".to_string(), Some("578762718".to_string())),
+    //     IrcTag("subscriber".to_string(), Some("1".to_string())),
+    //     IrcTag("tmi-sent-ts".to_string(), Some("1749748509617".to_string())),
+    //     IrcTag("user-id".to_string(), Some("231787559".to_string())),
+    //   ]),
+    //   prefix: Some(Prefix::ServerName("tmi.twitch.tv".into())),
+    //   command: Command::Raw("USERNOTICE".into(), vec!["#fallenshadow".into()]),
+    // };
+    // let third_party_emote_lists = EmoteListStorage::new().await.unwrap();
+    //
+    // MessageParser::new(&message, &third_party_emote_lists)
+    //   .unwrap()
+    //   .unwrap()
+    //   .parse()
+    //   .await
+    //   .unwrap();
   }
 }

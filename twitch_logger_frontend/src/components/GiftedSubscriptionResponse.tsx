@@ -1,5 +1,5 @@
 import { GiftedSubscription } from "../types/Subscriptions";
-import { Column, DataTable } from "./DataTable";
+import { Column, ResponsiveDataDisplay } from "./ResponsiveDataDisplay";
 
 export interface GiftedSubscriptionResultsProps {
   gifted_subscriptions: GiftedSubscription[];
@@ -32,15 +32,16 @@ export function GiftedSubscriptionResults(props: GiftedSubscriptionResultsProps)
   ];
 
   return (
-    <div className="gifted_subscriptions_data_table">
+    <>
+      <h3 className="text-xl font-semibold text-gray-200 mb-4">Gifted Subscriptions</h3>
       {props.gifted_subscriptions && (
-        <DataTable
+        <ResponsiveDataDisplay
           data={props.gifted_subscriptions}
           columns={giftedSubscriptionColumns}
           rowKey="id"
           emptyMessage="No gifted subscriptions found."
         />
       )}
-    </div>
+    </>
   );
 }

@@ -1,21 +1,7 @@
-:root {
-  --primary-background-color: #131313;
-  --primary-text-color: #e0e0e0;
-  --secondary-background-color: #252525;
-}
+@import "tailwindcss";
 
-body {
-  background-color: var(--primary-background-color);
-  color: var(--primary-text-color);
-
-  font-family: Arial, sans-serif;
-  font-size: 16px;
-  line-height: 1.6;
-}
-
-button,
-input,
 select {
-  color: var(--primary-text-color);
-  background-color: var(--secondary-background-color);
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
 }

@@ -1,7 +1,6 @@
 use crate::templates::chat_messages::get_messages_sent_ranking;
 use crate::templates::chat_statistics::get_chat_statistics_template;
 use app_config::Args;
-use chrono::{Datelike, Utc};
 use conditions::query_conditions::AppQueryConditions;
 use errors::AppError;
 use templates::donation_rankings::get_donation_rankings_for_streamer_and_date;
@@ -25,8 +24,7 @@ pub async fn generate_reports(
   query_conditions: AppQueryConditions,
   streamer_twitch_user_id: i32,
 ) -> Result<Vec<(&'static str, String)>, AppError> {
-  let monthly_condition =
-    AppQueryConditions::from_month(Some(6), streamer_twitch_user_id)?;
+  let monthly_condition = AppQueryConditions::from_month(Some(6), streamer_twitch_user_id)?;
 
   let general_stats_report = get_chat_statistics_template(&query_conditions, false)
     .await

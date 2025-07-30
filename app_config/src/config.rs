@@ -6,7 +6,7 @@ use std::path::PathBuf;
 use std::sync::OnceLock;
 
 const CONFIG_PATH_ENV_VAR: &str = "CONFIG_PATH";
-const DEFAULT_CONFIG_FILEPATH: &str = "./config/config.yml";
+const DEFAULT_CONFIG_FILEPATH: &str = "./config_files/config.yml";
 const MAX_QUERIES_PER_MINUTE: usize = 12;
 const RATE_LIMIT: usize = 500;
 

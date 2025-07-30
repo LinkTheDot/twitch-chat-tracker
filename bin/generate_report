@@ -1,6 +1,6 @@
 #!/usr/bin/env zsh
 
-kubectl apply -f "$PWD/database_report_generator/kube/job-generate-report.yaml"
+kubectl apply -f "$PWD/report_generator/kube/job-generate-report.yaml"
 
 kubectl wait --for=condition=Ready pod -l job-name="twitch-tracker-report-generator" 
 sleep 3

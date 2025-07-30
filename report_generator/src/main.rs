@@ -1,15 +1,15 @@
 use app_config::clap::Args;
 use database_connection::*;
-use database_report_generator::{
-  conditions::query_conditions_builder::AppQueryConditionsBuilder, upload_reports::upload_reports,
-};
 use entities::{stream, twitch_user};
 use entity_extensions::twitch_user::*;
+use report_generator::{
+  conditions::query_conditions_builder::AppQueryConditionsBuilder, upload_reports::upload_reports,
+};
 use sea_orm::*;
 
 #[tokio::main]
 async fn main() {
-  database_report_generator::logging::setup_logging_config().unwrap();
+  report_generator::logging::setup_logging_config().unwrap();
 
   let database_connection = get_database_connection().await;
   let stream = get_stream(database_connection).await;
@@ -20,7 +20,7 @@ async fn main() {
     .build()
     .unwrap();
 
-  match database_report_generator::generate_reports(condition, stream.twitch_user_id).await {
+  match report_generator::generate_reports(condition, stream.twitch_user_id).await {
     Ok(reports) => {
       println!("\n\n");
 

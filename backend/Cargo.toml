@@ -1,5 +1,5 @@
 [package]
-name = "query_interface_backend"
+name = "backend"
 version = "0.1.0"
 edition = "2024"
 
@@ -20,3 +20,7 @@ sea-orm = { version = "1.1.*", features = ["sqlx-mysql", "runtime-tokio", "macro
 http = "1.3"
 tower-http = { version = "0.6.6", features = ["cors"] }
 reqwest = "0.12.22"
+
+# [[bin]]
+# name = "backend"
+# path = "src/main.rs"

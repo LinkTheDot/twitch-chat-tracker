@@ -2,8 +2,8 @@
 
 use axum::{Router, response::Html, routing::get};
 use http::{Method, header::CONTENT_TYPE};
-use query_interface_backend::app::InterfaceConfig;
-use query_interface_backend::routes::route_builder::RouteBuilder;
+use backend::app::InterfaceConfig;
+use backend::routes::route_builder::RouteBuilder;
 use std::sync::Arc;
 use tower_http::cors::{Any, CorsLayer};
 
@@ -11,7 +11,7 @@ const LISTENING_ADDRESS: &str = "0.0.0.0:8080";
 
 #[tokio::main]
 async fn main() {
-  query_interface_backend::logging::setup_logging_config().unwrap();
+  backend::logging::setup_logging_config().unwrap();
 
   let interface_config = InterfaceConfig::new().await.unwrap();
 

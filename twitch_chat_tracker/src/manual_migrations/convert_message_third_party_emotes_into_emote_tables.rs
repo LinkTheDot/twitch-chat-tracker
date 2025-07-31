@@ -16,24 +16,24 @@ use twitch_chat_tracker::{
 
 #[allow(dead_code)]
 pub async fn run() -> ! {
-  // let database_connection = get_database_connection().await;
-  // let messages = stream_message::Entity::find()
-  //   .filter(stream_message::Column::ThirdPartyEmotesUsed.is_not_null())
-  //   .all(database_connection)
-  //   .await
-  //   .unwrap();
-  // let channels = get_all_channels(&messages, database_connection)
-  //   .await
-  //   .unwrap();
-  // let channel_logins: Vec<String> = channels
-  //   .iter()
-  //   .map(|channel| channel.login_name.clone())
-  //   .collect();
-  //
-  // EmoteListStorage::new(&channel_logins, database_connection)
-  //   .await
-  //   .unwrap();
-  //
+  let database_connection = get_database_connection().await;
+  let messages = stream_message::Entity::find()
+    .filter(stream_message::Column::ThirdPartyEmotesUsed.is_not_null())
+    .all(database_connection)
+    .await
+    .unwrap();
+  let channels = get_all_channels(&messages, database_connection)
+    .await
+    .unwrap();
+  let channel_logins: Vec<String> = channels
+    .iter()
+    .map(|channel| channel.login_name.clone())
+    .collect();
+
+  EmoteListStorage::new(&channel_logins, database_connection)
+    .await
+    .unwrap();
+
   std::process::exit(0);
 }
 

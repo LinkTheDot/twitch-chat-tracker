@@ -35,9 +35,8 @@ impl TwitchIrc {
     let mut irc_client = Self::get_irc_client().await?;
     let irc_client_stream = irc_client.stream()?;
     let database_connection = get_database_connection().await;
-    let third_party_emote_lists = EmoteListStorage::new(AppConfig::channels(), database_connection).await?;
-
-    tracing::info!("Third party emote lists: {:#?}", third_party_emote_lists);
+    let third_party_emote_lists =
+      EmoteListStorage::new(AppConfig::channels(), database_connection).await?;
 
     Ok(Self {
       irc_client,

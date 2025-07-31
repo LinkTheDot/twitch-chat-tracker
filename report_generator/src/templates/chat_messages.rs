@@ -153,9 +153,13 @@ async fn emote_filtered_messages<'a>(
   messages: Vec<&'a stream_message::Model>,
   database_connection: &DatabaseConnection,
 ) -> Result<Vec<&'a stream_message::Model>, AppError> {
-  let mut end_list = vec![];
+  let mut end_list: HashMap<i32, &stream_message::Model> = HashMap::default();
 
   for message in messages {
+    if end_list.contains_key(&message.id) {
+      continue;
+    }
+
     let Some(contents) = &message.contents else {
       tracing::error!(
         "Failed to get message with null contents. Message ID: {}",
@@ -163,7 +167,10 @@ async fn emote_filtered_messages<'a>(
       );
       continue;
     };
-    let word_count = contents.split_whitespace().count();
+    let word_count = contents
+      .split_whitespace()
+      .filter(|word| !word.is_empty())
+      .count() as f32;
 
     let sum_usage_query = format!(
       "SELECT COALESCE(SUM({}), 0) AS total FROM {} WHERE {} = {}",
@@ -174,17 +181,19 @@ async fn emote_filtered_messages<'a>(
     );
     let sum_usage_statement = Statement::from_string(DatabaseBackend::MySql, sum_usage_query);
     let Some(query_result) = database_connection.query_one(sum_usage_statement).await? else {
+      tracing::warn!("Skipping result for message {} at step 1", message.id);
       continue;
     };
     let total_emotes_used: Decimal = query_result.try_get("", "total")?;
     let Some(total_emotes_used) = total_emotes_used.to_f32() else {
+      tracing::warn!("Skipping result for message {} at step 2", message.id);
       continue;
     };
 
-    if total_emotes_used / word_count as f32 <= EMOTE_DOMINANCE {
-      end_list.push(message)
+    if total_emotes_used / word_count <= EMOTE_DOMINANCE {
+      end_list.insert(message.id, message);
     }
   }
 
-  Ok(end_list)
+  Ok(end_list.into_values().collect())
 }

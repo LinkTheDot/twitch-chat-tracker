@@ -3,6 +3,7 @@
 use database_connection::get_database_connection;
 use entities::*;
 use sea_orm::*;
+use sea_query::Expr;
 use std::collections::HashSet;
 use twitch_chat_tracker::{
   channel::third_party_emote_list_storage::EmoteListStorage, errors::AppError,
@@ -18,7 +19,7 @@ use twitch_chat_tracker::{
 pub async fn run() -> ! {
   let database_connection = get_database_connection().await;
   let messages = stream_message::Entity::find()
-    .filter(stream_message::Column::ThirdPartyEmotesUsed.is_not_null())
+    .filter(Expr::col("third_party_emotes_used").is_not_null())
     .all(database_connection)
     .await
     .unwrap();

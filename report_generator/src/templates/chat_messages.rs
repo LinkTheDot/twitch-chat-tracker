@@ -197,3 +197,46 @@ async fn emote_filtered_messages<'a>(
 
   Ok(end_list.into_values().collect())
 }
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+  use crate::testing_helper_methods::*;
+  use sea_orm::{DatabaseBackend, MockDatabase};
+  use std::collections::BTreeMap;
+
+  #[tokio::test]
+  async fn emote_filtered_messages_gives_expected_result() {
+    let mock_database = MockDatabase::new(DatabaseBackend::MySql)
+      .append_query_results([
+        vec![generate_total_query_result(3)],
+        vec![generate_total_query_result(7)],
+        vec![generate_total_query_result(2)],
+        vec![generate_total_query_result(0)],
+      ])
+      .into_connection();
+    let expected_message_ids = [2, 3, 4];
+    let messages = vec![
+      generate_message(1, 2, "emote1, emote2, emote3"), //                 100% emotes
+      generate_message(2, 2, "e1, e2, e3, e4, e5, e6, e7, w1, w2, w3"), // 70% emotes
+      generate_message(3, 2, "emote1, emote2, word1, word2"), //           50% emotes
+      generate_message(4, 2, "word1, word2"),           //                 0% emotes
+    ];
+
+    let filtered_messages = emote_filtered_messages(messages.iter().collect(), &mock_database)
+      .await
+      .unwrap();
+
+    let mut sorted_message_ids: Vec<i32> = filtered_messages
+      .into_iter()
+      .map(|message| message.id)
+      .collect();
+    sorted_message_ids.sort();
+
+    assert_eq!(sorted_message_ids, expected_message_ids);
+  }
+
+  fn generate_total_query_result(amount: i32) -> BTreeMap<&'static str, sea_orm::Value> {
+    BTreeMap::from([("total", sea_orm::Value::from(Decimal::from(amount)))])
+  }
+}

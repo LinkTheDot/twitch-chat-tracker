@@ -738,14 +738,11 @@ impl<'a> MessageParser<'a> {
 
 #[cfg(test)]
 mod tests {
-  use crate::channel::third_party_emote_list::{self, EmoteList};
-
   use super::*;
   use chrono::{DateTime, TimeZone, Utc};
   use irc::proto::message::Tag as IrcTag;
   use irc::proto::{Command, Prefix};
   use sea_orm_active_enums::ExternalService;
-  use serde_json::json;
 
   #[tokio::test]
   async fn parse_timeout_expected_value() {

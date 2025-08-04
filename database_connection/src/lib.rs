@@ -64,35 +64,29 @@ async fn run_migration(database: &DatabaseConnection) -> anyhow::Result<()> {
   Migrator::up(database, None).await?;
 
   let check_tables = [
-    "twitch_user",
+    "donation_event",
+    "emote",
+    "emote_usage",
+    "gift_sub_recipient",
+    "raid",
     "stream",
     "stream_message",
-    "emote",
     "stream_name",
-    "donation_event",
     "subscription_event",
-    "user_timeout",
-    "unknown_user",
-    "twitch_user_unknown_user_association",
+    "twitch_user",
     "twitch_user_name_change",
+    "twitch_user_unknown_user_association",
+    "unknown_user",
+    "user_timeout",
   ];
 
-  for table in check_tables {
-    check_if_has_table(&schema_manager, table).await?;
-  }
-
-  Ok(())
-}
-
-async fn check_if_has_table(
-  schema_manager: &SchemaManager<'_>,
-  table_name: &'static str,
-) -> anyhow::Result<()> {
-  if !schema_manager.has_table(table_name).await? {
-    return Err(anyhow!(
-      "Failed to migrate the database due to a missing table: `{:?}`",
-      table_name
-    ));
+  for table_name in check_tables {
+    if !schema_manager.has_table(table_name).await? {
+      return Err(anyhow!(
+        "Failed to migrate the database due to a missing table: `{:?}`",
+        table_name
+      ));
+    }
   }
 
   Ok(())

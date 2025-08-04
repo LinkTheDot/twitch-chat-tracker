@@ -181,9 +181,13 @@ impl ChatStatistics {
       messages_with_totals
         .into_iter()
         .filter(|(_id, (contents, emote_usage))| {
-          let word_count = contents.split_whitespace().count() as f32;
+          let word_count = contents
+            .split_whitespace()
+            .filter(|word| !word.is_empty())
+            .count() as f32;
+          let emote_usage = *emote_usage as f32;
 
-          *emote_usage as f32 / word_count <= EMOTE_DOMINANCE
+          emote_usage / word_count > EMOTE_DOMINANCE
         })
         .count() as i32,
     )
@@ -325,5 +329,68 @@ mod subscriptions {
         .await
         .map_err(Into::into)
     }
+  }
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+  use crate::testing_helper_methods::generate_message;
+
+  #[tokio::test]
+  async fn emote_dominant_chats_method_returns_expected_sum() {
+    let mock_database = MockDatabase::new(DatabaseBackend::MySql)
+      .append_query_results([vec![
+        // 100% emotes
+        EmoteUsageWithContents {
+          usage_count: 2,
+          emote_id: 1,
+          stream_message_id: 1,
+          contents: Some(String::from("e1, e1, e2")),
+        }
+        .to_queryable_result(),
+        // 100% emotes
+        EmoteUsageWithContents {
+          usage_count: 1,
+          emote_id: 2,
+          stream_message_id: 1,
+          contents: Some(String::from("e1, e1, e2")),
+        }
+        .to_queryable_result(),
+        // 70% emotes
+        EmoteUsageWithContents {
+          usage_count: 7,
+          emote_id: 1,
+          stream_message_id: 2,
+          contents: Some(String::from("e1, e1, e1, e1, e1, e1, e1, w1, w2, w3")),
+        }
+        .to_queryable_result(),
+        // 50% emotes
+        EmoteUsageWithContents {
+          usage_count: 2,
+          emote_id: 1,
+          stream_message_id: 3,
+          contents: Some(String::from("e1, e1, w1, w1")),
+        }
+        .to_queryable_result(),
+        // 25% emotes
+        EmoteUsageWithContents {
+          usage_count: 1,
+          emote_id: 2,
+          stream_message_id: 4,
+          contents: Some(String::from("e2, w1, w2, w3")),
+        }
+        .to_queryable_result(),
+      ]])
+      .into_connection();
+    let query_conditions = AppQueryConditions::from_stream_id(0);
+    let expected_sum = 1;
+
+    let emote_dominant_chats_sum =
+      ChatStatistics::emote_dominant_chats(&query_conditions, &mock_database)
+        .await
+        .unwrap();
+
+    assert_eq!(emote_dominant_chats_sum, expected_sum);
   }
 }

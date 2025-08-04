@@ -13,6 +13,8 @@ pub mod logging;
 pub mod pastebin;
 pub mod query_result_models;
 pub mod templates;
+#[cfg(test)]
+pub mod testing_helper_methods;
 pub mod upload_reports;
 
 /// Message containing this percentage of emotes per word is emote dominant.
@@ -24,7 +26,8 @@ pub async fn generate_reports(
   query_conditions: AppQueryConditions,
   streamer_twitch_user_id: i32,
 ) -> Result<Vec<(&'static str, String)>, AppError> {
-  let monthly_condition = AppQueryConditions::from_month(Some(6), streamer_twitch_user_id)?;
+  let monthly_condition =
+    AppQueryConditions::from_month(Args::get_month(), streamer_twitch_user_id)?;
 
   let general_stats_report = get_chat_statistics_template(&query_conditions, false)
     .await

@@ -28,9 +28,9 @@ spec:
                   name: twitch-chat-logger
                   key: twitchClientId
             - name: CONFIG_PATH
-              value: "/app/config/deploy_config.yml"
+              value: "/app/config_files/deploy_config.yml"
             - name: DATABASE_HOST_ADDRESS
               value: "mysql" # resolves to the mysql service running in the cluster
             - name: TRACKED_CHANNELS
-              value: 'fallenshadow,shadowchama,linkthedot,kitanya_is_here,alicesawyer,inislein'
-              # ,ninaninin,vividlyvivi,lilyhops
+              value: 'fallenshadow,shadowchama,linkthedot,ninaninin,alicesawyer,inislein'
+              # kitanya_is_here,vividlyvivi,lilyhops

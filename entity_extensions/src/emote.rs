@@ -4,6 +4,11 @@ use sea_orm::*;
 use crate::errors::EntityExtensionError;
 
 pub trait EmoteExtensions {
+  async fn get_or_set_active_model(
+    emote_active_model: emote::ActiveModel,
+    database_connection: &DatabaseConnection,
+  ) -> Result<emote::Model, EntityExtensionError>;
+
   async fn get_or_set_third_party_emote_by_external_id(
     emote_id: &str,
     emote_name: &str,
@@ -13,6 +18,31 @@ pub trait EmoteExtensions {
 }
 
 impl EmoteExtensions for emote::Model {
+  async fn get_or_set_active_model(
+    emote_active_model: emote::ActiveModel,
+    database_connection: &DatabaseConnection,
+  ) -> Result<emote::Model, EntityExtensionError> {
+    let Some(external_id) = emote_active_model.external_id.try_as_ref() else {
+      return Err(EntityExtensionError::FailedToGetValue {
+        value_name: "external_id",
+        location: "emote get_or_set_active_model",
+        additional_data: "".into(),
+      });
+    };
+    let maybe_emote = emote::Entity::find()
+      .filter(emote::Column::ExternalId.eq(external_id))
+      .one(database_connection)
+      .await?;
+
+    match maybe_emote {
+      Some(emote) => Ok(emote),
+      None => emote_active_model
+        .insert(database_connection)
+        .await
+        .map_err(Into::into),
+    }
+  }
+
   async fn get_or_set_third_party_emote_by_external_id(
     external_emote_id: &str,
     emote_name: &str,

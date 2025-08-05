@@ -17,9 +17,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
   ca-certificates \
   && rm -rf /var/lib/apt/lists/*
 
-COPY --from=builder /app/target/x86_64-unknown-linux-gnu/release/twitch-chat-logger /app/
+COPY --from=builder /app/target/x86_64-unknown-linux-gnu/release/twitch_chat_tracker /app/
 COPY --from=builder /app/config_files/deploy_config.yml /app/config_files/deploy_config.yml
 
 WORKDIR /app
 
-CMD ["./twitch-chat-logger"]
+CMD ["./twitch_chat_tracker"]

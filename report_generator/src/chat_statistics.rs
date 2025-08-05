@@ -335,7 +335,6 @@ mod subscriptions {
 #[cfg(test)]
 mod tests {
   use super::*;
-  use crate::testing_helper_methods::generate_message;
 
   #[tokio::test]
   async fn emote_dominant_chats_method_returns_expected_sum() {

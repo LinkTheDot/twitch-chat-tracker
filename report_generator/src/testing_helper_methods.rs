@@ -1,8 +1,6 @@
 use chrono::{DateTime, TimeZone, Utc};
 use entities::stream_message;
 
-use crate::conditions::query_conditions::AppQueryConditions;
-
 /// Creates a message with the given data, and every other value being set to 0. Except for the `is_subscribed` column which is set to true.
 pub fn generate_message(message_id: i32, user_id: i32, contents: &str) -> stream_message::Model {
   stream_message::Model {

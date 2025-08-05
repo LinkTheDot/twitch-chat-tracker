@@ -1,5 +1,6 @@
 use crate::{channel::third_party_emote_list_storage::EmoteListStorage, errors::AppError};
 use entities::*;
+use entity_extensions::emote::EmoteExtensions;
 use sea_orm::*;
 use sea_orm_active_enums::ExternalService;
 use std::{collections::HashMap, marker::PhantomData};
@@ -79,8 +80,9 @@ impl ParsedStreamMessage<'_, Model> {
   ) -> Result<Vec<emote_usage::ActiveModel>, AppError> {
     let mut emote_usage_active_models =
       self.parse_7tv_emote_usage_from_message(third_party_emote_list_storage);
-    let twitch_emote_usage_active_models =
-      self.parse_twitch_emote_usage_from_message(database_connection).await?;
+    let twitch_emote_usage_active_models = self
+      .parse_twitch_emote_usage_from_message(database_connection)
+      .await?;
 
     emote_usage_active_models.extend(twitch_emote_usage_active_models);
 
@@ -127,8 +129,7 @@ impl ParsedStreamMessage<'_, Model> {
   async fn parse_twitch_emote_usage_from_message(
     &self,
     database_connection: &DatabaseConnection,
-  ) -> Result<Vec<emote_usage::ActiveModel>, AppError> {
-    let StoredMessageModel::Model(stream_message) = &self.stream_message_model else {
+  ) -> Result<Vec<emote_usage::ActiveModel>, AppError> { let StoredMessageModel::Model(stream_message) = &self.stream_message_model else {
       tracing::error!("Unreachable broken state has been reached when parsing a stream message. Message dump: {:#?}", self);
 
       return Ok(vec![]);
@@ -145,7 +146,7 @@ impl ParsedStreamMessage<'_, Model> {
       usage_count,
     } in emote_usage_data
     {
-      let emote = emote_active_model.insert(database_connection).await?;
+      let emote = emote::Model::get_or_set_active_model(emote_active_model, database_connection).await?;
 
       let emote_usage = emote_usage::ActiveModel {
         stream_message_id: Set(stream_message.id),

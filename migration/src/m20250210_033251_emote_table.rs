@@ -18,7 +18,12 @@ impl MigrationTrait for Migration {
               .primary_key()
               .auto_increment(),
           )
-          .col(ColumnDef::new(Emote::TwitchId).string().not_null())
+          .col(
+            ColumnDef::new(Emote::TwitchId)
+              .string()
+              .unique_key()
+              .not_null(),
+          )
           .col(ColumnDef::new(Emote::Name).string().not_null())
           .to_owned(),
       )

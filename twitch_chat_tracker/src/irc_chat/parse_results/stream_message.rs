@@ -129,7 +129,8 @@ impl ParsedStreamMessage<'_, Model> {
   async fn parse_twitch_emote_usage_from_message(
     &self,
     database_connection: &DatabaseConnection,
-  ) -> Result<Vec<emote_usage::ActiveModel>, AppError> { let StoredMessageModel::Model(stream_message) = &self.stream_message_model else {
+  ) -> Result<Vec<emote_usage::ActiveModel>, AppError> {
+    let StoredMessageModel::Model(stream_message) = &self.stream_message_model else {
       tracing::error!("Unreachable broken state has been reached when parsing a stream message. Message dump: {:#?}", self);
 
       return Ok(vec![]);
@@ -146,7 +147,8 @@ impl ParsedStreamMessage<'_, Model> {
       usage_count,
     } in emote_usage_data
     {
-      let emote = emote::Model::get_or_set_active_model(emote_active_model, database_connection).await?;
+      let emote =
+        emote::Model::get_or_set_active_model(emote_active_model, database_connection).await?;
 
       let emote_usage = emote_usage::ActiveModel {
         stream_message_id: Set(stream_message.id),

@@ -184,8 +184,9 @@ impl TwitchIrc {
     let Some(message_parser) = MessageParser::new(&message, &third_party_emote_lists)? else {
       return Ok(());
     };
+    let database_connection = get_database_connection().await;
 
-    let result = message_parser.parse().await;
+    let result = message_parser.parse(database_connection).await;
 
     if let Err(error) = &result {
       if !error.is_unique_constraint_violation() {

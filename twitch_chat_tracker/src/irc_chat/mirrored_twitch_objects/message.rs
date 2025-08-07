@@ -15,7 +15,7 @@ pub struct TwitchIrcMessage {
 
 impl TwitchIrcMessage {
   pub const STREAMELEMENTS_TWITCH_ID: &str = "100135110";
-  const IGNORED_MESSAGE_IDS: &[&str] = &["bitsbadgetier", "announcement", "viewermilestone"];
+  pub const IGNORED_MESSAGE_IDS: &[&str] = &["bitsbadgetier", "announcement", "viewermilestone"];
 
   pub fn new(message: &IrcMessage) -> Result<Option<Self>, AppError> {
     let Some(mut tags) = TwitchIrcTagValues::new(message)? else {
@@ -122,6 +122,15 @@ impl TwitchIrcMessage {
   /// returned in most cases where the message was something else.
   fn is_user_message(tags: &TwitchIrcTagValues, message: &IrcMessage) -> bool {
     tags.display_name().is_some() && matches!(message.command, Command::PRIVMSG(_, _))
+  }
+
+  pub fn message_type_has_user_message_attached(&self) -> bool {
+    [
+      TwitchMessageType::UserMessage,
+      TwitchMessageType::Bits,
+      TwitchMessageType::StreamlabsDonation,
+    ]
+    .contains(&self.message_type)
   }
 
   pub fn is_shared_chat(&self) -> bool {

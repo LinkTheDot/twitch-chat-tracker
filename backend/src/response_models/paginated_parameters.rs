@@ -1,9 +1,14 @@
+use serde::Deserialize;
+
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct PaginationParameters {
-  #[serde(default = "default_page")]
+  #[serde(default = "default_page", deserialize_with = "deserialize_from_string")]
   pub page: u64,
 
-  #[serde(default = "default_page_size")]
+  #[serde(
+    default = "default_page_size",
+    deserialize_with = "deserialize_from_string"
+  )]
   pub page_size: u64,
 }
 
@@ -22,4 +27,15 @@ impl PaginationParameters {
       ..self
     }
   }
+}
+
+fn deserialize_from_string<'de, T, D>(deserializer: D) -> Result<T, D::Error>
+where
+  T: std::str::FromStr,
+  T::Err: std::fmt::Display,
+  D: serde::Deserializer<'de>,
+{
+  String::deserialize(deserializer)?
+    .parse()
+    .map_err(serde::de::Error::custom)
 }

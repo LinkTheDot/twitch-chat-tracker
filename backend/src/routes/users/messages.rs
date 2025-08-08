@@ -47,21 +47,31 @@ pub async fn get_messages(
 
   let mut user_messages_query = stream_message::Entity::find()
     .filter(stream_message::Column::TwitchUserId.eq(user.id))
-    .filter(stream_message::Column::ChannelId.eq(channel.id));
+    .filter(stream_message::Column::ChannelId.eq(channel.id))
+    .order_by(stream_message::Column::Timestamp, Order::Desc);
 
   if let Some(message_search) = query_payload.message_search {
     user_messages_query =
       user_messages_query.filter(stream_message::Column::Contents.contains(message_search));
   }
 
-  let user_messages = user_messages_query
-    .limit(pagination.page_size)
-    .offset((pagination.page - 1) * pagination.page_size)
-    .order_by(stream_message::Column::Timestamp, Order::Desc)
-    .all(database_connection)
-    .await?;
+  let paginated_user_messages =
+    user_messages_query.paginate(database_connection, pagination.page_size);
+  let user_messages = paginated_user_messages.fetch_page(pagination.page).await?;
 
-  todo!("Get user messages back-end")
+  let user_messages_dtos =
+    StreamMessageDto::convert_messages(user_messages, user, channel, database_connection).await?;
+  let ItemsAndPagesNumber {
+    number_of_items,
+    number_of_pages,
+  } = paginated_user_messages.num_items_and_pages().await?;
+
+  Ok(axum::Json(PaginatedResponse {
+    item: user_messages_dtos,
+    total_items: number_of_items,
+    total_pages: number_of_pages,
+    page_size: pagination.page_size,
+  }))
 }
 
 async fn get_channel(

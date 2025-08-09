@@ -14,11 +14,11 @@ export interface ResponsiveDataDisplayProps<T> {
   emptyMessage?: string;
 }
 
-export function ResponsiveDataDisplay<T>({ 
-  data, 
-  columns, 
-  rowKey, 
-  emptyMessage = "No results found." 
+export function ResponsiveDataDisplay<T>({
+  data,
+  columns,
+  rowKey,
+  emptyMessage = "No results found."
 }: ResponsiveDataDisplayProps<T>) {
   if (!data || data.length === 0) {
     return (
@@ -34,7 +34,7 @@ export function ResponsiveDataDisplay<T>({
       <div className="md:hidden space-y-4">
         {data.map((item) => {
           const rowKeyValue = typeof rowKey === 'function' ? rowKey(item) : item[rowKey] as string | number;
-          
+
           return (
             <div key={rowKeyValue} className="bg-gray-900 rounded-lg border border-gray-800 p-4 space-y-3">
               {columns.map((column, colIndex) => (
@@ -56,7 +56,7 @@ export function ResponsiveDataDisplay<T>({
       <div className="hidden md:grid lg:hidden grid-cols-1 gap-4">
         {data.map((item) => {
           const rowKeyValue = typeof rowKey === 'function' ? rowKey(item) : item[rowKey] as string | number;
-          
+
           return (
             <div key={rowKeyValue} className="bg-gray-900 rounded-lg border border-gray-800 p-6">
               <div className="grid grid-cols-2 gap-4">
@@ -92,7 +92,7 @@ export function ResponsiveDataDisplay<T>({
             <tbody className="divide-y divide-gray-800">
               {data.map((item) => {
                 const rowKeyValue = typeof rowKey === 'function' ? rowKey(item) : item[rowKey] as string | number;
-                
+
                 return (
                   <tr key={rowKeyValue} className="hover:bg-gray-800/50 transition-colors">
                     {columns.map((column, colIndex) => (

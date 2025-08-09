@@ -6,6 +6,7 @@ import { UserResults } from './components/UserResults';
 import { NameChangeResults } from './components/NameChangesResults';
 import { SubscriptionResults } from './components/SubscriptionResults';
 import { FollowingResults } from './components/FollowingResults';
+import { ReturnToTopButton } from './components/ReturnToTopButton';
 
 export default function App() {
   const [currentCategory, setCurrentCategory] = useState<CategoryState>(CategoryState.Users);
@@ -29,6 +30,9 @@ export default function App() {
           <QueryForm onSubmitQuery={setQueryForm} />
         </div>
 
+        <div>
+          <ReturnToTopButton />
+        </div>
 
         <main className="mx-auto">
           {queryFormData.category == CategoryState.Users && (

@@ -1,4 +1,4 @@
-import { DataTable, Column } from './DataTable';
+import { ResponsiveDataDisplay, Column } from './ResponsiveDataDisplay';
 import { User, UserRequest, UserRequestType } from '../types/users';
 import { getUsers } from '../services/users'; // Import the new custom hook
 import { QueryFormData } from '../components/QueryForm';
@@ -27,23 +27,32 @@ export function UserResults(props: UserResultsProps) {
   ];
 
   if (isLoading) {
-    return <div className="nondata_message">Loading users...</div>;
+    return (
+      <div className="flex justify-center items-center py-12">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-500"></div>
+        <span className="ml-3 text-gray-400">Loading users...</span>
+      </div>
+    );
   }
 
   if (error) {
-    return <div className="nondata_message">Error: {error.message || "Failed to fetch users."}</div>;
+    return (
+      <div className="bg-red-900/20 border border-red-800 rounded-lg p-6 text-center">
+        <p className="text-red-400">Error: {error.message || "Failed to fetch users."}</p>
+      </div>
+    );
   }
 
   return (
-    <div>
+    <>
       {users && (
-        <DataTable
+        <ResponsiveDataDisplay
           data={users}
           columns={userColumns}
           rowKey="id"
           emptyMessage="No users found."
         />
       )}
-    </div>
+    </>
   );
 }

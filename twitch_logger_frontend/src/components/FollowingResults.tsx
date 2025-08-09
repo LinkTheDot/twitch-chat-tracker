@@ -1,8 +1,7 @@
 import { getFollowing } from "../services/Followers";
 import { Follow, FollowingRequest } from "../types/Followers";
-import { Column, DataTable } from "./DataTable";
+import { Column, ResponsiveDataDisplay } from "./ResponsiveDataDisplay";
 import { QueryFormData } from "./QueryForm";
-import "./FollowingResults.css";
 
 export interface FollowingResultsProps {
   queryResults: QueryFormData;
@@ -23,8 +22,9 @@ export function FollowingResults(props: FollowingResultsProps) {
       render: (item) => (
         item.avatar && (
           <img
-            className="following_avatar"
+            className="w-10 h-10 rounded-full object-cover"
             src={item.avatar}
+            alt={`${item.displayName} avatar`}
           />
         )
       )
@@ -35,23 +35,32 @@ export function FollowingResults(props: FollowingResultsProps) {
   ];
 
   if (isLoading) {
-    return <div className="nondata_message">Loading users...</div>;
+    return (
+      <div className="flex justify-center items-center py-12">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-500"></div>
+        <span className="ml-3 text-gray-400">Loading following list...</span>
+      </div>
+    );
   }
 
   if (error) {
-    return <div className="nondata_message">Error: {error.message || "Failed to fetch users."}</div>;
+    return (
+      <div className="bg-red-900/20 border border-red-800 rounded-lg p-6 text-center">
+        <p className="text-red-400">Error: {error.message || "Failed to fetch following list."}</p>
+      </div>
+    );
   }
 
   return (
-    <div>
+    <>
       {following && (
-        <DataTable
+        <ResponsiveDataDisplay
           data={following}
           columns={followingColumns}
           rowKey="id"
-          emptyMessage="No name changes found."
+          emptyMessage="No following data found."
         />
       )}
-    </div>
+    </>
   );
 }

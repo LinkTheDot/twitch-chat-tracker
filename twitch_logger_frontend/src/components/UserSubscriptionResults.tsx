@@ -1,6 +1,5 @@
 import { UserSubscription } from "../types/Subscriptions";
-import { Column, DataTable } from "./DataTable";
-import "./UserSubscriptionResponse.css";
+import { Column, ResponsiveDataDisplay } from "./ResponsiveDataDisplay";
 
 export interface UserSubscriptionResultsProps {
   subscriptions: UserSubscription[],
@@ -23,15 +22,16 @@ export function UserSubscriptionResults(props: UserSubscriptionResultsProps) {
   ];
 
   return (
-    <div className="user_subscriptions_data_table">
+    <>
+      <h3 className="text-xl font-semibold text-gray-200 mb-4">User Subscriptions</h3>
       {props.subscriptions && (
-        <DataTable
+        <ResponsiveDataDisplay
           data={props.subscriptions}
           columns={userSubscriptionColumns}
           rowKey="id"
           emptyMessage="No user subscriptions found."
         />
       )}
-    </div>
+    </>
   );
 }

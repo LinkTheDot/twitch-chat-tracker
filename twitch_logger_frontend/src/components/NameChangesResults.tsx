@@ -1,7 +1,7 @@
 import { getNameChanges } from "../services/NameChanges";
 import { NameChange, NameChangeRequest } from "../types/NameChanges";
 import { UserRequestType } from "../types/users";
-import { Column, DataTable } from "./DataTable";
+import { Column, ResponsiveDataDisplay } from "./ResponsiveDataDisplay";
 import { QueryFormData } from "./QueryForm";
 
 export interface NameChangeResultsProps {
@@ -27,23 +27,32 @@ export function NameChangeResults(props: NameChangeResultsProps) {
   ];
 
   if (isLoading) {
-    return <div className="nondata_message">Loading users...</div>;
+    return (
+      <div className="flex justify-center items-center py-12">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-500"></div>
+        <span className="ml-3 text-gray-400">Loading name changes...</span>
+      </div>
+    );
   }
 
   if (error) {
-    return <div className="nondata_message">Error: {error.message || "Failed to fetch users."}</div>;
+    return (
+      <div className="bg-red-900/20 border border-red-800 rounded-lg p-6 text-center">
+        <p className="text-red-400">Error: {error.message || "Failed to fetch name changes."}</p>
+      </div>
+    );
   }
 
   return (
-    <div>
+    <>
       {nameChanges && (
-        <DataTable
+        <ResponsiveDataDisplay
           data={nameChanges}
           columns={nameChangeColumns}
           rowKey="twitch_user_twitch_id"
           emptyMessage="No name changes found."
         />
       )}
-    </div>
+    </>
   );
 }

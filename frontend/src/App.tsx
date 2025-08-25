@@ -17,20 +17,21 @@ export default function App() {
     category: CategoryState.Users,
     channelSearchQuery: "",
     userSearchQuery: "",
+    messageSearch: "",
   });
   const [pagination, setPagination] = useState<Pagination | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(false);
 
-const updateIsLoading = (isLoadingChange: boolean): void => {
-  if (isLoadingChange) {
-    setIsLoading(true);
-  } else {
-    // Delay setting to false by 100ms to avoid page cycling bug.
-    setTimeout(() => {
-      setIsLoading(false);
-    }, 100);
-  }
-};
+  const updateIsLoading = (isLoadingChange: boolean): void => {
+    if (isLoadingChange) {
+      setIsLoading(true);
+    } else {
+      // Delay setting to false by 100ms to avoid page cycling bug.
+      setTimeout(() => {
+        setIsLoading(false);
+      }, 100);
+    }
+  };
 
   const updatePagination = (paginationChange: Pagination | null): void => {
     console.log(`Updating pagination: totalItems=${paginationChange?.totalItems} totalPages=${paginationChange?.totalPages} page=${paginationChange?.page} totalSize=${paginationChange?.totalSize}`);
@@ -42,7 +43,6 @@ const updateIsLoading = (isLoadingChange: boolean): void => {
     setPagination(null);
     setQueryForm(data);
   };
-
 
   return (
     <div className="min-h-screen bg-gray-950 text-gray-100">

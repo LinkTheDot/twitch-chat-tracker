@@ -51,7 +51,10 @@ pub async fn get_subscriptions(
   } else {
     None
   };
-  let users = query_payload.get_user_query()?.all(database_connection).await?;
+  let users = query_payload
+    .get_user_query()?
+    .all(database_connection)
+    .await?;
   let user_ids: Vec<i32> = users.iter().map(|user| user.id).collect();
   let subscription_event_query = get_subscription_query(user_ids.clone(), &channel);
   let gift_sub_recipient_query = get_gift_sub_recipient_query(user_ids, &channel);

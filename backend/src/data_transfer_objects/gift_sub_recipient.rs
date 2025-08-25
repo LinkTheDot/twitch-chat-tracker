@@ -72,8 +72,9 @@ impl GiftSubRecipientDto {
     filter_for_channel: Option<twitch_user::Model>,
     database_connection: &DatabaseConnection,
   ) -> Result<Vec<Self>, AppError> {
-    let mut gift_subs_received_query = gift_sub_recipient::Entity::find().find_also_related(donation_event::Entity);
-      
+    let mut gift_subs_received_query =
+      gift_sub_recipient::Entity::find().find_also_related(donation_event::Entity);
+
     if let Some(filter_for_channel) = filter_for_channel {
       gift_subs_received_query = gift_subs_received_query
         .filter(donation_event::Column::DonationReceiverTwitchUserId.eq(filter_for_channel.id));
@@ -81,16 +82,21 @@ impl GiftSubRecipientDto {
 
     let gift_subs_received_with_donation_events = gift_subs_received_query
       .filter(gift_sub_recipient::Column::TwitchUserId.eq(gift_sub_recipient.id))
-      .all(database_connection).await?;
+      .all(database_connection)
+      .await?;
 
     let mut end_list = vec![];
 
     for (recipient, related_donation_event) in gift_subs_received_with_donation_events {
       let Some(related_donation_event) = related_donation_event else {
-        tracing::warn!("Donation receipient (ID: {}) is missing a related donation event.", recipient.id);
+        tracing::warn!(
+          "Donation receipient (ID: {}) is missing a related donation event.",
+          recipient.id
+        );
         continue;
       };
-      let donation_event_dto = DonationEventDto::from_donation_event(related_donation_event, database_connection).await?;
+      let donation_event_dto =
+        DonationEventDto::from_donation_event(related_donation_event, database_connection).await?;
 
       let recipient = GiftSubRecipientDto {
         id: recipient.id,

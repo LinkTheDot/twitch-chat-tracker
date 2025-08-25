@@ -1,12 +1,12 @@
 use super::MessageParser;
-use entities::sea_orm_active_enums::EventType;
-use irc::client::prelude::*;
-use crate::irc_chat::message_parser::streamlabs_donation::StreamlabsDonation;
 use crate::errors::AppError;
+use crate::irc_chat::message_parser::streamlabs_donation::StreamlabsDonation;
 use crate::irc_chat::mirrored_twitch_objects::message::TwitchIrcMessage;
 use crate::irc_chat::mirrored_twitch_objects::twitch_message_type::TwitchMessageType;
+use entities::sea_orm_active_enums::EventType;
 use entities::*;
 use entity_extensions::prelude::*;
+use irc::client::prelude::*;
 use sea_orm::*;
 
 impl MessageParser<'_> {
@@ -102,14 +102,13 @@ impl MessageParser<'_> {
 
     Ok(donation_event)
   }
-
 }
 
 #[cfg(test)]
 mod tests {
   use super::*;
   use crate::channel::third_party_emote_list_storage::EmoteListStorage;
-use crate::testing_helper_methods::timestamp_from_string;
+  use crate::testing_helper_methods::timestamp_from_string;
   use irc::proto::message::Tag as IrcTag;
   use irc::proto::Message as IrcMessage;
   use irc::proto::{Command, Prefix};
@@ -185,6 +184,4 @@ use crate::testing_helper_methods::timestamp_from_string;
 
     (message, mock_database)
   }
-
-
 }

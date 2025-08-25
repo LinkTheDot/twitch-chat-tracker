@@ -24,7 +24,10 @@ pub async fn run_main_process(
         tracing::error!("=== PING TIMEOUT ERROR ===");
 
         if !reconnect_client(&mut irc_client, RECONNECT_ATTEMPTS).await {
-          tracing::error!("Failed to reconnect to Twitch's IRC servers after {} attempts. Exiting program.", RECONNECT_ATTEMPTS);
+          tracing::error!(
+            "Failed to reconnect to Twitch's IRC servers after {} attempts. Exiting program.",
+            RECONNECT_ATTEMPTS
+          );
 
           std::process::exit(1);
         }
@@ -40,7 +43,10 @@ pub async fn run_main_process(
         tracing::error!("Received an IO error: {:?}", error);
 
         if !reconnect_client(&mut irc_client, RECONNECT_ATTEMPTS).await {
-          tracing::error!("Failed to reconnect to Twitch's IRC servers after {} attempts. Exiting program.", RECONNECT_ATTEMPTS);
+          tracing::error!(
+            "Failed to reconnect to Twitch's IRC servers after {} attempts. Exiting program.",
+            RECONNECT_ATTEMPTS
+          );
 
           std::process::exit(1);
         }
@@ -59,7 +65,7 @@ pub async fn run_main_process(
 ///
 /// False is returned if the client failed to reconnect after n attempts.
 async fn reconnect_client(irc_client: &mut TwitchIrc, total_attempts: usize) -> bool {
-  let mut attempts = 0; 
+  let mut attempts = 0;
 
   while let Err(error) = irc_client.reconnect().await {
     tracing::error!("Failed to reconnect the IRC client. Reason: `{:?}`", error);

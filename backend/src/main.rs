@@ -1,9 +1,9 @@
 #![allow(unused)]
 
 use axum::{Router, response::Html, routing::get};
-use http::{Method, header::CONTENT_TYPE};
 use backend::app::InterfaceConfig;
 use backend::routes::route_builder::RouteBuilder;
+use http::{Method, header::CONTENT_TYPE};
 use std::sync::Arc;
 use tower_http::cors::{Any, CorsLayer};
 

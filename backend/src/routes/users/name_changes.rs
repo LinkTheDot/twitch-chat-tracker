@@ -1,6 +1,11 @@
 use crate::{
-  app::InterfaceConfig, data_transfer_objects::twitch_user_name_change::TwitchUserNameChangeDto,
-  error::*, response_models::{paginated_parameters::PaginationParameters, paginatied_response::{PaginatedResponse, Pagination}},
+  app::InterfaceConfig,
+  data_transfer_objects::twitch_user_name_change::TwitchUserNameChangeDto,
+  error::*,
+  response_models::{
+    paginated_parameters::PaginationParameters,
+    paginatied_response::{PaginatedResponse, Pagination},
+  },
 };
 use axum::extract::{Query, State};
 use entities::*;
@@ -31,7 +36,8 @@ pub async fn get_name_changes(
     .clamped_page_size(MIN_PAGE_SIZE, MAX_PAGE_SIZE);
 
   let name_changes_query = build_query(query_payload)?;
-  let paginated_name_changes = name_changes_query.paginate(database_connection, pagination.page_size);
+  let paginated_name_changes =
+    name_changes_query.paginate(database_connection, pagination.page_size);
 
   let name_changes_and_users = paginated_name_changes.fetch_page(pagination.page).await?;
   let ItemsAndPagesNumber {
@@ -39,7 +45,8 @@ pub async fn get_name_changes(
     number_of_pages,
   } = paginated_name_changes.num_items_and_pages().await?;
 
-  let name_changes_dtos = TwitchUserNameChangeDto::from_name_changes_and_users(name_changes_and_users);
+  let name_changes_dtos =
+    TwitchUserNameChangeDto::from_name_changes_and_users(name_changes_and_users);
 
   Ok(axum::Json(PaginatedResponse {
     data: name_changes_dtos,
@@ -48,7 +55,7 @@ pub async fn get_name_changes(
       total_pages: number_of_pages,
       page: pagination.page,
       page_size: pagination.page_size,
-    }
+    },
   }))
 }
 

@@ -17,7 +17,7 @@ impl MigrationTrait for Migration {
           )
           .to_owned(),
       )
-    .await
+      .await
   }
 
   async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
@@ -28,7 +28,7 @@ impl MigrationTrait for Migration {
           .drop_column(StreamMessage::TwitchEmoteUsage)
           .to_owned(),
       )
-    .await
+      .await
   }
 }
 

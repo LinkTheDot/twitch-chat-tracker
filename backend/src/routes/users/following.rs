@@ -1,5 +1,7 @@
 use crate::{
-  app::InterfaceConfig, data_transfer_objects::follow::{Follow, FollowResponse}, error::AppError,
+  app::InterfaceConfig,
+  data_transfer_objects::follow::{Follow, FollowResponse},
+  error::AppError,
   routes::helpers::get_users::GetUsers,
 };
 use axum::extract::{Query, State};

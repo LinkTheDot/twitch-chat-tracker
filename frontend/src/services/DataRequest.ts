@@ -5,16 +5,18 @@ import { Pagination } from "../types/Pagination";
 export interface GetDataProps {
   requestUrl: string;
   updatePagination: (paginationResponse: Pagination | null) => void;
+  setIsLoading: (isLoading: boolean) => void;
 }
 
-export const useGetData = <T,>({ requestUrl, updatePagination }: GetDataProps): Response<T> => {
+export const useGetData = <T,>({ requestUrl, updatePagination, setIsLoading }: GetDataProps): Response<T> => {
   const [response_data, setResponseData] = useState<ResponseData<T> | null>(null);
   const [error, setError] = useState<any | null>(null);
-  const [isLoading, setIsLoading] = useState<boolean>(true);
 
   useEffect(() => {
     const fetchData = async () => {
       try {
+        setIsLoading(true);
+
         const response = await fetch(requestUrl);
         if (!response.ok) {
           throw new Error(`HTTP error! ${await response.text()}`);
@@ -44,6 +46,5 @@ export const useGetData = <T,>({ requestUrl, updatePagination }: GetDataProps): 
   return {
     response_data,
     error,
-    isLoading,
   };
 };

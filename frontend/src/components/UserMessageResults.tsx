@@ -1,4 +1,3 @@
-import React, { useEffect } from 'react';
 import { formatDate } from '../services/FormatDate';
 import { buildFetchUrl } from '../services/FetchUrl';
 import { useGetData } from '../services/DataRequest';
@@ -98,7 +97,7 @@ const MessageRow: React.FC<{ message: UserMessage; user: User }> = ({ message, u
             const textNode = document.createTextNode(emoteName);
             e.currentTarget.parentNode?.insertBefore(textNode, e.currentTarget);
           }}
-          onLoad={() => console.log(`Emote loaded: ${emoteName}`)}
+        // onLoad={() => console.log(`Emote loaded: ${emoteName}`)}
         />
       );
 
@@ -144,7 +143,7 @@ const MessageRow: React.FC<{ message: UserMessage; user: User }> = ({ message, u
             console.log('Badge image failed to load:', e);
             e.currentTarget.style.display = 'none';
           }}
-          onLoad={() => console.log('Badge image loaded successfully')}
+        // onLoad={() => console.log('Badge image loaded successfully')}
         />
       )}
 
@@ -193,18 +192,11 @@ export function MessageResults(props: MessageResultsProps) {
     additional: "page_size=1000"
   });
 
-  const { response_data, error, isLoading } = useGetData<UserMessageResponse>({ requestUrl, updatePagination: props.updatePagination });
-
-  useEffect(() => { props.setIsLoading(isLoading) }, [isLoading]);
-
-  if (isLoading) {
-    return (
-      <div className="flex justify-center items-center py-12">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-500"></div>
-        <span className="ml-3 text-gray-400">Loading user messages...</span>
-      </div>
-    );
-  }
+  const { response_data, error } = useGetData<UserMessageResponse>({
+    requestUrl,
+    updatePagination: props.updatePagination,
+    setIsLoading: props.setIsLoading
+  });
 
   if (error) {
     return (

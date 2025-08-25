@@ -21,6 +21,17 @@ export default function App() {
   const [pagination, setPagination] = useState<Pagination | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(false);
 
+const updateIsLoading = (isLoadingChange: boolean): void => {
+  if (isLoadingChange) {
+    setIsLoading(true);
+  } else {
+    // Delay setting to false by 100ms to avoid page cycling bug.
+    setTimeout(() => {
+      setIsLoading(false);
+    }, 100);
+  }
+};
+
   const updatePagination = (paginationChange: Pagination | null): void => {
     console.log(`Updating pagination: totalItems=${paginationChange?.totalItems} totalPages=${paginationChange?.totalPages} page=${paginationChange?.page} totalSize=${paginationChange?.totalSize}`);
 
@@ -47,15 +58,26 @@ export default function App() {
           <QueryForm onSubmitQuery={onQueryFormSubmit} />
         </div>
 
-        {pagination && pagination.totalItems > 0 && (queryFormData.userSearchQuery || queryFormData.channelSearchQuery) &&
-          <div className="flex justify-end items-center mb-8 gap-4">
-            <PageSelect
-              pagination={pagination}
-              onPageChange={updatePagination}
-              isLoading={isLoading}
-            />
+        {(isLoading || (pagination && pagination.totalItems > 0 && (queryFormData.userSearchQuery || queryFormData.channelSearchQuery))) && (
+          <div className="flex justify-end items-center mb-8 relative">
+            {isLoading && (
+              <div className="absolute left-1/2 transform -translate-x-1/2 flex items-center">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-500"></div>
+                <span className="ml-3 text-gray-400">Loading user messages...</span>
+              </div>
+            )}
+
+            {pagination && pagination.totalItems > 0 && (queryFormData.userSearchQuery || queryFormData.channelSearchQuery) && (
+              <div className="flex items-center gap-4">
+                <PageSelect
+                  pagination={pagination}
+                  onPageChange={updatePagination}
+                  isLoading={isLoading}
+                />
+              </div>
+            )}
           </div>
-        }
+        )}
 
         <main className="mx-auto">
           {queryFormData.category == CategoryState.Users && (
@@ -63,6 +85,7 @@ export default function App() {
               queryResults={queryFormData}
               pagination={pagination}
               updatePagination={updatePagination}
+              setIsLoading={updateIsLoading}
             />
           )}
 
@@ -71,6 +94,7 @@ export default function App() {
               queryResults={queryFormData}
               pagination={pagination}
               updatePagination={updatePagination}
+              setIsLoading={updateIsLoading}
             />
           )}
 
@@ -79,6 +103,7 @@ export default function App() {
               queryResults={queryFormData}
               pagination={pagination}
               updatePagination={updatePagination}
+              setIsLoading={updateIsLoading}
             />
           )}
 
@@ -87,6 +112,7 @@ export default function App() {
               queryResults={queryFormData}
               pagination={pagination}
               updatePagination={updatePagination}
+              setIsLoading={updateIsLoading}
             />
           )}
 
@@ -95,7 +121,7 @@ export default function App() {
               queryResults={queryFormData}
               pagination={pagination}
               updatePagination={updatePagination}
-              setIsLoading={setIsLoading}
+              setIsLoading={updateIsLoading}
             />
           )}
         </main>

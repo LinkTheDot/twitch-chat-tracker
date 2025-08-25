@@ -10,6 +10,7 @@ export interface SubscriptionResultsProps {
   queryResults: QueryFormData;
   pagination: Pagination | null;
   updatePagination: (paginationResponse: Pagination | null) => void;
+  setIsLoading: (isLoading: boolean) => void;
 }
 
 export function SubscriptionResults(props: SubscriptionResultsProps) {
@@ -28,16 +29,11 @@ export function SubscriptionResults(props: SubscriptionResultsProps) {
     pagination: props.pagination,
   });
 
-  const { response_data, error, isLoading } = useGetData<Subscriptions>({ requestUrl, updatePagination: props.updatePagination });
-
-  if (isLoading) {
-    return (
-      <div className="flex justify-center items-center py-12">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-500"></div>
-        <span className="ml-3 text-gray-400">Loading subscriptions...</span>
-      </div>
-    );
-  }
+  const { response_data, error } = useGetData<Subscriptions>({
+    requestUrl,
+    updatePagination: props.updatePagination,
+    setIsLoading: props.setIsLoading,
+  });
 
   if (error) {
     return (

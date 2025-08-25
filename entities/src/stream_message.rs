@@ -16,15 +16,15 @@ pub struct Model {
   pub twitch_user_id: i32,
   pub channel_id: i32,
   pub stream_id: Option<i32>,
-  pub third_party_emotes_used: Option<Json>,
   pub is_subscriber: i8,
-  pub twitch_emote_usage: Option<Json>,
   #[sea_orm(unique)]
   pub origin_id: Option<String>,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
 pub enum Relation {
+  #[sea_orm(has_many = "super::emote_usage::Entity")]
+  EmoteUsage,
   #[sea_orm(
     belongs_to = "super::stream::Entity",
     from = "Column::StreamId",
@@ -51,9 +51,24 @@ pub enum Relation {
   TwitchUser1,
 }
 
+impl Related<super::emote_usage::Entity> for Entity {
+  fn to() -> RelationDef {
+    Relation::EmoteUsage.def()
+  }
+}
+
 impl Related<super::stream::Entity> for Entity {
   fn to() -> RelationDef {
     Relation::Stream.def()
+  }
+}
+
+impl Related<super::emote::Entity> for Entity {
+  fn to() -> RelationDef {
+    super::emote_usage::Relation::Emote.def()
+  }
+  fn via() -> Option<RelationDef> {
+    Some(super::emote_usage::Relation::StreamMessage.def().rev())
   }
 }
 

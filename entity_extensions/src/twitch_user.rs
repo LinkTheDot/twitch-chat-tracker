@@ -71,7 +71,7 @@ impl TwitchUserExtensions for twitch_user::Model {
       ChannelIdentifier::Login(user_login) => {
         // -
         twitch_user::Entity::find()
-          .filter(twitch_user::Column::LoginName.eq(user_login.as_ref()))
+          .filter(twitch_user::Column::LoginName.like(user_login.as_ref()))
           .one(database_connection)
           .await
           .map_err(Into::into)
@@ -100,19 +100,15 @@ impl TwitchUserExtensions for twitch_user::Model {
         // -
         twitch_user::Entity::find()
           .filter(twitch_user::Column::LoginName.contains(approximate_login.as_ref()))
-          .all(database_connection)
-          .await
-          .map_err(Into::into)
       }
       ChannelIdentifier::TwitchID(twitch_id) => {
         // -
-        twitch_user::Entity::find()
-          .filter(twitch_user::Column::TwitchId.eq(twitch_id.as_ref()))
-          .all(database_connection)
-          .await
-          .map_err(Into::into)
+        twitch_user::Entity::find().filter(twitch_user::Column::TwitchId.eq(twitch_id.as_ref()))
       }
-    };
+    }
+    .all(database_connection)
+    .await
+    .map_err(Into::into);
 
     if let Ok(user_list) = &user_list_result {
       if user_list.is_empty() {
@@ -429,6 +425,15 @@ async fn attempt_insert(
   }
 
   result.map_err(Into::into)
+}
+
+impl ChannelIdentifier<&str> {
+  pub fn to_owned(&self) -> ChannelIdentifier<String> {
+    match self {
+      Self::Login(login) => ChannelIdentifier::Login((*login).to_owned()),
+      Self::TwitchID(twitch_id) => ChannelIdentifier::TwitchID((*twitch_id).to_owned()),
+    }
+  }
 }
 
 #[cfg(test)]

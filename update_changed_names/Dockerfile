@@ -18,7 +18,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
   && rm -rf /var/lib/apt/lists/*
 
 COPY --from=builder /app/target/x86_64-unknown-linux-gnu/release/update_changed_names /
-COPY --from=builder /app/config/deploy_config.yml /config/deploy_config.yml
+COPY --from=builder /app/config_files/deploy_config.yml /config_files/deploy_config.yml
 
 WORKDIR /app
 

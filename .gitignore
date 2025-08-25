@@ -1,7 +1,7 @@
 /target
 migration/target
 /tokens
-/config
+/config_files
 /app_log
 /*\.sql
 /file_reports
@@ -9,6 +9,6 @@ secrets.*
 /docs
 bin/build_and_push_*
 bin/update
-src/manual_migrations*
 temp_*
 *.fsh
+*.db

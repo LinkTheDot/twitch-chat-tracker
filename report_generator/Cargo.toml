@@ -1,0 +1,26 @@
+[package]
+name = "report_generator"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+app_config = { path = "../app_config" }
+database_connection = { path = "../database_connection" }
+serde = { version = "1.0", features = ["derive"] }
+entities = { path = "../entities" }
+entity_extensions = { path = "../entity_extensions" }
+tokio = { version = "1.41", features = ["full"] }
+sea-orm = { version = "1.1.10", features = ["sqlx-mysql", "runtime-tokio", "macros"] } 
+tabled = "0.20.0"
+tracing = "0.1.41"
+tracing-subscriber = "0.3.*"
+thiserror = "2.0.12"
+human-time = "0.1.6"
+serde_json = "1.0.140"
+reqwest = "0.12.15"
+chrono = "0.4.40"
+num-traits = "0.2"
+
+# [[bin]]
+# name = "report_generator"
+# path = "src/main.rs"

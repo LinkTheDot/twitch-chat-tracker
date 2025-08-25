@@ -1,11 +1,6 @@
 import { useState } from "react";
 import { CategoryState } from "../types/CategoryState";
-
-export interface QueryFormData {
-  category: CategoryState;
-  channelSearchQuery: string;
-  userSearchQuery: string;
-}
+import { QueryFormData } from "../types/QueryFormData";
 
 interface QueryFormProps {
   onSubmitQuery: (data: QueryFormData) => void;

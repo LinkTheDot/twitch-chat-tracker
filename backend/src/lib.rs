@@ -4,4 +4,3 @@ pub mod error;
 pub mod logging;
 pub mod response_models;
 pub mod routes;
-

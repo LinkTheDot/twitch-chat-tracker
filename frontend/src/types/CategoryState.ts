@@ -3,5 +3,6 @@ export enum CategoryState {
   NameChanges = "Name changes",
   Subscriptions = "Subscriptions",
   Following = "Following",
+  Messages = "Messages",
   // Donations = "Donations",
 }

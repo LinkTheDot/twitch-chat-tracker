@@ -71,7 +71,7 @@ impl TwitchUserExtensions for twitch_user::Model {
       ChannelIdentifier::Login(user_login) => {
         // -
         twitch_user::Entity::find()
-          .filter(twitch_user::Column::LoginName.eq(user_login.as_ref()))
+          .filter(twitch_user::Column::LoginName.like(user_login.as_ref()))
           .one(database_connection)
           .await
           .map_err(Into::into)

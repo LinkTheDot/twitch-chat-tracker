@@ -1,25 +1,36 @@
-import { getSubscriptions } from "../services/Subscriptions";
-import { SubscriptionRequest, SubscriptionRequestType } from "../types/Subscriptions";
+import { useGetData } from "../services/DataRequest";
+import { buildFetchUrl } from "../services/FetchUrl";
+import { Pagination } from "../types/Pagination";
+import { QueryFormData } from "../types/QueryFormData";
+import { Subscriptions } from "../types/Subscriptions";
 import { GiftedSubscriptionResults } from "./GiftedSubscriptionResponse";
-import { QueryFormData } from "./QueryForm";
 import { UserSubscriptionResults } from "./UserSubscriptionResults";
 
 export interface SubscriptionResultsProps {
   queryResults: QueryFormData;
+  pagination: Pagination | null;
+  updatePagination: (paginationResponse: Pagination | null) => void;
 }
 
 export function SubscriptionResults(props: SubscriptionResultsProps) {
-  const userRequestType = Number(props.queryResults.userSearchQuery) ? SubscriptionRequestType.TwitchId : SubscriptionRequestType.Name;
-  
-  const subscriptionRequest: SubscriptionRequest = {
-    userRequestType,
-    userIdentifier: props.queryResults.userSearchQuery,
+  if (!props.queryResults.userSearchQuery && !props.queryResults.channelSearchQuery) {
+    return;
+  }
+
+  const userIdentifier = props.queryResults.userSearchQuery;
+  const requestType = Number(userIdentifier) ? "twitch_id" : "maybe_login";
+
+  const requestUrl = buildFetchUrl({
+    route: "/donations/subscriptions",
     channel: props.queryResults.channelSearchQuery,
-  };
+    dataName: requestType,
+    data: userIdentifier,
+    pagination: props.pagination,
+  });
 
-  const subscriptionResponse = getSubscriptions(subscriptionRequest);
+  const { response_data, error, isLoading } = useGetData<Subscriptions>({ requestUrl, updatePagination: props.updatePagination });
 
-  if (subscriptionResponse.isLoading) {
+  if (isLoading) {
     return (
       <div className="flex justify-center items-center py-12">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-500"></div>
@@ -28,25 +39,25 @@ export function SubscriptionResults(props: SubscriptionResultsProps) {
     );
   }
 
-  if (subscriptionResponse.error) {
+  if (error) {
     return (
       <div className="bg-red-900/20 border border-red-800 rounded-lg p-6 text-center">
-        <p className="text-red-400">Error: {subscriptionResponse.error.message || "Failed to fetch subscriptions."}</p>
+        <p className="text-red-400">Error: {error.message || "Failed to fetch subscriptions."}</p>
       </div>
     );
   }
 
   return (
     <div className="space-y-6">
-      {subscriptionResponse.value?.subscriptions &&
+      {response_data?.data.subscriptions &&
         <UserSubscriptionResults
-          subscriptions={subscriptionResponse.value.subscriptions}
+          subscriptions={response_data.data.subscriptions}
         />
       }
 
-      {subscriptionResponse.value?.gifted_subscriptions &&
+      {response_data?.data.gifted_subscriptions &&
         <GiftedSubscriptionResults
-          gifted_subscriptions={subscriptionResponse.value.gifted_subscriptions}
+          gifted_subscriptions={response_data.data.gifted_subscriptions}
         />
       }
     </div>

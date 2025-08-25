@@ -9,6 +9,7 @@ pub struct EmoteUsageWithContents {
 }
 
 impl EmoteUsageWithContents {
+  /// Used in tests to allow the object to be created for use in a mock database.
   #[cfg(test)]
   pub fn to_queryable_result(self) -> std::collections::BTreeMap<String, sea_orm::Value> {
     std::collections::BTreeMap::from([

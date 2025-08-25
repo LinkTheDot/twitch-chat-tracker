@@ -1,4 +1,3 @@
-import { Response } from "./Response";
 import { User } from "./users";
 
 export interface Subscriptions {
@@ -29,16 +28,3 @@ export interface DonationEvent {
   subscription_tier: number
   donation_receiver: User;
 }
-
-export enum SubscriptionRequestType {
-  TwitchId,
-  Name,
-}
-
-export interface SubscriptionRequest {
-  userRequestType: SubscriptionRequestType,
-  userIdentifier: string;
-  channel: string
-}
-
-export interface SubscriptionResponse extends Response<Subscriptions> { }

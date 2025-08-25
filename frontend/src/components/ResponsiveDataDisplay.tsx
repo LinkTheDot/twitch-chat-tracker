@@ -1,5 +1,3 @@
-import React from 'react';
-
 export interface Column<T> {
   header_name: string;
   header_value_key?: keyof T;
@@ -20,6 +18,8 @@ export function ResponsiveDataDisplay<T>({
   rowKey,
   emptyMessage = "No results found."
 }: ResponsiveDataDisplayProps<T>) {
+  console.log("Got to ResponsiveDataDisplay");
+
   if (!data || data.length === 0) {
     return (
       <div className="text-center py-12 text-gray-400">

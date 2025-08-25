@@ -18,7 +18,7 @@ spec:
           imagePullPolicy: Always
           env:
             - name: CONFIG_PATH
-              value: "/app/config/deploy_config.yml"
+              value: "/app/config_files/deploy_config.yml"
             - name: DATABASE_HOST_ADDRESS
               value: "mysql"
           ports:

@@ -395,7 +395,6 @@ dependencies = [
  "entities",
  "entity_extensions",
  "http",
- "regex",
  "reqwest",
  "sea-orm",
  "serde",

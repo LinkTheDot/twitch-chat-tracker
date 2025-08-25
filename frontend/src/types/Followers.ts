@@ -1,16 +1,14 @@
-import {Response} from './Response';
+import { User } from './users';
+
+export interface Follows {
+  forUser: User;
+  follows: Follow[];
+}
 
 export interface Follow {
-  id: number;
+  id: string;
   displayName: string;
   login: string;
   avatar: string;
   followedAt: string;
 }
-
-export interface FollowingRequest {
-  userLogin: string;
-}
-
-export interface FollowingResponse extends Response<Follow[]> {}
-

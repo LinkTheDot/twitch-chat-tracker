@@ -1,23 +1,33 @@
 import { ResponsiveDataDisplay, Column } from './ResponsiveDataDisplay';
-import { User, UserRequest, UserRequestType } from '../types/users';
-import { getUsers } from '../services/users'; // Import the new custom hook
-import { QueryFormData } from '../components/QueryForm';
+import { User } from '../types/users';
+import { Pagination } from '../types/Pagination';
+import { QueryFormData } from '../types/QueryFormData';
+import { useGetData } from '../services/DataRequest';
+import { buildFetchUrl } from '../services/FetchUrl';
 
 
 export interface UserResultsProps {
   queryResults: QueryFormData;
+  pagination: Pagination | null;
+  updatePagination: (paginationResponse: Pagination | null) => void;
 }
 
 export function UserResults(props: UserResultsProps) {
-  const identifier = props.queryResults.userSearchQuery || props.queryResults.channelSearchQuery;
-  const requestType = Number(identifier) ? UserRequestType.TwitchId : UserRequestType.Name;
+  if (!props.queryResults.userSearchQuery && !props.queryResults.channelSearchQuery) {
+    return;
+  }
 
-  const userRequest: UserRequest = {
-    userRequestType: requestType,
-    userIdentifier: identifier
-  };
+  const userIdentifier = props.queryResults.userSearchQuery || props.queryResults.channelSearchQuery;
+  const requestType = Number(userIdentifier) ? "user_ids" : "maybe_login";
 
-  const { value: users, error, isLoading } = getUsers(userRequest);
+  const requestUrl = buildFetchUrl({
+    route: "/users",
+    dataName: requestType,
+    data: userIdentifier,
+    pagination: props.pagination,
+  });
+
+  const { response_data, error, isLoading } = useGetData<User[]>({ requestUrl, updatePagination: props.updatePagination });
 
   const userColumns: Column<User>[] = [
     { header_name: 'Id', header_value_key: 'id' },
@@ -45,9 +55,9 @@ export function UserResults(props: UserResultsProps) {
 
   return (
     <>
-      {users && (
+      {response_data?.data && (
         <ResponsiveDataDisplay
-          data={users}
+          data={response_data.data}
           columns={userColumns}
           rowKey="id"
           emptyMessage="No users found."

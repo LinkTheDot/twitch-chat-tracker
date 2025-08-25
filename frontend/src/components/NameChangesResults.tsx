@@ -1,23 +1,34 @@
-import { getNameChanges } from "../services/NameChanges";
-import { NameChange, NameChangeRequest } from "../types/NameChanges";
-import { UserRequestType } from "../types/users";
+import { NameChange } from "../types/NameChanges";
 import { Column, ResponsiveDataDisplay } from "./ResponsiveDataDisplay";
-import { QueryFormData } from "./QueryForm";
+import { useGetData } from "../services/DataRequest";
+import { Pagination } from "../types/Pagination";
+import { buildFetchUrl } from "../services/FetchUrl";
+import { QueryFormData } from "../types/QueryFormData";
 
 export interface NameChangeResultsProps {
   queryResults: QueryFormData;
+  pagination: Pagination | null;
+  updatePagination: (paginationResponse: Pagination | null) => void;
 }
 
 export function NameChangeResults(props: NameChangeResultsProps) {
-  const identifier = props.queryResults.userSearchQuery || props.queryResults.channelSearchQuery;
-  const requestType = Number(identifier) ? UserRequestType.TwitchId : UserRequestType.Name;
+  if (!props.queryResults.userSearchQuery && !props.queryResults.channelSearchQuery) {
+    return;
+  }
 
-  const nameChangeRequest: NameChangeRequest = {
-    requestType,
-    userIdentifier: identifier,
-  };
+  const userIdentifier = props.queryResults.userSearchQuery || props.queryResults.channelSearchQuery;
+  const requestType = Number(userIdentifier) ? "twitch_id" : "maybe_login";
 
-  const { value: nameChanges, error, isLoading } = getNameChanges(nameChangeRequest);
+  const requestUrl = buildFetchUrl({
+    route: "/users/name_changes",
+    dataName: requestType,
+    data: userIdentifier,
+    pagination: props.pagination,
+  });
+
+  const { response_data, error, isLoading } = useGetData<NameChange[]>({ requestUrl, updatePagination: props.updatePagination });
+
+  console.log(`Response data=${response_data?.data}`);
 
   const nameChangeColumns: Column<NameChange>[] = [
     { header_name: 'Twitch ID', header_value_key: 'twitch_user_twitch_id' },
@@ -45,11 +56,11 @@ export function NameChangeResults(props: NameChangeResultsProps) {
 
   return (
     <>
-      {nameChanges && (
+      {response_data?.data && (
         <ResponsiveDataDisplay
-          data={nameChanges}
+          data={response_data.data}
           columns={nameChangeColumns}
-          rowKey="twitch_user_twitch_id"
+          rowKey="id"
           emptyMessage="No name changes found."
         />
       )}

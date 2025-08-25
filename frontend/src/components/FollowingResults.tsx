@@ -1,24 +1,37 @@
-import { getFollowing } from "../services/Followers";
-import { Follow, FollowingRequest } from "../types/Followers";
+import { useGetData } from "../services/DataRequest";
+import { buildFetchUrl } from "../services/FetchUrl";
+import { Follow, Follows } from "../types/Followers";
+import { Pagination } from "../types/Pagination";
+import { QueryFormData } from "../types/QueryFormData";
 import { Column, ResponsiveDataDisplay } from "./ResponsiveDataDisplay";
-import { QueryFormData } from "./QueryForm";
 
 export interface FollowingResultsProps {
   queryResults: QueryFormData;
+  pagination: Pagination | null;
+  updatePagination: (paginationResponse: Pagination | null) => void;
 }
 
 export function FollowingResults(props: FollowingResultsProps) {
-  const identifier = props.queryResults.userSearchQuery || props.queryResults.channelSearchQuery;
+  if (!props.queryResults.userSearchQuery && !props.queryResults.channelSearchQuery) {
+    return;
+  }
 
-  const followingRequest: FollowingRequest = {
-    userLogin: identifier,
-  };
+  const userIdentifier = props.queryResults.userSearchQuery || props.queryResults.channelSearchQuery;
+  const requestType = Number(userIdentifier) ? "user_id" : "maybe_login";
 
-  const { value: following, error, isLoading } = getFollowing(followingRequest);
+  const requestUrl = buildFetchUrl({
+    route: "/users/following",
+    dataName: requestType,
+    data: userIdentifier,
+    pagination: props.pagination,
+  });
+
+  const { response_data, error, isLoading } = useGetData<Follows>({ requestUrl, updatePagination: props.updatePagination });
 
   const followingColumns: Column<Follow>[] = [
     { header_name: 'Twitch ID', header_value_key: 'id' },
-    { header_name: 'Avatar', 
+    {
+      header_name: 'Avatar',
       render: (item) => (
         item.avatar && (
           <img
@@ -53,9 +66,11 @@ export function FollowingResults(props: FollowingResultsProps) {
 
   return (
     <>
-      {following && (
+      <h3 className="text-center text-xl font-semibold text-gray-200 mb-4">Following list for `{response_data?.data.forUser.login_name}`</h3>
+
+      {response_data?.data && (
         <ResponsiveDataDisplay
-          data={following}
+          data={response_data.data.follows}
           columns={followingColumns}
           rowKey="id"
           emptyMessage="No following data found."

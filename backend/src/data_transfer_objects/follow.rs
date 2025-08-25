@@ -1,3 +1,5 @@
+use entities::twitch_user;
+
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct Follow {
   pub id: String,
@@ -13,4 +15,12 @@ pub struct Follow {
 
   #[serde(rename = "followedAt")]
   pub followed_at: String,
+}
+
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
+pub struct FollowResponse {
+  #[serde(rename = "forUser")]
+  pub for_user: twitch_user::Model,
+
+  pub follows: Vec<Follow>,
 }

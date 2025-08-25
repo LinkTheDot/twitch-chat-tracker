@@ -9,6 +9,7 @@ export interface FollowingResultsProps {
   queryResults: QueryFormData;
   pagination: Pagination | null;
   updatePagination: (paginationResponse: Pagination | null) => void;
+  setIsLoading: (isLoading: boolean) => void;
 }
 
 export function FollowingResults(props: FollowingResultsProps) {
@@ -26,7 +27,11 @@ export function FollowingResults(props: FollowingResultsProps) {
     pagination: props.pagination,
   });
 
-  const { response_data, error, isLoading } = useGetData<Follows>({ requestUrl, updatePagination: props.updatePagination });
+  const { response_data, error } = useGetData<Follows>({
+    requestUrl,
+    updatePagination: props.updatePagination,
+    setIsLoading: props.setIsLoading,
+  });
 
   const followingColumns: Column<Follow>[] = [
     { header_name: 'Twitch ID', header_value_key: 'id' },
@@ -46,15 +51,6 @@ export function FollowingResults(props: FollowingResultsProps) {
     { header_name: 'Login Name', header_value_key: 'login' },
     { header_name: 'Followed At', header_value_key: 'followedAt' },
   ];
-
-  if (isLoading) {
-    return (
-      <div className="flex justify-center items-center py-12">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-500"></div>
-        <span className="ml-3 text-gray-400">Loading following list...</span>
-      </div>
-    );
-  }
 
   if (error) {
     return (

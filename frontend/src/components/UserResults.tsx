@@ -10,6 +10,7 @@ export interface UserResultsProps {
   queryResults: QueryFormData;
   pagination: Pagination | null;
   updatePagination: (paginationResponse: Pagination | null) => void;
+  setIsLoading: (isLoading: boolean) => void;
 }
 
 export function UserResults(props: UserResultsProps) {
@@ -27,7 +28,11 @@ export function UserResults(props: UserResultsProps) {
     pagination: props.pagination,
   });
 
-  const { response_data, error, isLoading } = useGetData<User[]>({ requestUrl, updatePagination: props.updatePagination });
+  const { response_data, error } = useGetData<User[]>({
+    requestUrl,
+    updatePagination: props.updatePagination,
+    setIsLoading: props.setIsLoading,
+  });
 
   const userColumns: Column<User>[] = [
     { header_name: 'Id', header_value_key: 'id' },
@@ -35,15 +40,6 @@ export function UserResults(props: UserResultsProps) {
     { header_name: 'Display Name', header_value_key: 'display_name' },
     { header_name: 'Login Name', header_value_key: 'login_name' },
   ];
-
-  if (isLoading) {
-    return (
-      <div className="flex justify-center items-center py-12">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-500"></div>
-        <span className="ml-3 text-gray-400">Loading users...</span>
-      </div>
-    );
-  }
 
   if (error) {
     return (

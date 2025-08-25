@@ -183,13 +183,21 @@ export function MessageResults(props: MessageResultsProps) {
   const userIdentifier = props.queryResults.userSearchQuery || props.queryResults.channelSearchQuery;
   const requestType = Number(userIdentifier) ? "user_id" : "maybe_login";
 
+  let additionalData = "page_size=1000";
+
+  if (props.queryResults.messageSearch) {
+    additionalData += `&message_search=${props.queryResults.messageSearch}`;
+  } else {
+    console.log("No message search found.");
+  }
+
   const requestUrl = buildFetchUrl({
     route: "/users/messages",
     dataName: requestType,
     data: userIdentifier,
     pagination: props.pagination,
     channel: props.queryResults.channelSearchQuery,
-    additional: "page_size=1000"
+    additional: additionalData,
   });
 
   const { response_data, error } = useGetData<UserMessageResponse>({

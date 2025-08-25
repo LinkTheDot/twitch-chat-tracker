@@ -7,16 +7,18 @@ interface QueryFormProps {
 }
 
 const QueryForm: React.FC<QueryFormProps> = ({ onSubmitQuery }) => {
-  const [formData, setFormData] = useState<QueryFormData>({
+  const [formData, setFormData] = useState<QueryFormData & { messageSearch: string }>({
     category: CategoryState.Users,
     channelSearchQuery: '',
     userSearchQuery: '',
+    messageSearch: '',
   });
 
   const categoryOptions = Object.values(CategoryState);
 
   const handleSubmit = (event: React.FormEvent) => {
     event.preventDefault();
+    console.log('Form data being submitted:', formData); // Debug log
     onSubmitQuery(formData);
   };
 
@@ -32,21 +34,32 @@ const QueryForm: React.FC<QueryFormProps> = ({ onSubmitQuery }) => {
     setFormData({ ...formData, userSearchQuery: event.target.value });
   };
 
+  const handleMessageSearchChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    setFormData({ ...formData, messageSearch: event.target.value });
+  };
+
+  const isMessagesCategory = formData.category === "Messages";
+
   return (
     <form onSubmit={handleSubmit} className="bg-gray-900 rounded-xl p-6 shadow-2xl border border-gray-800">
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-2 mb-2">
+      <div className={`grid grid-cols-1 md:grid-cols-2 ${isMessagesCategory ? 'lg:grid-cols-5' : 'lg:grid-cols-4'} gap-2 mb-2`}>
         <label htmlFor="username" className="text-sm font-medium text-gray-400">
           Username
         </label>
         <label htmlFor="channel" className="text-sm font-medium text-gray-400">
           Channel
         </label>
+        {isMessagesCategory && (
+          <label htmlFor="message-search" className="text-sm font-medium text-gray-400">
+            Message Search
+          </label>
+        )}
         <label htmlFor="search-type" className="text-sm font-medium text-gray-400">
           Search Type
         </label>
         <div></div>
       </div>
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className={`grid grid-cols-1 md:grid-cols-2 ${isMessagesCategory ? 'lg:grid-cols-5' : 'lg:grid-cols-4'} gap-4`}>
         <input
           id="username"
           type="text"
@@ -64,6 +77,17 @@ const QueryForm: React.FC<QueryFormProps> = ({ onSubmitQuery }) => {
           onChange={handleChannelSearchChange}
           className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all placeholder-gray-500"
         />
+
+        {isMessagesCategory && (
+          <input
+            id="message-search"
+            type="text"
+            placeholder="Search messages..."
+            value={formData.messageSearch}
+            onChange={handleMessageSearchChange}
+            className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all placeholder-gray-500"
+          />
+        )}
 
         <div className="relative">
           <select

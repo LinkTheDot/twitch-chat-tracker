@@ -18,7 +18,7 @@ const QueryForm: React.FC<QueryFormProps> = ({ onSubmitQuery }) => {
 
   const handleSubmit = (event: React.FormEvent) => {
     event.preventDefault();
-    console.log('Form data being submitted:', formData); // Debug log
+    console.log('Form data being submitted:', formData);
     onSubmitQuery(formData);
   };
 
@@ -39,44 +39,49 @@ const QueryForm: React.FC<QueryFormProps> = ({ onSubmitQuery }) => {
   };
 
   const isMessagesCategory = formData.category === "Messages";
+  const isChannelCategory = [CategoryState.Subscriptions, CategoryState.Messages].includes(formData.category);
 
   return (
     <form onSubmit={handleSubmit} className="bg-gray-900 rounded-xl p-6 shadow-2xl border border-gray-800">
-      <div className={`grid grid-cols-1 md:grid-cols-2 ${isMessagesCategory ? 'lg:grid-cols-5' : 'lg:grid-cols-4'} gap-2 mb-2`}>
-        <label htmlFor="username" className="text-sm font-medium text-gray-400">
-          Username
+      <div className="flex gap-2 mb-2">
+        <label htmlFor="username" className="flex-1 text-sm font-medium text-gray-400">
+          Username / Twitch ID
         </label>
-        <label htmlFor="channel" className="text-sm font-medium text-gray-400">
-          Channel
-        </label>
+        {isChannelCategory && (
+          <label htmlFor="channel" className="flex-1 text-sm font-medium text-gray-400">
+            Channel
+          </label>
+        )}
         {isMessagesCategory && (
-          <label htmlFor="message-search" className="text-sm font-medium text-gray-400">
+          <label htmlFor="message-search" className="flex-1 text-sm font-medium text-gray-400">
             Message Search
           </label>
         )}
-        <label htmlFor="search-type" className="text-sm font-medium text-gray-400">
+        <label htmlFor="search-type" className="flex-1 text-sm font-medium text-gray-400">
           Search Type
         </label>
-        <div></div>
+        <div className="flex-1"></div>
       </div>
-      <div className={`grid grid-cols-1 md:grid-cols-2 ${isMessagesCategory ? 'lg:grid-cols-5' : 'lg:grid-cols-4'} gap-4`}>
+      <div className="flex gap-4">
         <input
           id="username"
           type="text"
-          placeholder="Username"
+          placeholder="Username / Twitch ID"
           value={formData.userSearchQuery}
           onChange={handleUserSearchChange}
-          className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all placeholder-gray-500"
+          className="flex-1 px-4 py-3 bg-gray-800 border border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all placeholder-gray-500"
         />
 
-        <input
-          id="channel"
-          type="text"
-          placeholder="Channel (optional)"
-          value={formData.channelSearchQuery}
-          onChange={handleChannelSearchChange}
-          className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all placeholder-gray-500"
-        />
+        {isChannelCategory && (
+          <input
+            id="channel"
+            type="text"
+            placeholder="Channel"
+            value={formData.channelSearchQuery}
+            onChange={handleChannelSearchChange}
+            className="flex-1 px-4 py-3 bg-gray-800 border border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all placeholder-gray-500"
+          />
+        )}
 
         {isMessagesCategory && (
           <input
@@ -85,11 +90,11 @@ const QueryForm: React.FC<QueryFormProps> = ({ onSubmitQuery }) => {
             placeholder="Search messages..."
             value={formData.messageSearch}
             onChange={handleMessageSearchChange}
-            className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all placeholder-gray-500"
+            className="flex-1 px-4 py-3 bg-gray-800 border border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all placeholder-gray-500"
           />
         )}
 
-        <div className="relative">
+        <div className="flex-1 relative">
           <select
             id="search-type"
             value={formData.category}
@@ -111,7 +116,7 @@ const QueryForm: React.FC<QueryFormProps> = ({ onSubmitQuery }) => {
 
         <button
           type="submit"
-          className="w-full px-6 py-3 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-semibold rounded-lg shadow-lg transform transition-all duration-200 hover:scale-105 focus:outline-none focus:ring-2 focus:ring-purple-500"
+          className="flex-1 px-6 py-3 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-semibold rounded-lg shadow-lg transform transition-all duration-200 hover:scale-105 focus:outline-none focus:ring-2 focus:ring-purple-500"
         >
           Search
         </button>

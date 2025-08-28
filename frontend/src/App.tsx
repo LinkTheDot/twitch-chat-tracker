@@ -11,6 +11,7 @@ import { PageSelect } from './components/PageSelect';
 import { QueryFormData } from './types/QueryFormData';
 import { Pagination } from './types/Pagination';
 import { MessageResults } from './components/UserMessageResults';
+import { StreamsResults } from './components/StreamsResults';
 
 export default function App() {
   const [queryFormData, setQueryForm] = useState<QueryFormData>({
@@ -118,6 +119,15 @@ export default function App() {
 
           {queryFormData.category == CategoryState.Messages && (
             <MessageResults
+              queryResults={queryFormData}
+              pagination={pagination}
+              updatePagination={updatePagination}
+              setIsLoading={updateIsLoading}
+            />
+          )}
+
+          {queryFormData.category == CategoryState.Streams && (
+            <StreamsResults
               queryResults={queryFormData}
               pagination={pagination}
               updatePagination={updatePagination}

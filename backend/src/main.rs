@@ -27,7 +27,7 @@ async fn main() {
   tracing::info!("listening on {}", listener.local_addr().unwrap());
 
   let mut app = Router::new()
-    .apply_routes()
+    .apply_all_routes()
     .with_state(interface_config)
     .layer(cors);
 

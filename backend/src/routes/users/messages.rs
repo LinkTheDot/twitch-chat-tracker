@@ -2,10 +2,9 @@ use crate::app::InterfaceConfig;
 use crate::data_transfer_objects::stream_message::StreamMessageDto;
 use crate::error::*;
 use crate::response_models::{paginated_parameters::*, paginatied_response::*};
-use crate::routes::helpers::user_identifier::get_user_identifier;
+use crate::routes::helpers::get_users::GetUsers;
 use axum::extract::{Path, Query, State};
 use entities::*;
-use entity_extensions::twitch_user::*;
 use sea_orm::*;
 
 const MAX_PAGE_SIZE: u64 = 1_000;
@@ -36,20 +35,19 @@ pub async fn get_messages(
   State(interface_config): State<InterfaceConfig>,
   Path(channel_name): Path<String>,
 ) -> Result<axum::Json<PaginatedResponse<UserMessageResponse>>, AppError> {
-  tracing::info!("Got a user messages request: {query_payload:?}");
+  tracing::info!("Got a user messages request: {query_payload:?} For channel: {channel_name:?}");
 
   let database_connection = interface_config.database_connection();
-  let user_identifier = get_user_identifier(&query_payload.maybe_login, &query_payload.user_id)?;
   let pagination = query_payload
     .pagination_parameters
     .clamped_page_size(MIN_PAGE_SIZE, MAX_PAGE_SIZE);
 
-  let Some(user) =
-    twitch_user::Model::get_by_identifier(user_identifier.clone(), database_connection).await?
+  let Some(user) = query_payload
+    .get_user_query()?
+    .one(database_connection)
+    .await?
   else {
-    return Err(AppError::CouldNotFindUserByIdentifier {
-      identifier: user_identifier.to_owned(),
-    });
+    return Err(query_payload.get_missing_user_error());
   };
   let channel = get_channel(channel_name, database_connection).await?;
 
@@ -102,13 +100,24 @@ async fn get_channel(
   channel_login: String,
   database_connection: &DatabaseConnection,
 ) -> Result<twitch_user::Model, AppError> {
-  let channel_result = twitch_user::Model::get_by_identifier(
-    ChannelIdentifier::Login(&channel_login),
-    database_connection,
-  )
-  .await?;
+  let get_channel_query =
+    twitch_user::Entity::find().filter(twitch_user::Column::LoginName.contains(&channel_login));
 
-  channel_result.ok_or(AppError::CouldNotFindUserByLoginName {
-    login: channel_login,
-  })
+  if let Some(channel) = get_channel_query.one(database_connection).await? {
+    Ok(channel)
+  } else {
+    Err(AppError::CouldNotFindUserByLoginName {
+      login: channel_login,
+    })
+  }
+}
+
+impl GetUsers for UserMessagesQuery {
+  fn get_login(&self) -> Option<&str> {
+    self.maybe_login.as_deref()
+  }
+
+  fn get_twitch_id(&self) -> Option<&str> {
+    self.user_id.as_deref()
+  }
 }

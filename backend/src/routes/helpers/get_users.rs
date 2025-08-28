@@ -49,4 +49,32 @@ pub trait GetUsers {
 
     Err(AppError::NoQueryParameterFound)
   }
+
+  fn get_missing_user_error(&self) -> AppError {
+    if let Some(user_login) = self.get_login() {
+      return AppError::CouldNotFindUserByLoginName {
+        login: user_login.to_string(),
+      };
+    }
+
+    if let Some(twitch_id) = self.get_twitch_id() {
+      return AppError::CouldNotFindUserByTwitchId {
+        user_id: twitch_id.to_string(),
+      };
+    }
+
+    if let Some(logins_string) = self.get_many_logins() {
+      return AppError::CouldNotFindUserByLoginName {
+        login: logins_string.to_string(),
+      };
+    }
+
+    if let Some(twitch_ids) = self.get_many_twitch_ids() {
+      return AppError::CouldNotFindUserByTwitchId {
+        user_id: twitch_ids.to_string(),
+      };
+    }
+
+    AppError::NoQueryParameterFound
+  }
 }

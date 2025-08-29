@@ -13,6 +13,90 @@ interface MessageResultsProps {
   setIsLoading: (isLoading: boolean) => void;
 }
 
+// Main component
+export function MessageResults(props: MessageResultsProps) {
+  if (!props.queryResults.userSearchQuery || !props.queryResults.channelSearchQuery) {
+    let missingData;
+
+    if (!props.queryResults.userSearchQuery && !props.queryResults.channelSearchQuery) {
+      missingData = "user and channel";
+    } else if (!props.queryResults.userSearchQuery) {
+      missingData = "user"
+    } else {
+      missingData = "channel"
+    }
+
+    return (
+      <div className="bg-red-900/20 border border-red-800 rounded-lg p-6 text-center">
+        <p className="text-red-400">Error: {`Missing ${missingData}` || "Failed to fetch users."}</p>
+      </div>
+    );
+  }
+
+  const userIdentifier = props.queryResults.userSearchQuery || props.queryResults.channelSearchQuery;
+  const requestType = Number(userIdentifier) ? "user_id" : "maybe_login";
+
+  let additionalData = "page_size=1000";
+
+  if (props.queryResults.messageSearch) {
+    additionalData += `&message_search=${props.queryResults.messageSearch}`;
+  } else {
+    console.log("No message search found.");
+  }
+
+  const requestUrl = buildFetchUrl({
+    route: "/users/messages",
+    dataName: requestType,
+    data: userIdentifier,
+    pagination: props.pagination,
+    channel: props.queryResults.channelSearchQuery,
+    additional: additionalData,
+  });
+
+  const { response_data, error } = useGetData<UserMessageResponse>({
+    requestUrl,
+    updatePagination: props.updatePagination,
+    setIsLoading: props.setIsLoading
+  });
+
+  if (error) {
+    return (
+      <div className="bg-red-900/20 border border-red-800 rounded-lg p-6 text-center">
+        <p className="text-red-400">Error: {error.message || "Failed to fetch user messages."}</p>
+      </div>
+    );
+  }
+
+  return (
+    <>
+      {response_data?.data && (
+        <div className="bg-gray-900/50 rounded-lg border border-gray-700">
+          {/* Header */}
+          <div className="px-4 py-3 border-b border-gray-700">
+            <h2 className="text-lg font-semibold text-gray-100">
+              Chat Messages from `{response_data.data.user.display_name}` to `{response_data.data.channel.display_name}`
+            </h2>
+          </div>
+
+          {/* Messages list */}
+          <div className="divide-y divide-gray-700/50">
+            {response_data.data.messages.map((message) => (
+              <MessageRow key={message.id} message={message} user={response_data.data.user} />
+            ))}
+          </div>
+
+          {/* Empty state */}
+          {response_data.data.messages.length === 0 && (
+            <div className="px-4 py-8 text-center">
+              <p className="text-gray-400">No messages found</p>
+            </div>
+          )}
+        </div>
+      )}
+    </>
+  );
+}
+
 // Component to render a single message with emotes
 const MessageRow: React.FC<{ message: UserMessage; user: User }> = ({ message, user }) => {
   const renderMessageWithEmotes = (contents: string, emoteUsage: Emote[]): React.ReactNode => {
@@ -159,87 +243,3 @@ const MessageRow: React.FC<{ message: UserMessage; user: User }> = ({ message, u
     </div>
   );
 };
-
-// Main component
-export function MessageResults(props: MessageResultsProps) {
-  if (!props.queryResults.userSearchQuery || !props.queryResults.channelSearchQuery) {
-    let missingData;
-
-    if (!props.queryResults.userSearchQuery && !props.queryResults.channelSearchQuery) {
-      missingData = "user and channel";
-    } else if (!props.queryResults.userSearchQuery) {
-      missingData = "user"
-    } else {
-      missingData = "channel"
-    }
-
-    return (
-      <div className="bg-red-900/20 border border-red-800 rounded-lg p-6 text-center">
-        <p className="text-red-400">Error: {`Missing ${missingData}` || "Failed to fetch users."}</p>
-      </div>
-    );
-  }
-
-  const userIdentifier = props.queryResults.userSearchQuery || props.queryResults.channelSearchQuery;
-  const requestType = Number(userIdentifier) ? "user_id" : "maybe_login";
-
-  let additionalData = "page_size=1000";
-
-  if (props.queryResults.messageSearch) {
-    additionalData += `&message_search=${props.queryResults.messageSearch}`;
-  } else {
-    console.log("No message search found.");
-  }
-
-  const requestUrl = buildFetchUrl({
-    route: "/users/messages",
-    dataName: requestType,
-    data: userIdentifier,
-    pagination: props.pagination,
-    channel: props.queryResults.channelSearchQuery,
-    additional: additionalData,
-  });
-
-  const { response_data, error } = useGetData<UserMessageResponse>({
-    requestUrl,
-    updatePagination: props.updatePagination,
-    setIsLoading: props.setIsLoading
-  });
-
-  if (error) {
-    return (
-      <div className="bg-red-900/20 border border-red-800 rounded-lg p-6 text-center">
-        <p className="text-red-400">Error: {error.message || "Failed to fetch user messages."}</p>
-      </div>
-    );
-  }
-
-  return (
-    <>
-      {response_data?.data && (
-        <div className="bg-gray-900/50 rounded-lg border border-gray-700">
-          {/* Header */}
-          <div className="px-4 py-3 border-b border-gray-700">
-            <h2 className="text-lg font-semibold text-gray-100">
-              Chat Messages from `{response_data.data.user.display_name}` to `{response_data.data.channel.display_name}`
-            </h2>
-          </div>
-
-          {/* Messages list */}
-          <div className="divide-y divide-gray-700/50">
-            {response_data.data.messages.map((message) => (
-              <MessageRow key={message.id} message={message} user={response_data.data.user} />
-            ))}
-          </div>
-
-          {/* Empty state */}
-          {response_data.data.messages.length === 0 && (
-            <div className="px-4 py-8 text-center">
-              <p className="text-gray-400">No messages found</p>
-            </div>
-          )}
-        </div>
-      )}
-    </>
-  );
-}

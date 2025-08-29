@@ -28,14 +28,14 @@ pub async fn get_following(
     .one(interface_config.database_connection())
     .await?
   else {
-    return Err(get_missing_user_error(&query_payload));
+    return Err(query_payload.get_missing_user_error());
   };
   let user_login = &user.login_name;
 
-  tracing::info!("Got a user for the following request: {:?}", user_login);
+  tracing::info!("Got a user for the following request: {user_login:?}");
 
   let reqwest_client = reqwest::Client::new();
-  let get_following_url = format!("{FOLLOWING_URL}/{}", user_login);
+  let get_following_url = format!("{FOLLOWING_URL}/{user_login}");
 
   let response = reqwest_client.get(get_following_url).send().await?;
   let response_body = response.text().await?.replace('\\', "");
@@ -46,22 +46,6 @@ pub async fn get_following(
     for_user: user,
     follows: response_value,
   }))
-}
-
-fn get_missing_user_error(query_payload: &UserFollowingQuery) -> AppError {
-  if let Some(login) = &query_payload.maybe_login {
-    return AppError::CouldNotFindUserByLoginName {
-      login: login.to_string(),
-    };
-  }
-
-  if let Some(user_id) = &query_payload.user_id {
-    return AppError::CouldNotFindUserByTwitchId {
-      user_id: user_id.to_string(),
-    };
-  }
-
-  AppError::NoQueryParameterFound
 }
 
 impl GetUsers for UserFollowingQuery {

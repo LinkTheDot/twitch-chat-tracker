@@ -60,9 +60,11 @@ export function FollowingResults(props: FollowingResultsProps) {
     );
   }
 
+  const userName = response_data?.data.forUser?.login_name ?? userIdentifier;
+
   return (
     <>
-      <h3 className="text-center text-xl font-semibold text-gray-200 mb-4">Following list for `{response_data?.data.forUser.login_name}`</h3>
+      <h3 className="text-center text-xl font-semibold text-gray-200 mb-4">Following list for `{userName}`</h3>
 
       {response_data?.data && (
         <ResponsiveDataDisplay

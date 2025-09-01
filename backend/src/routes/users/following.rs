@@ -23,14 +23,18 @@ pub async fn get_following(
 ) -> Result<axum::Json<FollowResponse>, AppError> {
   tracing::info!("Got a following request: {query_payload:?}");
 
-  let Some(user) = query_payload
+  let user = query_payload
     .get_user_query()?
     .one(interface_config.database_connection())
-    .await?
-  else {
-    return Err(query_payload.get_missing_user_error());
+    .await?;
+  let user_login = if let Some(user) = &user {
+    &user.login_name
+  } else {
+    match &query_payload.maybe_login {
+      Some(maybe_login) => maybe_login.as_str(),
+      None => return Err(query_payload.get_missing_user_error()),
+    }
   };
-  let user_login = &user.login_name;
 
   tracing::info!("Got a user for the following request: {user_login:?}");
 

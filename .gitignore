@@ -12,3 +12,5 @@ bin/update
 temp_*
 *.fsh
 *.db
+ingress*
+*env.production

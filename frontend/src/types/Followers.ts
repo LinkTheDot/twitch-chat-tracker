@@ -1,7 +1,7 @@
 import { User } from './users';
 
 export interface Follows {
-  forUser: User;
+  forUser?: User;
   follows: Follow[];
 }
 

@@ -20,7 +20,7 @@ pub struct Follow {
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct FollowResponse {
   #[serde(rename = "forUser")]
-  pub for_user: twitch_user::Model,
+  pub for_user: Option<twitch_user::Model>,
 
   pub follows: Vec<Follow>,
 }

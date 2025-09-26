@@ -11,6 +11,8 @@ use std::collections::HashMap;
 use std::time::Duration;
 use tracing::instrument;
 
+const TOP_N_EMOTES: usize = 20;
+
 const STATS_FILE_TEMPLATE: &str = r#"
 = Chat statistics =
 First time chatters: {first_time_chatters}
@@ -40,7 +42,7 @@ pub async fn get_chat_statistics_template(
   let chat_statistics = ChatStatistics::new(query_conditions).await?;
   let (mut user_bans, user_timeouts) = get_timeouts(query_conditions, database_connection).await?;
   let raids = get_raids(query_conditions, database_connection).await?;
-  let top_emotes = get_top_n_emotes(query_conditions, database_connection, Some(15)).await?;
+  let top_emotes = get_top_n_emotes(query_conditions, database_connection, Some(TOP_N_EMOTES)).await?;
   let mut statistics_template = String::from(STATS_FILE_TEMPLATE);
   let mut statistics_string = String::new();
 

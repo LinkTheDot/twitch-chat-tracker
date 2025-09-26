@@ -14,3 +14,5 @@ temp_*
 *.db
 ingress*
 *env.production
+*/spanix-user-messages
+*/failed_spanix_messages.dat

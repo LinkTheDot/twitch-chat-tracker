@@ -1,10 +1,9 @@
-use app_config::clap::Args;
 use database_connection::*;
 use entities::{stream, twitch_user};
 use entity_extensions::twitch_user::*;
-use report_generator::{
-  conditions::query_conditions_builder::AppQueryConditionsBuilder, upload_reports::upload_reports,
-};
+use report_generator::clap::Args;
+use report_generator::conditions::query_conditions_builder::AppQueryConditionsBuilder;
+use report_generator::upload_reports::upload_reports;
 use sea_orm::*;
 
 #[tokio::main]

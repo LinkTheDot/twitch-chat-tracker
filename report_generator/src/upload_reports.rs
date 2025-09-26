@@ -1,5 +1,5 @@
+use crate::clap::Args;
 use crate::{errors::AppError, pastebin::generate_pastebin};
-use app_config::clap::Args;
 use entities::stream;
 use std::path::PathBuf;
 use tokio::{fs, io::AsyncWriteExt};

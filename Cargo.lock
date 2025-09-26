@@ -125,8 +125,6 @@ name = "app_config"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "chrono",
- "clap",
  "schematic",
  "secrecy",
  "serde",
@@ -2610,6 +2608,7 @@ version = "0.1.0"
 dependencies = [
  "app_config",
  "chrono",
+ "clap",
  "database_connection",
  "entities",
  "entity_extensions",
@@ -3226,6 +3225,25 @@ checksum = "233504af464074f9d066d7b5416c5f9b894a5862a6506e306f7b816cdd6f1807"
 dependencies = [
  "libc",
  "windows-sys 0.59.0",
+]
+
+[[package]]
+name = "spanix_scrubber"
+version = "0.1.0"
+dependencies = [
+ "clap",
+ "database_connection",
+ "entities",
+ "entity_extensions",
+ "futures",
+ "irc",
+ "reqwest",
+ "sea-orm",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tracing",
+ "twitch_chat_tracker",
 ]
 
 [[package]]

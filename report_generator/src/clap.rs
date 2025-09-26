@@ -5,7 +5,7 @@ use std::sync::OnceLock;
 static ARGS: OnceLock<Args> = OnceLock::new();
 
 #[derive(Parser)]
-#[command(name = "TwitchChatParser")]
+#[command(name = "TwitchStreamReportGenerator")]
 pub struct Args {
   /// Assigns which stream ID from the database to generate a report with.
   #[arg(short = 's', long)]

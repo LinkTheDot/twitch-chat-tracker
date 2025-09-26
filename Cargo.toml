@@ -9,5 +9,6 @@ members = [
   "migration", 
   "update_changed_names",
   "backend", 
+  "spanix_scrubber", 
 ]
 resolver = "3"

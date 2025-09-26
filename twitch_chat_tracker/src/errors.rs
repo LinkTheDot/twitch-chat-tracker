@@ -168,4 +168,7 @@ pub enum AppError {
     streamer_id
   )]
   FailedToFindActiveStreamForAUserWhereOneWasExpected { streamer_id: i32 },
+
+  #[error("Received a failed response from {}. Code: {}", location, code)]
+  FailedResponse { location: &'static str, code: u16 },
 }

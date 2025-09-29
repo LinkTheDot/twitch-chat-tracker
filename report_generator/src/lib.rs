@@ -45,6 +45,8 @@ pub async fn generate_reports(
       .unwrap();
   let (unfiltered_chat_report, emote_filtered_chat_report) =
     get_messages_sent_ranking(&query_conditions).await.unwrap();
+  let (monthly_unfiltered_chat_report, monthly_emote_filtered_chat_report) =
+    get_messages_sent_ranking(&monthly_condition).await.unwrap();
 
   let mut reports = vec![
     ("general_stats", general_stats_report),
@@ -58,6 +60,14 @@ pub async fn generate_reports(
     (
       "monthly_general_stats_with_donations",
       monthly_general_with_donations_stats_report,
+    ),
+    (
+      "monthly_unfiltered_chat_rankings",
+      monthly_unfiltered_chat_report,
+    ),
+    (
+      "monthly_emote_filtered_chat_rankings",
+      monthly_emote_filtered_chat_report,
     ),
   ];
 

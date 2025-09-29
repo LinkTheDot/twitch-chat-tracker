@@ -42,7 +42,8 @@ pub async fn get_chat_statistics_template(
   let chat_statistics = ChatStatistics::new(query_conditions).await?;
   let (mut user_bans, user_timeouts) = get_timeouts(query_conditions, database_connection).await?;
   let raids = get_raids(query_conditions, database_connection).await?;
-  let top_emotes = get_top_n_emotes(query_conditions, database_connection, Some(TOP_N_EMOTES)).await?;
+  let top_emotes =
+    get_top_n_emotes(query_conditions, database_connection, Some(TOP_N_EMOTES)).await?;
   let mut statistics_template = String::from(STATS_FILE_TEMPLATE);
   let mut statistics_string = String::new();
 

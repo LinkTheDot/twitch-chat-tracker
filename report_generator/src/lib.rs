@@ -20,6 +20,7 @@ pub mod upload_reports;
 
 /// Message containing this percentage of emotes per word is emote dominant.
 pub const EMOTE_DOMINANCE: f32 = 0.7;
+const MONTHLY_RANKING_ROW_LIMIT: usize = 1000;
 
 /// Generates reports for the given stream ID.
 /// Returns a list of the name and report string.
@@ -44,9 +45,13 @@ pub async fn generate_reports(
       .await
       .unwrap();
   let (unfiltered_chat_report, emote_filtered_chat_report) =
-    get_messages_sent_ranking(&query_conditions).await.unwrap();
+    get_messages_sent_ranking(&query_conditions, None)
+      .await
+      .unwrap();
   let (monthly_unfiltered_chat_report, monthly_emote_filtered_chat_report) =
-    get_messages_sent_ranking(&monthly_condition).await.unwrap();
+    get_messages_sent_ranking(&monthly_condition, Some(MONTHLY_RANKING_ROW_LIMIT))
+      .await
+      .unwrap();
 
   let mut reports = vec![
     ("general_stats", general_stats_report),

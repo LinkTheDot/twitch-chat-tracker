@@ -17,6 +17,7 @@ mod messages_with_word_counts;
 mod ranking_table;
 
 const EMOTE_DOMINANCE_INFO: &str = "This table has omitted messages where more than {emote_message_threshold}% of the words were Twitch or third party emotes.";
+const WORD_PERCENTAGE_INFO: &str = "The `%_of_words` column shows how many of all words between all messages were from that particular user. Emotes are not counted as words.";
 const USER_TAG_INFO: &str = r#"After a user's ranking will be indicators for both if they're subscribed and if they're a first time chatter.
 * for first time chatter.
 - for if the user isn't subscribed.
@@ -28,6 +29,7 @@ const USER_TAG_INFO: &str = r#"After a user's ranking will be indicators for bot
 #[instrument(skip_all)]
 pub async fn get_messages_sent_ranking(
   query_conditions: &AppQueryConditions,
+  ranking_row_limit: Option<usize>,
 ) -> Result<(String, String), AppError> {
   let database_connection = get_database_connection().await;
   tracing::info!("Getting messages.");
@@ -37,7 +39,7 @@ pub async fn get_messages_sent_ranking(
     .await?;
   let messages: Vec<&stream_message::Model> = messages.iter().collect();
 
-  let rankings = calculate_rankings(messages, database_connection).await?;
+  let rankings = calculate_rankings(messages, database_connection, ranking_row_limit).await?;
 
   let mut unfiltered_table = Table::new(rankings.all_messages);
   let mut filtered_table = Table::new(rankings.emote_filtered_messages);
@@ -45,15 +47,15 @@ pub async fn get_messages_sent_ranking(
   unfiltered_table.with(Style::markdown());
   filtered_table.with(Style::markdown());
 
-  let unfiltered_table = format!("{}\n\n{}", USER_TAG_INFO, unfiltered_table);
+  let emote_dominance_info = EMOTE_DOMINANCE_INFO.replace(
+    "{emote_message_threshold}",
+    &((EMOTE_DOMINANCE * 100.0).floor() as usize).to_string(),
+  );
+
+  let unfiltered_table =
+    format!("{WORD_PERCENTAGE_INFO}\n\n{USER_TAG_INFO}\n\n{unfiltered_table}",);
   let filtered_table = format!(
-    "{}\n\n{}\n\n{}",
-    EMOTE_DOMINANCE_INFO.replace(
-      "{emote_message_threshold}",
-      &((EMOTE_DOMINANCE * 100.0).floor() as usize).to_string(),
-    ),
-    USER_TAG_INFO,
-    filtered_table
+    "{emote_dominance_info}\n{WORD_PERCENTAGE_INFO}\n\n{USER_TAG_INFO}\n\n{filtered_table}",
   );
 
   Ok((unfiltered_table, filtered_table))
@@ -62,6 +64,7 @@ pub async fn get_messages_sent_ranking(
 async fn calculate_rankings(
   messages: Vec<&stream_message::Model>,
   database_connection: &DatabaseConnection,
+  ranking_row_limit: Option<usize>,
 ) -> Result<ChatRankings, AppError> {
   let mut chats_sent: HashMap<i32, UserMessages> = HashMap::new();
   let total_messages_sent = messages.len();
@@ -101,11 +104,28 @@ async fn calculate_rankings(
     user_messages.insert_message(message);
   }
 
-  let mut chats_sent = replace_ids_with_users(chats_sent, database_connection).await?;
+  let mut emote_filtered_chats_sent =
+    replace_ids_with_users(chats_sent, database_connection).await?;
+  let mut unfiltered_chats_sent = emote_filtered_chats_sent.clone();
 
-  chats_sent.sort_by(|(_, lhs), (_, rhs)| rhs.all_messages.len().cmp(&lhs.all_messages.len()));
+  unfiltered_chats_sent
+    .sort_by(|(_, lhs), (_, rhs)| rhs.all_messages.len().cmp(&lhs.all_messages.len()));
 
-  let unfiltered_message_rankings: Vec<RankingEntry> = chats_sent
+  emote_filtered_chats_sent
+    .retain(|(_user, chats_sent)| !chats_sent.emote_filtered_messages.is_empty());
+  emote_filtered_chats_sent.sort_by(|(_, lhs), (_, rhs)| {
+    rhs
+      .emote_filtered_messages
+      .len()
+      .cmp(&lhs.emote_filtered_messages.len())
+  });
+
+  if let Some(ranking_row_limit) = ranking_row_limit {
+    unfiltered_chats_sent.truncate(ranking_row_limit);
+    emote_filtered_chats_sent.truncate(ranking_row_limit);
+  }
+
+  let unfiltered_message_rankings: Vec<RankingEntry> = unfiltered_chats_sent
     .iter()
     .enumerate()
     .map(|(place, (user, user_messages))| {
@@ -142,15 +162,7 @@ async fn calculate_rankings(
     })
     .collect();
 
-  chats_sent.retain(|(_user, chats_sent)| !chats_sent.emote_filtered_messages.is_empty());
-  chats_sent.sort_by(|(_, lhs), (_, rhs)| {
-    rhs
-      .emote_filtered_messages
-      .len()
-      .cmp(&lhs.emote_filtered_messages.len())
-  });
-
-  let emote_filtered_message_rankings: Vec<RankingEntry> = chats_sent
+  let emote_filtered_message_rankings: Vec<RankingEntry> = emote_filtered_chats_sent
     .iter()
     .enumerate()
     .map(|(place, (user, user_messages))| {
@@ -306,7 +318,9 @@ mod tests {
 
     let expected_chat_rankings = get_expected_chat_rankings();
 
-    let chat_rankings = calculate_rankings(messages, &mock_database).await.unwrap();
+    let chat_rankings = calculate_rankings(messages, &mock_database, None)
+      .await
+      .unwrap();
 
     assert_eq!(chat_rankings, expected_chat_rankings);
   }

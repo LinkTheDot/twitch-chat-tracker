@@ -1,10 +1,7 @@
-#![allow(unused)]
-
-use axum::{Router, response::Html, routing::get};
+use axum::Router;
 use backend::app::InterfaceConfig;
 use backend::routes::route_builder::RouteBuilder;
 use http::{Method, header::CONTENT_TYPE};
-use std::sync::Arc;
 use tower_http::cors::{Any, CorsLayer};
 
 const LISTENING_ADDRESS: &str = "0.0.0.0:8080";
@@ -26,7 +23,7 @@ async fn main() {
 
   tracing::info!("listening on {}", listener.local_addr().unwrap());
 
-  let mut app = Router::new()
+  let app = Router::new()
     .apply_all_routes()
     .with_state(interface_config)
     .layer(cors);

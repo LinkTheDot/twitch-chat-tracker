@@ -1,4 +1,5 @@
 use crate::clap::Args;
+use crate::reports::{Report, Reports};
 use crate::{errors::AppError, pastebin::generate_pastebin};
 use entities::stream;
 use std::path::PathBuf;
@@ -10,18 +11,18 @@ const FILE_REPORTS_DIR: &str = "file_reports";
 ///
 /// Takes (report_name, report_string) and uploads them to pastebin or if the `-f` flag is passed in.
 /// Writes the reports to files instead.
-pub async fn upload_reports<S1: AsRef<str>, S2: AsRef<str>>(
-  stream: stream::Model,
-  reports: Vec<(S1, S2)>,
-) -> Result<(), AppError> {
+pub async fn upload_reports(stream: stream::Model, reports: Reports) -> Result<(), AppError> {
   let stream_start_time = stream
     .start_timestamp
     .unwrap()
     .format("%d-%m-%y")
     .to_string();
 
-  for (report_name, report) in reports {
-    let (report_name, report) = (report_name.as_ref(), report.as_ref());
+  for Report {
+    name: report_name,
+    body: report,
+  } in reports.get_list()
+  {
     let report_date_and_name = format!("[{stream_start_time}]|{report_name}");
 
     if Args::generate_file_reports() {

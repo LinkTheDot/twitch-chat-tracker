@@ -33,6 +33,9 @@ pub struct Args {
   #[arg(short = 'n', long = "report_streamer_name")]
   /// Sets the streamer to generate a report for. Chooses their latest stream.
   report_latest_stream_for_user: Option<String>,
+
+  #[arg(long = "monthly_chat_ranking")]
+  run_monthly_chat_ranking: bool,
 }
 
 impl Args {
@@ -66,5 +69,9 @@ impl Args {
 
   pub fn streamer_name_report() -> Option<&'static String> {
     Self::get_or_set().report_latest_stream_for_user.as_ref()
+  }
+
+  pub fn run_monthly_chat_ranking() -> bool {
+    Self::get_or_set().run_monthly_chat_ranking
   }
 }

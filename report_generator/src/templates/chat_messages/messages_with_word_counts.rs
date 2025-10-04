@@ -1,6 +1,6 @@
 use entities::*;
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 pub struct UserMessages<'a> {
   pub all_messages: Vec<MessageWithWordCount<'a>>,
   pub emote_filtered_messages: Vec<MessageWithWordCount<'a>>,

@@ -19,7 +19,8 @@ async fn main() {
     .build()
     .unwrap();
 
-  match report_generator::generate_reports(condition, stream.twitch_user_id).await {
+  match report_generator::reports::Reports::generate_reports(condition, stream.twitch_user_id).await
+  {
     Ok(reports) => {
       println!("\n\n");
 

@@ -4,12 +4,12 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-tracing = "0.1.*"
-tracing-appender = "0.2.3"
-secrecy = "0.10.*"
-anyhow = "1.0.*"
+tracing = "0.1"
+tracing-appender = "0.2"
+secrecy = "0.10"
+anyhow = "1.0"
 serde = { version = "1.0", features = ["derive"] }
-schematic = { version = "0.18.2", features = ["yaml", "env"] }
+schematic = { version = "0.18", features = ["yaml", "env"] }
 
 [features]
 __test_hook = []

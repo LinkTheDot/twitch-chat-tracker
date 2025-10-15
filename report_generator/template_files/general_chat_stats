@@ -1,0 +1,7 @@
+= Chat statistics =
+First time chatters: {{ chat_stats.first_time_chatters }}
+Total chats: {{ chat_stats.total_chats }}
+Total chats with < {{ chat_stats.emote_message_threshold }}% emotes to words: {{ chat_stats.non_emote_dominant_chats }}
+Subscribed|Unsubscribed chats: {{ chat_stats.subscribed_chat_percentage | round(precision=2) }} | {{ 100.0 - chat_stats.subscribed_chat_percentage | round(precision=2) }}
+Average word count in messages: {{ chat_stats.average_words_per_message | round(precision=2) }}
+Brand new subscribers: {{ chat_stats.new_subscribers }}

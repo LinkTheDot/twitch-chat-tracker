@@ -34,6 +34,7 @@ impl TopDonatorsTables {
 impl std::fmt::Display for TopDonatorsTables {
   fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
     let spacing = "\n".repeat(5);
+
     write!(
       formatter,
       "{}{spacing}{}{spacing}{}",

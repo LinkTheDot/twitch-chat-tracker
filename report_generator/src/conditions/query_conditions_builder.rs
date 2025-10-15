@@ -35,7 +35,7 @@ macro_rules! generate_condition_getter {
       )?
 
       $(
-        if let (Some(start_time), Some(end_time)) = (self.month_start, self.month_end) {
+        if let (Some(start_time), Some(end_time)) = (self.start_time, self.end_time) {
           condition =
             condition.add($condition_module::Column::$timestamp_column_definition.between(start_time, end_time))
         }
@@ -56,8 +56,8 @@ macro_rules! generate_condition_getter {
 #[derive(Default, Debug)]
 pub struct AppQueryConditionsBuilder {
   stream_id: Option<i32>,
-  month_start: Option<DateTime<Utc>>,
-  month_end: Option<DateTime<Utc>>,
+  start_time: Option<DateTime<Utc>>,
+  end_time: Option<DateTime<Utc>>,
   streamer_twitch_user_id: Option<i32>,
 }
 
@@ -66,10 +66,43 @@ impl AppQueryConditionsBuilder {
     Self::default()
   }
 
+  pub fn copy_from_existing_query_conditions(query_conditions: &AppQueryConditions) -> Self {
+    Self {
+      stream_id: query_conditions.stream_id,
+      start_time: query_conditions.date_start,
+      end_time: query_conditions.date_end,
+      streamer_twitch_user_id: query_conditions.streamer_twitch_user_id,
+    }
+  }
+
   pub fn set_stream_id(mut self, stream_id: i32) -> Self {
     self.stream_id = Some(stream_id);
 
     self
+  }
+
+  pub fn wipe_stream_id(mut self) -> Self {
+    self.stream_id = None;
+
+    self
+  }
+
+  pub fn set_time_range(
+    mut self,
+    start_time: DateTime<Utc>,
+    end_time: DateTime<Utc>,
+  ) -> Result<Self, AppError> {
+    if start_time > end_time {
+      return Err(AppError::EndTimeIsOlderThanStartTime {
+        start_time,
+        end_time,
+      });
+    }
+
+    self.start_time = Some(start_time);
+    self.end_time = Some(end_time);
+
+    Ok(self)
   }
 
   pub fn set_month_range(mut self, start_month: i32, end_month: i32) -> Result<Self, AppError> {
@@ -102,8 +135,8 @@ impl AppQueryConditionsBuilder {
     let end_date =
       DateTime::<Utc>::from_naive_utc_and_offset(end_date.and_time(NaiveTime::MIN), Utc);
 
-    self.month_start = Some(start_date);
-    self.month_end = Some(end_date);
+    self.start_time = Some(start_date);
+    self.end_time = Some(end_date);
 
     Ok(self)
   }
@@ -121,10 +154,11 @@ impl AppQueryConditionsBuilder {
       donations: self.donation_event(),
       subscriptions: self.subscription_event(),
       raids: self.raid(),
+      streams: self.stream(),
 
       stream_id: self.stream_id,
-      month_start: self.month_start,
-      month_end: self.month_end,
+      date_start: self.start_time,
+      date_end: self.end_time,
       streamer_twitch_user_id: self.streamer_twitch_user_id,
     })
   }
@@ -162,5 +196,21 @@ impl AppQueryConditionsBuilder {
     get_stream_column: StreamId,
     get_timestamp_column: Timestamp,
     get_user_column: TwitchUserId,
+  }
+
+  fn stream(&self) -> sea_orm::Condition {
+    let mut condition = sea_orm::Condition::all();
+
+    if let (Some(start_time), Some(end_time)) = (self.start_time, self.end_time) {
+      condition = condition
+        .add(stream::Column::StartTimestamp.gte(start_time))
+        .add(stream::Column::EndTimestamp.lte(end_time))
+    }
+
+    if let Some(streamer_twitch_user_id) = self.streamer_twitch_user_id {
+      condition = condition.add(stream::Column::TwitchUserId.eq(streamer_twitch_user_id));
+    }
+
+    condition
   }
 }

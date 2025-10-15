@@ -1,6 +1,8 @@
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, NaiveDate, Utc};
 use clap::Parser;
 use std::sync::OnceLock;
+
+use crate::reports::chosen_report::ChosenReport;
 
 static ARGS: OnceLock<Args> = OnceLock::new();
 
@@ -36,11 +38,23 @@ pub struct Args {
 
   #[arg(long = "monthly_chat_ranking")]
   run_monthly_chat_ranking: bool,
+
+  #[arg(short = 'r', long)]
+  chosen_report: ChosenReport,
+
+  #[arg(long, value_parser = parse_date)]
+  subathon_start_date: Option<DateTime<Utc>>,
+  #[arg(long, value_parser = parse_date)]
+  subathon_end_date: Option<DateTime<Utc>>,
 }
 
 impl Args {
   fn get_or_set() -> &'static Self {
     ARGS.get_or_init(Args::parse)
+  }
+
+  pub fn chosen_report() -> ChosenReport {
+    Self::get_or_set().chosen_report
   }
 
   pub fn report_stream_id() -> Option<i32> {
@@ -74,4 +88,19 @@ impl Args {
   pub fn run_monthly_chat_ranking() -> bool {
     Self::get_or_set().run_monthly_chat_ranking
   }
+
+  pub fn subathon_start_date() -> Option<&'static DateTime<Utc>> {
+    Self::get_or_set().subathon_start_date.as_ref()
+  }
+
+  pub fn subathon_end_date() -> Option<&'static DateTime<Utc>> {
+    Self::get_or_set().subathon_end_date.as_ref()
+  }
+}
+
+/// Custom parser for to convert "yyyy-mm-dd" string to DateTime<Utc> at midnight.
+fn parse_date(s: &str) -> Result<DateTime<Utc>, String> {
+  NaiveDate::parse_from_str(s, "%Y-%m-%d")
+    .map(|date| date.and_hms_opt(0, 0, 0).unwrap().and_utc())
+    .map_err(|e| e.to_string())
 }

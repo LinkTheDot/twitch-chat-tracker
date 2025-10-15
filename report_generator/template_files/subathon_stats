@@ -1,0 +1,3 @@
+Total stream time: {{ subathon_stats.hours_streamed | round(precision=2) }} hours
+Total time added from donations: {{ subathon_stats.hours_added_from_donations | round(precision=2) }} hours
+Total points: {{ subathon_stats.total_points }}

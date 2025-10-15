@@ -11,10 +11,11 @@ pub struct AppQueryConditions {
   pub donations: Condition,
   pub subscriptions: Condition,
   pub raids: Condition,
+  pub streams: Condition,
 
   pub stream_id: Option<i32>,
-  pub month_start: Option<DateTime<Utc>>,
-  pub month_end: Option<DateTime<Utc>>,
+  pub date_start: Option<DateTime<Utc>>,
+  pub date_end: Option<DateTime<Utc>>,
   pub streamer_twitch_user_id: Option<i32>,
 }
 
@@ -26,10 +27,11 @@ impl AppQueryConditions {
       donations: Condition::all().add(donation_event::Column::StreamId.eq(Some(stream_id))),
       subscriptions: Condition::all().add(subscription_event::Column::StreamId.eq(Some(stream_id))),
       raids: Condition::all().add(raid::Column::StreamId.eq(Some(stream_id))),
+      streams: Condition::all().add(stream::Column::Id.eq(stream_id)),
 
       stream_id: Some(stream_id),
-      month_start: None,
-      month_end: None,
+      date_start: None,
+      date_end: None,
       streamer_twitch_user_id: None,
     }
   }
@@ -44,7 +46,7 @@ impl AppQueryConditions {
 
       timeouts: Condition::all()
         .add(user_timeout::Column::Timestamp.between(start_date, end_date))
-        .add(user_timeout::Column::TwitchUserId.eq(streamer_twitch_user_id)),
+        .add(user_timeout::Column::ChannelId.eq(streamer_twitch_user_id)),
 
       donations: Condition::all()
         .add(donation_event::Column::Timestamp.between(start_date, end_date))
@@ -58,9 +60,13 @@ impl AppQueryConditions {
         .add(raid::Column::Timestamp.between(start_date, end_date))
         .add(raid::Column::TwitchUserId.eq(streamer_twitch_user_id)),
 
+      streams: Condition::all()
+        .add(stream::Column::StartTimestamp.gte(start_date))
+        .add(stream::Column::EndTimestamp.gte(end_date)),
+
       stream_id: None,
-      month_start: Some(start_date),
-      month_end: Some(end_date),
+      date_start: Some(start_date),
+      date_end: Some(end_date),
       streamer_twitch_user_id: None,
     })
   }
@@ -83,6 +89,10 @@ impl AppQueryConditions {
 
   pub fn raids(&self) -> &Condition {
     &self.raids
+  }
+
+  pub fn streams(&self) -> &Condition {
+    &self.streams
   }
 }
 

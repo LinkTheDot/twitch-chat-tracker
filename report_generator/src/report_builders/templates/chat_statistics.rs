@@ -9,12 +9,13 @@ use sea_orm::*;
 use std::collections::HashMap;
 use subscriptions::Subscriptions;
 
-#[derive(Default)]
+#[derive(Default, serde::Serialize)]
 pub struct ChatStatistics {
+  pub emote_message_threshold: f64,
   pub first_time_chatters: i32,
   pub total_chats: i32,
-  pub emote_dominant_chats: i32,
-  pub average_word_length: f32,
+  pub non_emote_dominant_chats: i32,
+  pub average_words_per_message: f32,
   /// 0-100
   pub subscribed_chat_percentage: f32,
   pub raw_donations: f32,
@@ -30,6 +31,9 @@ pub struct ChatStatistics {
 }
 
 impl ChatStatistics {
+  /// The name used to indentify the ChatStatistics object for template rendering.
+  pub const NAME: &str = "chat_stats";
+
   pub async fn new(query_conditions: &AppQueryConditions) -> Result<Self, AppError> {
     let database_connection = get_database_connection().await;
     let stream_messages = stream_message::Entity::find()
@@ -38,13 +42,15 @@ impl ChatStatistics {
       .await?;
     let total_chats = stream_messages.len() as i32;
     let subscriptions = Subscriptions::new(query_conditions).await?;
+    let emote_dominant_chats =
+      Self::emote_dominant_chats(query_conditions, database_connection).await?;
 
     Ok(Self {
+      emote_message_threshold: (EMOTE_DOMINANCE * 100.0).floor() as f64,
       first_time_chatters: Self::first_time_chatters(&stream_messages),
       total_chats,
-      emote_dominant_chats: Self::emote_dominant_chats(query_conditions, database_connection)
-        .await?,
-      average_word_length: Self::average_word_length(&stream_messages),
+      non_emote_dominant_chats: total_chats - emote_dominant_chats,
+      average_words_per_message: Self::average_word_length(&stream_messages),
       subscribed_chat_percentage: Self::subscribed_chat_percentage(&stream_messages),
       raw_donations: Self::get_donation_event_total_amount(
         query_conditions,
@@ -74,11 +80,11 @@ impl ChatStatistics {
     end_pairs.insert("{total_chats}".into(), self.total_chats.to_string());
     end_pairs.insert(
       "{emote_message_threshold}".into(),
-      ((EMOTE_DOMINANCE * 100.0).floor() as usize).to_string(),
+      self.emote_message_threshold.to_string(),
     );
     end_pairs.insert(
       "{non-emote_dominant_chats}".into(),
-      (self.total_chats - self.emote_dominant_chats).to_string(),
+      self.non_emote_dominant_chats.to_string(),
     );
     end_pairs.insert(
       "{subscriber_chat_percentage}".into(),
@@ -90,7 +96,7 @@ impl ChatStatistics {
     );
     end_pairs.insert(
       "{average_message_length}".into(),
-      format!("{:.2}", self.average_word_length),
+      format!("{:.2}", self.average_words_per_message),
     );
     end_pairs.insert(
       "{raw_donations}".into(),
@@ -217,7 +223,8 @@ impl ChatStatistics {
       streamlabs_donation_events
         .iter()
         .map(|donation| donation.amount)
-        .sum::<f32>(),
+        .sum::<f32>()
+        .max(0.0),
     )
   }
 

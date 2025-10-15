@@ -17,6 +17,9 @@ pub enum AppError {
   #[error("{}", .0)]
   SerdeError(#[from] serde_json::Error),
 
+  #[error("{}", .0)]
+  TeraError(#[from] tera::Error),
+
   #[error("Failed to generate a pastebin. Reason: {:?}", .0)]
   IncorrectPastebinResponse(String),
 
@@ -56,4 +59,16 @@ pub enum AppError {
 
   #[error("Invalid query date range conditions. start: {} | end: {}", start, end)]
   InvalidQueryDateConditions { start: i32, end: i32 },
+
+  #[error("Failed to render a template because it did not exist. Template name: {template_name}")]
+  MissingTeraTemplate { template_name: &'static str },
+
+  #[error("Failed to build conditions because the passed in end time `{end_time:?}` is older than the start time `{start_time:?}`.")]
+  EndTimeIsOlderThanStartTime {
+    start_time: chrono::DateTime<chrono::Utc>,
+    end_time: chrono::DateTime<chrono::Utc>,
+  },
+
+  #[error("Tried to generate subathon report without a subathon start time.")]
+  MissingSubathonStartTime,
 }

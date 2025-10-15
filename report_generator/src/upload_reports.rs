@@ -21,7 +21,7 @@ pub async fn upload_reports(stream: stream::Model, reports: Reports) -> Result<(
   for Report {
     name: report_name,
     body: report,
-  } in reports.get_list()
+  } in reports.get_reports()
   {
     let report_date_and_name = format!("[{stream_start_time}]|{report_name}");
 

@@ -1,0 +1,13 @@
+= Donation Statistics =
+Donations: £{{ chat_stats.raw_donations }}
+Bits: {{ chat_stats.bits }}
+
+{%- set total_tier_1 = chat_stats.tier_1_subs + chat_stats.tier_1_gift_subs %}
+{%- set total_tier_2 = chat_stats.tier_2_subs + chat_stats.tier_2_gift_subs %}
+{%- set total_tier_3 = chat_stats.tier_3_subs + chat_stats.tier_3_gift_subs %}
+
+Subscriptions: T1 - {{ chat_stats.tier_1_subs }} | T2 - {{ chat_stats.tier_2_subs }} | T3 - {{ chat_stats.tier_3_subs }} | Prime - {{ chat_stats.prime_subscriptions }}
+Gift Subs: T1 - {{ chat_stats.tier_1_gift_subs }} | T2 - {{ chat_stats.tier_2_gift_subs }} | T3 - {{ chat_stats.tier_3_gift_subs }}
+
+Total Subs: T1 - {{ total_tier_1 }} | T2 - {{ total_tier_2 }} | T3 - {{ total_tier_3 }} | Prime - {{ chat_stats.prime_subscriptions }}
+All: {{ total_tier_1 + total_tier_2 + total_tier_3 + chat_stats.prime_subscriptions }}

@@ -3,6 +3,8 @@ use entities::{stream, twitch_user};
 use entity_extensions::twitch_user::*;
 use report_generator::clap::Args;
 use report_generator::conditions::query_conditions_builder::AppQueryConditionsBuilder;
+use report_generator::reports::chosen_report::ChosenReport;
+use report_generator::reports::*;
 use report_generator::upload_reports::upload_reports;
 use sea_orm::*;
 
@@ -19,8 +21,14 @@ async fn main() {
     .build()
     .unwrap();
 
-  match report_generator::reports::Reports::generate_reports(condition, stream.twitch_user_id).await
-  {
+  let generate_reports_result = match Args::chosen_report() {
+    ChosenReport::Basic => basic_reports::generate_reports(condition, stream.twitch_user_id).await,
+    ChosenReport::Subathon => {
+      subathon_reports::generate_reports(condition, stream.twitch_user_id).await
+    }
+  };
+
+  match generate_reports_result {
     Ok(reports) => {
       println!("\n\n");
 

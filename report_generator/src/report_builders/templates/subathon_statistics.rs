@@ -27,6 +27,8 @@ impl SubathonStatistics {
     query_conditions: &AppQueryConditions,
     database_connection: &DatabaseConnection,
   ) -> Result<Self, AppError> {
+    tracing::info!("Building subathon statistics.");
+
     let total_stream_duration =
       Self::get_duration_of_streams(query_conditions, database_connection).await?;
     let total_stream_duration = total_stream_duration.as_seconds_f64() / 3600.0;
@@ -45,6 +47,8 @@ impl SubathonStatistics {
     query_conditions: &AppQueryConditions,
     database_connection: &DatabaseConnection,
   ) -> Result<ChronoDuration, AppError> {
+    tracing::info!("Calculating duration of all streams.");
+
     let streams = stream::Entity::find()
       .filter(query_conditions.streams().clone())
       .all(database_connection)
@@ -74,6 +78,8 @@ impl SubathonStatistics {
     query_conditions: &AppQueryConditions,
     database_connection: &DatabaseConnection,
   ) -> Result<f64, AppError> {
+    tracing::info!("Calculating total points from all donations since start time.");
+
     let all_donations = donation_event::Entity::find()
       .filter(query_conditions.donations().clone())
       .select_only()

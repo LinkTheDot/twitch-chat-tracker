@@ -22,6 +22,8 @@ pub struct TopDonators {
 
 impl TopDonators {
   pub async fn build_tables(self) -> Result<TopDonatorsTables, AppError> {
+    tracing::info!("Building tables for top donators.");
+
     let donators = self.get_donator_name_list().await?;
 
     let streamlabs_table = self.streamlabs_table(&donators);

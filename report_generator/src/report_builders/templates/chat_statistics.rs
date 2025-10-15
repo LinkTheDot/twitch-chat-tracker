@@ -35,7 +35,10 @@ impl ChatStatistics {
   pub const NAME: &str = "chat_stats";
 
   pub async fn new(query_conditions: &AppQueryConditions) -> Result<Self, AppError> {
+    tracing::info!("Building chat statistics.");
+
     let database_connection = get_database_connection().await;
+    tracing::info!("Gathering all messages.");
     let stream_messages = stream_message::Entity::find()
       .filter(query_conditions.messages().clone())
       .all(database_connection)
@@ -140,6 +143,8 @@ impl ChatStatistics {
   }
 
   fn first_time_chatters(messages: &[stream_message::Model]) -> i32 {
+    tracing::info!("Calculating total first time messages.");
+
     messages
       .iter()
       .filter(|message| message.is_first_message == 1)
@@ -150,6 +155,9 @@ impl ChatStatistics {
     query_conditions: &AppQueryConditions,
     database_connection: &DatabaseConnection,
   ) -> Result<i32, AppError> {
+    tracing::info!("Calculating emote dominant chats.");
+
+    tracing::info!("Getting emote usage with message contents.");
     let emote_usage_with_contents = emote_usage::Entity::find()
       .join(
         JoinType::InnerJoin,
@@ -167,6 +175,7 @@ impl ChatStatistics {
       .all(database_connection)
       .await?;
 
+    tracing::info!("Building messages with total emote usage.");
     // id: (contents, total)
     let messages_with_totals: HashMap<i32, (String, i32)> = emote_usage_with_contents
       .into_iter()
@@ -183,6 +192,7 @@ impl ChatStatistics {
         end_list
       });
 
+    tracing::info!("Filtering messages that have more than {EMOTE_DOMINANCE}% emotes to words.");
     Ok(
       messages_with_totals
         .into_iter()
@@ -200,6 +210,8 @@ impl ChatStatistics {
   }
 
   fn average_word_length(messages: &[stream_message::Model]) -> f32 {
+    tracing::info!("Calculating average word length of all messages.");
+
     messages
       .iter()
       .filter_map(|message| Some(message.contents.as_ref()?.split(' ').count()))
@@ -211,6 +223,8 @@ impl ChatStatistics {
     query_conditions: &AppQueryConditions,
     event_type: EventType,
   ) -> Result<f32, AppError> {
+    tracing::info!("Getting total {event_type:?} donation amount.");
+
     let database_connection = get_database_connection().await;
 
     let streamlabs_donation_events = donation_event::Entity::find()
@@ -229,6 +243,8 @@ impl ChatStatistics {
   }
 
   fn subscribed_chat_percentage(messages: &[stream_message::Model]) -> f32 {
+    tracing::info!("Calculating subscribed chat messages to unsubscribed chat messages ratio.");
+
     let total_chats = messages.len();
     let subscriber_message_count = messages
       .iter()
@@ -239,6 +255,8 @@ impl ChatStatistics {
   }
 
   async fn get_new_subscribers(query_conditions: &AppQueryConditions) -> Result<i32, AppError> {
+    tracing::info!("Calculating brand new subscribers.");
+
     let database_connection = get_database_connection().await;
 
     Ok(
@@ -269,6 +287,8 @@ mod subscriptions {
 
   impl Subscriptions {
     pub async fn new(query_conditions: &AppQueryConditions) -> Result<Self, AppError> {
+      tracing::info!("Calculating total subscription and gift subscriptions.");
+
       let database_connection = get_database_connection().await;
       let subs = Self::get_subscriptions_for_stream(query_conditions).await?;
       let gifted_subs = donation_event::Entity::find()

@@ -8,13 +8,19 @@ pub async fn get_raids_table(
   query_conditions: &AppQueryConditions,
   database_connection: &DatabaseConnection,
 ) -> Result<String, AppError> {
+  tracing::info!("Building raids table.");
+
   let raids = get_raids(query_conditions, database_connection).await?;
+
+  tracing::info!("Building...");
 
   let raids_list = raids
     .iter()
     .map(|(raid, raider)| format!("{} - {} viewers", raider.login_name, raid.size))
     .collect::<Vec<String>>()
     .join("\n");
+
+  tracing::info!("Finished.");
 
   if raids_list.is_empty() {
     return Ok(String::default());
@@ -27,13 +33,13 @@ async fn get_raids(
   query_conditions: &AppQueryConditions,
   database_connection: &DatabaseConnection,
 ) -> Result<Vec<(raid::Model, twitch_user::Model)>, AppError> {
+  tracing::info!("Getting raids.");
   let raids_and_raiders = raid::Entity::find()
     .join(JoinType::LeftJoin, raid::Relation::TwitchUser2.def())
     .filter(query_conditions.raids().clone())
     .select_also(twitch_user::Entity)
     .all(database_connection)
     .await?;
-
   Ok(
     raids_and_raiders
       .into_iter()

@@ -38,9 +38,16 @@ pub async fn generate_reports(
       .wipe_stream_id()
       .build()?;
 
+  tracing::info!(
+    "Building reports for subathon starting at {:?}.",
+    subathon_start_date
+  );
+
   let baseline_reports = get_baseline_reports(query_conditions, subathon_conditions).await?;
   let conditional_reports =
     get_conditional_reports(&monthly_conditions, streamer_twitch_user_id).await?;
+
+  tracing::info!("Finished building reports for subathon.");
 
   reports.add_reports(baseline_reports);
   reports.add_reports(conditional_reports);
@@ -53,12 +60,15 @@ async fn get_baseline_reports(
   query_conditions: AppQueryConditions,
   subathon_conditions: AppQueryConditions,
 ) -> Result<Vec<Report>, AppError> {
+  tracing::info!("Generating baseline reports.");
+
   let database_connection = get_database_connection().await;
   let mut template_renderer = TemplateRenderer::new();
   let subathon_statistics =
     SubathonStatistics::new(&subathon_conditions, database_connection).await?;
   let general_chat_statistics = ChatStatistics::new(&query_conditions).await?;
 
+  tracing::info!("Building template renderer.");
   template_renderer.add_context(ChatStatistics::NAME, &general_chat_statistics);
   template_renderer.add_context(SubathonStatistics::NAME, &subathon_statistics);
   template_renderer
@@ -86,6 +96,8 @@ async fn get_baseline_reports(
   let raids = get_raids_table(&query_conditions, database_connection).await?;
   let timeouts = get_timeouts_table(&query_conditions, database_connection).await?;
 
+  tracing::info!("Building report strings.");
+
   let general_stats_report = Report::build_report_from_list(
     "general_stats",
     &[
@@ -112,10 +124,13 @@ async fn get_baseline_reports(
 
   tracing::info!("Generating chat message rankings.");
   let (unfiltered_chat_report, emote_filtered_chat_report) =
+
     get_messages_sent_ranking(&query_conditions, None).await?;
   tracing::info!("Generating chat message rankings for subathon.");
   let (unfiltered_subathon_chat_report, subathon_emote_filtered_chat_report) =
     get_messages_sent_ranking(&subathon_conditions, Some(SUBATHON_RANKING_ROW_LIMIT)).await?;
+
+  tracing::info!("Gathering reports.");
 
   let reports = vec![
     general_stats_report,
@@ -140,9 +155,10 @@ async fn get_conditional_reports(
   monthly_conditions: &AppQueryConditions,
   streamer_twitch_user_id: i32,
 ) -> Result<Vec<Report>, AppError> {
+  tracing::info!("Generating conditional reports.");
+
   let mut conditional_reports = vec![];
 
-  tracing::info!("Generating donation rankings.");
   let donator_monthly_rankings_result = get_donation_rankings_for_streamer_and_date(
     streamer_twitch_user_id,
     Args::get_year(),
@@ -163,6 +179,7 @@ async fn get_conditional_reports(
 
   if Args::run_monthly_chat_ranking() {
     tracing::info!("Generating monthly chat message rankings.");
+
     let (monthly_unfiltered_chat_report, monthly_emote_filtered_chat_report) =
       get_messages_sent_ranking(monthly_conditions, Some(MONTHLY_RANKING_ROW_LIMIT)).await?;
 

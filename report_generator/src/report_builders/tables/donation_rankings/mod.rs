@@ -31,11 +31,14 @@ pub async fn get_donation_rankings_for_streamer_and_date(
   let month = month.unwrap_or(current_date.month() as usize) as u32;
   let database_connection = get_database_connection().await;
 
+  tracing::info!("Generating donation rankings at {year}-{month}.");
+
   let Some(top_donators) = get_top_donators(streamer_id, year, month, database_connection).await?
   else {
     return Err(AppError::NoDonationsForDate { year, month });
   };
   let donator_ranking_tables = top_donators.build_tables().await?;
+  tracing::info!("Getting streamer.");
   let streamer = twitch_user::Entity::find_by_id(streamer_id)
     .one(database_connection)
     .await?;
@@ -59,6 +62,8 @@ async fn get_top_donators(
   month: u32,
   database_connection: &DatabaseConnection,
 ) -> Result<Option<TopDonators>, AppError> {
+  tracing::info!("Calculating top donators.");
+
   let date_start = NaiveDate::from_ymd_opt(year, month, 1).unwrap();
   let date_end = NaiveDate::from_ymd_opt(year, month + 1, 1).unwrap();
   let donations = donation_event::Entity::find()
@@ -74,6 +79,8 @@ async fn get_top_donators(
   }
 
   let mut donators = TopDonators::default();
+
+  tracing::info!("Building top donators list.");
 
   for donation in donations {
     let donator_identifier = DonatorIdentifier::from_donation_event(&donation);
@@ -121,6 +128,8 @@ async fn get_top_donators(
       }
     };
   }
+
+  tracing::info!("Finished building top donators list.");
 
   Ok(Some(donators))
 }

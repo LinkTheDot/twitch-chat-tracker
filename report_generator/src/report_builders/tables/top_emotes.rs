@@ -8,6 +8,11 @@ pub async fn get_top_n_emotes_table(
   database_connection: &DatabaseConnection,
   amount: Option<usize>,
 ) -> Result<String, AppError> {
+  tracing::info!(
+    "Getting top {} emotes.",
+    amount.map(|a| a.to_string()).unwrap_or("all".into())
+  );
+
   let top_emotes = get_top_n_emotes(query_conditions, database_connection, amount).await?;
   let top_emotes_table = build_emote_ranking_table(top_emotes);
 
@@ -19,6 +24,8 @@ async fn get_top_n_emotes(
   database_connection: &DatabaseConnection,
   amount: Option<usize>,
 ) -> Result<Vec<(String, usize)>, AppError> {
+  tracing::info!("Getting emotes used.");
+
   let emotes_used: Vec<(emote_usage::Model, Option<emote::Model>)> = emote_usage::Entity::find()
     .join(
       JoinType::LeftJoin,
@@ -29,6 +36,7 @@ async fn get_top_n_emotes(
     .all(database_connection)
     .await?;
 
+  tracing::info!("Calculating total usage for each emote.");
   let emotes_used_totals: HashMap<String, usize> =
     emotes_used
       .into_iter()
@@ -48,6 +56,7 @@ async fn get_top_n_emotes(
         usage_totals
       });
 
+  tracing::info!("Sorting emote usage by usage amount.");
   let mut emote_uses: Vec<(String, usize)> = emotes_used_totals.into_iter().collect();
   emote_uses.sort_by(|(_, uses_lhs), (_, uses_rhs)| uses_rhs.cmp(uses_lhs));
 
@@ -57,6 +66,8 @@ async fn get_top_n_emotes(
 }
 
 fn build_emote_ranking_table(top_emotes: Vec<(String, usize)>) -> String {
+  tracing::info!("Building emote ranking table.");
+
   let longest_emote_name = top_emotes
     .iter()
     .map(|(emote_name, _)| emote_name.chars().count())
@@ -65,6 +76,7 @@ fn build_emote_ranking_table(top_emotes: Vec<(String, usize)>) -> String {
   let title = format!("= Top {} Emotes Used =", top_emotes.len());
   let emote_rankings_max_digits = number_of_digits(top_emotes.len());
 
+  tracing::info!("Building...");
   let top_emotes_string = top_emotes
     .into_iter()
     .enumerate()
@@ -78,6 +90,7 @@ fn build_emote_ranking_table(top_emotes: Vec<(String, usize)>) -> String {
     })
     .collect::<Vec<String>>()
     .join("\n");
+  tracing::info!("Finished.");
 
   format!("{title}\n{top_emotes_string}")
 }

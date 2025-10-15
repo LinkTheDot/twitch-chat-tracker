@@ -11,6 +11,8 @@ pub async fn get_timeouts_table(
   query_conditions: &AppQueryConditions,
   database_connection: &DatabaseConnection,
 ) -> Result<String, AppError> {
+  tracing::info!("Building timeouts table");
+
   let (mut banned_users, timedout_users) =
     get_timeouts(query_conditions, database_connection).await?;
 
@@ -34,6 +36,8 @@ fn generate_timedout_users_string(
   timedout_users: Vec<(user_timeout::Model, twitch_user::Model)>,
   banned_users: &mut Vec<(user_timeout::Model, twitch_user::Model)>,
 ) -> String {
+  tracing::info!("Building timed-out users string.");
+
   timedout_users
     .into_iter()
     .filter_map(|(timeout, user)| {
@@ -61,6 +65,8 @@ fn generate_timedout_users_string(
 fn generate_banned_users_string(
   banned_users: Vec<(user_timeout::Model, twitch_user::Model)>,
 ) -> String {
+  tracing::info!("Building banned users string.");
+
   banned_users
     .into_iter()
     .map(|(_timeout, user)| user.login_name)
@@ -78,6 +84,8 @@ async fn get_timeouts(
   ),
   AppError,
 > {
+  tracing::info!("Getting all timeouts.");
+
   let timeouts = user_timeout::Entity::find()
     .join(
       JoinType::LeftJoin,
@@ -87,6 +95,8 @@ async fn get_timeouts(
     .select_also(twitch_user::Entity)
     .all(database_connection)
     .await?;
+
+  tracing::info!("Filtering missing users.");
 
   let timeouts: Vec<(user_timeout::Model, twitch_user::Model)> = timeouts
     .into_iter()
@@ -102,6 +112,8 @@ async fn get_timeouts(
       Some((timeout, user))
     })
     .collect();
+
+  tracing::info!("Separating bans from timeouts.");
 
   Ok(
     timeouts

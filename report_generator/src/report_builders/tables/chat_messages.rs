@@ -32,7 +32,7 @@ pub async fn get_messages_sent_ranking(
   ranking_row_limit: Option<usize>,
 ) -> Result<(String, String), AppError> {
   let database_connection = get_database_connection().await;
-  tracing::info!("Getting messages.");
+  tracing::info!("Getting messages for message rankings.");
   let messages = stream_message::Entity::find()
     .filter(query_conditions.messages().clone())
     .all(database_connection)
@@ -40,6 +40,8 @@ pub async fn get_messages_sent_ranking(
   let messages: Vec<&stream_message::Model> = messages.iter().collect();
 
   let rankings = calculate_rankings(messages, database_connection, ranking_row_limit).await?;
+
+  tracing::info!("Building chat ranking table strings.");
 
   let mut unfiltered_table = Table::new(rankings.all_messages);
   let mut filtered_table = Table::new(rankings.emote_filtered_messages);
@@ -66,11 +68,15 @@ async fn calculate_rankings(
   database_connection: &DatabaseConnection,
   ranking_row_limit: Option<usize>,
 ) -> Result<ChatRankings, AppError> {
+  tracing::info!("Calculating rankings for all messages.");
+
   let mut chats_sent: HashMap<i32, UserMessages> = HashMap::new();
   let total_messages_sent = messages.len();
   let mut emote_filtered_messages_sent: usize = 0;
   let mut total_word_count: usize = 0;
   let mut total_emote_filtered_chats_word_count: usize = 0;
+
+  tracing::info!("Building ranking list.");
 
   for message in messages {
     let user_messages = chats_sent.entry(message.twitch_user_id).or_default();
@@ -108,8 +114,12 @@ async fn calculate_rankings(
     replace_ids_with_users(chats_sent, database_connection).await?;
   let mut unfiltered_chats_sent = emote_filtered_chats_sent.clone();
 
+  tracing::info!("Sorting unfiltered chats sent.");
+
   unfiltered_chats_sent
     .sort_by(|(_, lhs), (_, rhs)| rhs.all_messages.len().cmp(&lhs.all_messages.len()));
+
+  tracing::info!("Sorting and removing users with no messages from emote filtered chats sent.");
 
   emote_filtered_chats_sent
     .retain(|(_user, chats_sent)| !chats_sent.emote_filtered_messages.is_empty());
@@ -121,9 +131,13 @@ async fn calculate_rankings(
   });
 
   if let Some(ranking_row_limit) = ranking_row_limit {
+    tracing::info!("Truncating rankings to {ranking_row_limit} messages");
+
     unfiltered_chats_sent.truncate(ranking_row_limit);
     emote_filtered_chats_sent.truncate(ranking_row_limit);
   }
+
+  tracing::info!("Building ranking entries for unfiltered messages sent.");
 
   let unfiltered_message_rankings: Vec<RankingEntry> = unfiltered_chats_sent
     .iter()
@@ -161,6 +175,8 @@ async fn calculate_rankings(
       }
     })
     .collect();
+
+  tracing::info!("Building ranking entries for emote filtered messages sent.");
 
   let emote_filtered_message_rankings: Vec<RankingEntry> = emote_filtered_chats_sent
     .iter()
@@ -248,6 +264,8 @@ async fn replace_ids_with_users<'a>(
   mut messages: HashMap<i32, UserMessages<'a>>,
   database_connection: &DatabaseConnection,
 ) -> Result<Vec<(twitch_user::Model, UserMessages<'a>)>, AppError> {
+  tracing::info!("Getting users for each set of messages.");
+
   let user_ids: Vec<i32> = messages.keys().copied().collect();
 
   let users = twitch_user::Entity::find()

@@ -1,5 +1,6 @@
 pub mod basic_reports;
 pub mod chosen_report;
+pub mod subathon_points;
 pub mod subathon_reports;
 
 #[derive(Debug, Default)]

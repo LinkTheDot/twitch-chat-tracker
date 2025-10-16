@@ -4,6 +4,7 @@ use entity_extensions::twitch_user::*;
 use report_generator::clap::Args;
 use report_generator::conditions::query_conditions_builder::AppQueryConditionsBuilder;
 use report_generator::reports::chosen_report::ChosenReport;
+use report_generator::reports::subathon_points::get_points_for_subathon;
 use report_generator::reports::*;
 use report_generator::upload_reports::upload_reports;
 use sea_orm::*;
@@ -25,6 +26,15 @@ async fn main() {
     ChosenReport::Basic => basic_reports::generate_reports(condition, stream.twitch_user_id).await,
     ChosenReport::Subathon => {
       subathon_reports::generate_reports(condition, stream.twitch_user_id).await
+    }
+    ChosenReport::CalculateSubathonPoints => {
+      let points = get_points_for_subathon(stream.twitch_user_id)
+        .await
+        .unwrap();
+
+      println!("Total points for subathon: `{points}`");
+
+      std::process::exit(0);
     }
   };
 

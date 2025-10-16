@@ -10,7 +10,7 @@ pub struct ClapArgs {
   pub mode: Mode,
 
   #[arg(short = 'd', long)]
-  pub data_set: Option<String>
+  pub data_set: Option<String>,
 }
 
 #[derive(Parser, Debug)]

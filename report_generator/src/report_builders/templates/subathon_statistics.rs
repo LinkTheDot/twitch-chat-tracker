@@ -1,4 +1,7 @@
-use crate::{conditions::query_conditions::AppQueryConditions, errors::AppError, report_builders::templates::subathon_statistics::donation_sum::StrippedSubscriptionEvent};
+use crate::{
+  conditions::query_conditions::AppQueryConditions, errors::AppError,
+  report_builders::templates::subathon_statistics::donation_sum::StrippedSubscriptionEvent,
+};
 use chrono::{Duration as ChronoDuration, Utc};
 use donation_sum::DonationSum;
 use entities::{donation_event, sea_orm_active_enums::EventType, stream, subscription_event};

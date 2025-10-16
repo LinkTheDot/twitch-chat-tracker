@@ -15,6 +15,9 @@ pub enum AppError {
   #[error("{0}")]
   SerdeError(#[from] serde_json::Error),
 
+  #[error("0")]
+  ChronoError(String),
+
   #[error("Failed to find a query parameter to use to find a user.")]
   NoQueryParameterFound,
 
@@ -68,6 +71,8 @@ impl From<AppError> for StatusCode {
       AppError::FailedToFindStreamByID { .. } => StatusCode::NOT_FOUND,
       AppError::FailedToFindDonationEventByID { .. } => StatusCode::NOT_FOUND,
       AppError::FailedToParseResponse { .. } => StatusCode::INTERNAL_SERVER_ERROR,
+
+      AppError::ChronoError(_) => StatusCode::INTERNAL_SERVER_ERROR,
     }
   }
 }

@@ -1,14 +1,14 @@
-use crate::{conditions::query_conditions::AppQueryConditions, errors::AppError};
+use crate::{conditions::query_conditions::AppQueryConditions, errors::AppError, report_builders::templates::subathon_statistics::donation_sum::StrippedSubscriptionEvent};
 use chrono::{Duration as ChronoDuration, Utc};
 use donation_sum::DonationSum;
-use entities::{donation_event, sea_orm_active_enums::EventType, stream};
+use entities::{donation_event, sea_orm_active_enums::EventType, stream, subscription_event};
 use sea_orm::*;
 mod donation_sum;
 
 const POINTS_PER_BIT: f64 = 0.01;
 const POINTS_PER_TIER_1_SUB: f64 = 5.0;
-const POINTS_PER_TIER_2_SUB: f64 = 10.0;
-const POINTS_PER_TIER_3_SUB: f64 = 25.0;
+const POINTS_PER_TIER_2_SUB: f64 = 8.0;
+const POINTS_PER_TIER_3_SUB: f64 = 20.0;
 const POINTS_PER_DOLLAR: f64 = 1.0;
 
 const SECONDS_PER_POINT: f64 = 6.0;
@@ -74,13 +74,13 @@ impl SubathonStatistics {
     )
   }
 
-  async fn points_from_donations(
+  pub async fn points_from_donations(
     query_conditions: &AppQueryConditions,
     database_connection: &DatabaseConnection,
   ) -> Result<f64, AppError> {
     tracing::info!("Calculating total points from all donations since start time.");
 
-    let all_donations = donation_event::Entity::find()
+    let mut all_donations = donation_event::Entity::find()
       .filter(query_conditions.donations().clone())
       .select_only()
       .column(donation_event::Column::EventType)
@@ -91,6 +91,19 @@ impl SubathonStatistics {
       .into_model::<DonationSum>()
       .all(database_connection)
       .await?;
+    let subscriptions = subscription_event::Entity::find()
+      .filter(query_conditions.subscriptions().clone())
+      .select_only()
+      .column(subscription_event::Column::SubscriptionTier)
+      .into_model::<StrippedSubscriptionEvent>()
+      .all(database_connection)
+      .await?;
+    let subscriptions = subscriptions
+      .into_iter()
+      .map(Into::into)
+      .collect::<Vec<DonationSum>>();
+
+    all_donations.extend(subscriptions);
 
     let mut total_points = 0.0_f64;
 

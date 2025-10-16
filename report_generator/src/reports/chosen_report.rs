@@ -5,6 +5,7 @@ pub enum ChosenReport {
   #[default]
   Basic,
   Subathon,
+  CalculateSubathonPoints,
 }
 
 impl FromStr for ChosenReport {
@@ -14,6 +15,7 @@ impl FromStr for ChosenReport {
     match s.to_lowercase().trim() {
       "basic" => Ok(Self::Basic),
       "subathon" => Ok(Self::Subathon),
+      "calculate_subathon_points" => Ok(Self::CalculateSubathonPoints),
       _ => Err(format!("Invalid variant: {}", s)),
     }
   }

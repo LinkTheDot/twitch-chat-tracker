@@ -124,7 +124,6 @@ async fn get_baseline_reports(
 
   tracing::info!("Generating chat message rankings.");
   let (unfiltered_chat_report, emote_filtered_chat_report) =
-
     get_messages_sent_ranking(&query_conditions, None).await?;
   tracing::info!("Generating chat message rankings for subathon.");
   let (unfiltered_subathon_chat_report, subathon_emote_filtered_chat_report) =

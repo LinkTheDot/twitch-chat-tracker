@@ -30,9 +30,13 @@ pub async fn get_donation_rankings_for_streamer_and_date(
 
   tracing::info!("Generating donation rankings from {start_date} to {end_date}.");
 
-  let Some(top_donators) = get_top_donators(streamer_id, start_date, end_date, database_connection).await?
+  let Some(top_donators) =
+    get_top_donators(streamer_id, start_date, end_date, database_connection).await?
   else {
-    return Err(AppError::NoDonationsRankings { start_date, end_date });
+    return Err(AppError::NoDonationsRankings {
+      start_date,
+      end_date,
+    });
   };
   let donator_ranking_tables = top_donators.build_tables().await?;
   tracing::info!("Getting streamer.");

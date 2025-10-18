@@ -1,5 +1,3 @@
-use database_connection::get_database_connection;
-
 use crate::clap::Args;
 use crate::conditions::query_conditions::AppQueryConditions;
 use crate::errors::AppError;
@@ -11,6 +9,8 @@ use crate::report_builders::tables::top_emotes::get_top_n_emotes_table;
 use crate::report_builders::templates::chat_statistics::ChatStatistics;
 use crate::report_builders::templates::template_renderer::TemplateRenderer;
 use crate::reports::{Report, Reports};
+use chrono::{Datelike, NaiveDate, TimeZone, Utc};
+use database_connection::get_database_connection;
 
 const MONTHLY_RANKING_ROW_LIMIT: usize = 1000;
 const REPORT_SECTION_SEPARATION: &str = "\n\n";
@@ -133,12 +133,18 @@ async fn get_conditional_reports(
   let mut conditional_reports = vec![];
 
   tracing::info!("Generating donation rankings.");
-  let donator_monthly_rankings_result = get_donation_rankings_for_streamer_and_date(
-    streamer_twitch_user_id,
-    Args::get_year(),
-    Args::get_month(),
-  )
-  .await;
+  let current_date = chrono::Local::now();
+  let year = Args::get_year().unwrap_or(current_date.year() as usize) as i32;
+  let month = Args::get_month().unwrap_or(current_date.month() as usize) as u32;
+
+  let date_start = NaiveDate::from_ymd_opt(year, month, 1).unwrap();
+  let date_start = Utc.from_utc_datetime(&date_start.and_hms_opt(0, 0, 0).unwrap());
+  let date_end = NaiveDate::from_ymd_opt(year, month + 1, 1).unwrap();
+  let date_end = Utc.from_utc_datetime(&date_end.and_hms_opt(0, 0, 0).unwrap());
+
+  let donator_monthly_rankings_result =
+    get_donation_rankings_for_streamer_and_date(streamer_twitch_user_id, date_start, date_end)
+      .await;
 
   match donator_monthly_rankings_result {
     Ok(donator_monthly_rankings) => conditional_reports.push(Report::new(

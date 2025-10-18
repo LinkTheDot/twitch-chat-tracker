@@ -48,8 +48,11 @@ pub enum AppError {
   #[error("Attempted to generate a report for donation rankings with an invalid month of {:?}", .0)]
   InvalidMonthValue(i32),
 
-  #[error("Found no donations for date {}-{}", year, month)]
-  NoDonationsForDate { year: i32, month: u32 },
+  #[error("Found no donations between given date range {start_date}-{end_date}")]
+  NoDonationsRankings {
+    start_date: chrono::DateTime<chrono::Utc>,
+    end_date: chrono::DateTime<chrono::Utc>,
+  },
 
   #[error("Could not find stream by ID {:?}", .0)]
   FailedToFindStream(i32),

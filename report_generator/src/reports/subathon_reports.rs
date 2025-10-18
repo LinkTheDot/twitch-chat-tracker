@@ -43,9 +43,13 @@ pub async fn generate_reports(
     subathon_start_date
   );
 
-  let baseline_reports = get_baseline_reports(query_conditions, subathon_conditions).await?;
-  let conditional_reports =
-    get_conditional_reports(&monthly_conditions, streamer_twitch_user_id).await?;
+  let baseline_reports = get_baseline_reports(&query_conditions, &subathon_conditions).await?;
+  let conditional_reports = get_conditional_reports(
+    &monthly_conditions,
+    &subathon_conditions,
+    streamer_twitch_user_id,
+  )
+  .await?;
 
   tracing::info!("Finished building reports for subathon.");
 
@@ -57,16 +61,16 @@ pub async fn generate_reports(
 
 /// Gets the reports that will always be added regardless of arguments passed in.
 async fn get_baseline_reports(
-  query_conditions: AppQueryConditions,
-  subathon_conditions: AppQueryConditions,
+  query_conditions: &AppQueryConditions,
+  subathon_conditions: &AppQueryConditions,
 ) -> Result<Vec<Report>, AppError> {
   tracing::info!("Generating baseline reports.");
 
   let database_connection = get_database_connection().await;
   let mut template_renderer = TemplateRenderer::new();
   let subathon_statistics =
-    SubathonStatistics::new(&subathon_conditions, database_connection).await?;
-  let general_chat_statistics = ChatStatistics::new(&query_conditions).await?;
+    SubathonStatistics::new(subathon_conditions, database_connection).await?;
+  let general_chat_statistics = ChatStatistics::new(subathon_conditions).await?;
 
   tracing::info!("Building template renderer.");
   template_renderer.add_context(ChatStatistics::NAME, &general_chat_statistics);
@@ -92,14 +96,14 @@ async fn get_baseline_reports(
   let rendered_donation_statistics = template_renderer.render("donation_stats")?;
   let rendered_subathon_statistics = template_renderer.render("subathon_stats")?;
   let top_emotes_table =
-    get_top_n_emotes_table(&query_conditions, database_connection, Some(15)).await?;
-  let raids = get_raids_table(&query_conditions, database_connection).await?;
-  let timeouts = get_timeouts_table(&query_conditions, database_connection).await?;
+    get_top_n_emotes_table(subathon_conditions, database_connection, Some(15)).await?;
+  let raids = get_raids_table(subathon_conditions, database_connection).await?;
+  let timeouts = get_timeouts_table(subathon_conditions, database_connection).await?;
 
   tracing::info!("Building report strings.");
 
   let general_stats_report = Report::build_report_from_list(
-    "general_stats",
+    "subathon_general_stats",
     &[
       &raids,
       &timeouts,
@@ -110,7 +114,7 @@ async fn get_baseline_reports(
     REPORT_SECTION_SEPARATION,
   );
   let general_stats_report_with_donations = Report::build_report_from_list(
-    "general_stats_with_donations",
+    "subathon_general_stats_with_donations",
     &[
       &raids,
       &timeouts,
@@ -124,10 +128,10 @@ async fn get_baseline_reports(
 
   tracing::info!("Generating chat message rankings.");
   let (unfiltered_chat_report, emote_filtered_chat_report) =
-    get_messages_sent_ranking(&query_conditions, None).await?;
+    get_messages_sent_ranking(query_conditions, None).await?;
   tracing::info!("Generating chat message rankings for subathon.");
   let (unfiltered_subathon_chat_report, subathon_emote_filtered_chat_report) =
-    get_messages_sent_ranking(&subathon_conditions, Some(SUBATHON_RANKING_ROW_LIMIT)).await?;
+    get_messages_sent_ranking(subathon_conditions, Some(SUBATHON_RANKING_ROW_LIMIT)).await?;
 
   tracing::info!("Gathering reports.");
 
@@ -152,26 +156,29 @@ async fn get_baseline_reports(
 /// Gets the list of reports that will only be added based on passed in flags or available data.
 async fn get_conditional_reports(
   monthly_conditions: &AppQueryConditions,
+  subathon_conditions: &AppQueryConditions,
   streamer_twitch_user_id: i32,
 ) -> Result<Vec<Report>, AppError> {
   tracing::info!("Generating conditional reports.");
 
   let mut conditional_reports = vec![];
+  let subathon_start = subathon_conditions.date_start.unwrap();
+  let subathon_end = subathon_conditions.date_end.unwrap_or(Utc::now());
 
   let donator_monthly_rankings_result = get_donation_rankings_for_streamer_and_date(
     streamer_twitch_user_id,
-    Args::get_year(),
-    Args::get_month(),
+    subathon_start,
+    subathon_end,
   )
   .await;
 
   match donator_monthly_rankings_result {
-    Ok(donator_monthly_rankings) => conditional_reports.push(Report::new(
-      "donator_monthly_rankings",
-      donator_monthly_rankings,
+    Ok(donator_subathon_rankings) => conditional_reports.push(Report::new(
+      "donator_subathon_rankings",
+      donator_subathon_rankings,
     )),
     Err(error) => tracing::error!(
-      "Failed to generate monthly donation rankings. Reason: {:?}",
+      "Failed to generate subathon donation rankings. Reason: {:?}",
       error
     ),
   }

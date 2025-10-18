@@ -18,24 +18,21 @@ mod top_donators_tables;
 /// The value of each sub tier in order of tier, and in USD.
 const SUB_TIER_VALUE: [f32; 3] = [5.99, 9.99, 24.99];
 const REPORT_INFO: &str =
-  r#"This report contains the donation rankings for streamer {STREAMER} during {DATE}."#;
+  r#"This report contains the donation rankings for streamer {STREAMER} from {START} to {END}."#;
 
 #[instrument(skip_all)]
 pub async fn get_donation_rankings_for_streamer_and_date(
   streamer_id: i32,
-  year: Option<usize>,
-  month: Option<usize>,
+  start_date: DateTime<Utc>,
+  end_date: DateTime<Utc>,
 ) -> Result<String, AppError> {
-  let current_date = Local::now();
-  let year = year.unwrap_or(current_date.year() as usize) as i32;
-  let month = month.unwrap_or(current_date.month() as usize) as u32;
   let database_connection = get_database_connection().await;
 
-  tracing::info!("Generating donation rankings at {year}-{month}.");
+  tracing::info!("Generating donation rankings from {start_date} to {end_date}.");
 
-  let Some(top_donators) = get_top_donators(streamer_id, year, month, database_connection).await?
+  let Some(top_donators) = get_top_donators(streamer_id, start_date, end_date, database_connection).await?
   else {
-    return Err(AppError::NoDonationsForDate { year, month });
+    return Err(AppError::NoDonationsRankings { start_date, end_date });
   };
   let donator_ranking_tables = top_donators.build_tables().await?;
   tracing::info!("Getting streamer.");
@@ -48,7 +45,8 @@ pub async fn get_donation_rankings_for_streamer_and_date(
 
   let mut report_string = REPORT_INFO
     .replace("{STREAMER}", &streamer_name)
-    .replace("{DATE}", &format!("{year}-{month}"));
+    .replace("{START}", &start_date.to_string())
+    .replace("{END}", &end_date.to_string());
 
   report_string.push_str("\n\n");
   report_string.push_str(&donator_ranking_tables.to_string());
@@ -58,22 +56,20 @@ pub async fn get_donation_rankings_for_streamer_and_date(
 
 async fn get_top_donators(
   streamer_id: i32,
-  year: i32,
-  month: u32,
+  start_date: DateTime<Utc>,
+  end_date: DateTime<Utc>,
   database_connection: &DatabaseConnection,
 ) -> Result<Option<TopDonators>, AppError> {
   tracing::info!("Calculating top donators.");
 
-  let date_start = NaiveDate::from_ymd_opt(year, month, 1).unwrap();
-  let date_end = NaiveDate::from_ymd_opt(year, month + 1, 1).unwrap();
   let donations = donation_event::Entity::find()
-    .filter(donation_event::Column::Timestamp.between(date_start, date_end))
+    .filter(donation_event::Column::Timestamp.between(start_date, end_date))
     .filter(donation_event::Column::DonationReceiverTwitchUserId.eq(streamer_id))
     .all(database_connection)
     .await?;
 
   if donations.is_empty() {
-    tracing::info!("No donations for date {year}-{month}.");
+    tracing::info!("No donations between dates {start_date}-{end_date}.");
 
     return Ok(None);
   }

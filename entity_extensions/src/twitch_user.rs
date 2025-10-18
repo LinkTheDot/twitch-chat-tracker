@@ -110,14 +110,14 @@ impl TwitchUserExtensions for twitch_user::Model {
     .await
     .map_err(Into::into);
 
-    if let Ok(user_list) = &user_list_result {
-      if user_list.is_empty() {
-        return Err(EntityExtensionError::FailedToGetValue {
-          value_name: "user",
-          location: "get_list_by_incomplete_name",
-          additional_data: format!("{:?}", identifier),
-        });
-      }
+    if let Ok(user_list) = &user_list_result
+      && user_list.is_empty()
+    {
+      return Err(EntityExtensionError::FailedToGetValue {
+        value_name: "user",
+        location: "get_list_by_incomplete_name",
+        additional_data: format!("{:?}", identifier),
+      });
     }
 
     user_list_result
@@ -405,22 +405,22 @@ async fn attempt_insert(
   let result = helix_channel.insert(database_connection).await;
 
   // Checking if there was a race condition where another process is inserting at the same time.
-  if let Err(error) = &result {
-    if let Some(SqlErr::UniqueConstraintViolation(_)) = error.sql_err() {
-      let user_model_result = twitch_user::Entity::find()
-        .filter(twitch_user::Column::TwitchId.eq(twitch_id))
-        .one(database_connection)
-        .await?;
+  if let Err(error) = &result
+    && let Some(SqlErr::UniqueConstraintViolation(_)) = error.sql_err()
+  {
+    let user_model_result = twitch_user::Entity::find()
+      .filter(twitch_user::Column::TwitchId.eq(twitch_id))
+      .one(database_connection)
+      .await?;
 
-      if let Some(user_model) = user_model_result {
-        return Ok(user_model);
-      } else {
-        return Err(EntityExtensionError::FailedToQuery {
-          value_name: "twitch user",
-          location: "attempt insert",
-          value: twitch_id.to_string(),
-        });
-      }
+    if let Some(user_model) = user_model_result {
+      return Ok(user_model);
+    } else {
+      return Err(EntityExtensionError::FailedToQuery {
+        value_name: "twitch user",
+        location: "attempt insert",
+        value: twitch_id.to_string(),
+      });
     }
   }
 

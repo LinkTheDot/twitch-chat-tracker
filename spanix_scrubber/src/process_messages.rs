@@ -15,10 +15,12 @@ const LOGIN_NAME_TAG: &str = "login";
 
 impl SpanixScrubberConfig {
   pub async fn insert_user_messages_into_database(self, data_set: &str) -> ! {
-    let third_party_emote_list =
-      EmoteListStorage::new(&[self.channel_login.clone()], self.database_connection)
-        .await
-        .unwrap();
+    let third_party_emote_list = EmoteListStorage::new(
+      std::slice::from_ref(&self.channel_login),
+      self.database_connection,
+    )
+    .await
+    .unwrap();
     let third_party_emote_list = Arc::new(third_party_emote_list);
     let mut data_path = PathBuf::from(Self::DATA_OUTPUT_DIRECTORY);
     data_path.push(data_set);
@@ -148,14 +150,14 @@ impl SpanixScrubberConfig {
 
     let mut failed_message_file_path = PathBuf::from(Self::FAILED_MESSAGES_OUTPUT_DIRECTORY);
 
-    if !failed_message_file_path.exists() {
-      if let Err(error) = fs::create_dir_all(&failed_message_file_path).await {
-        tracing::error!(
-          "Failed to create directory for failed user messages. Reason: `{error}`. Dumping failed messages."
-        );
+    if !failed_message_file_path.exists()
+      && let Err(error) = fs::create_dir_all(&failed_message_file_path).await
+    {
+      tracing::error!(
+        "Failed to create directory for failed user messages. Reason: `{error}`. Dumping failed messages."
+      );
 
-        tracing::info!("{failed_messages:?}");
-      }
+      tracing::info!("{failed_messages:?}");
     }
 
     failed_message_file_path.push(Self::FAILED_MESSAGES_FILE_NAME.replace("{data_set}", data_set));
@@ -215,12 +217,12 @@ impl SpanixScrubberConfig {
         }
       };
 
-      if let Some(message_parser) = message_parser {
-        if let Err(error) = message_parser.parse(database_connection).await {
-          tracing::error!("Failed to parse a message for user `{user_login}`. Reason: {error}");
+      if let Some(message_parser) = message_parser
+        && let Err(error) = message_parser.parse(database_connection).await
+      {
+        tracing::error!("Failed to parse a message for user `{user_login}`. Reason: {error}");
 
-          failed_messages.push(irc_message);
-        }
+        failed_messages.push(irc_message);
       }
     }
 
@@ -243,10 +245,10 @@ fn set_irc_login_tag_if_names_differ(irc_message: &mut IrcMessage, user_login: &
       continue;
     }
 
-    if let Some(login) = tag_value {
-      if login != user_login {
-        *login = user_login.to_string();
-      }
+    if let Some(login) = tag_value
+      && login != user_login
+    {
+      *login = user_login.to_string();
     }
   }
 }

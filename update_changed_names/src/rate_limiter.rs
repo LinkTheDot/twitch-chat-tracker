@@ -46,10 +46,8 @@ impl RateLimiter {
   }
 
   pub fn tokens(&self) -> usize {
-    if self.rate_per_minute > self.used_since_last_refresh {
-      self.rate_per_minute - self.used_since_last_refresh
-    } else {
-      0
-    }
+    self
+      .rate_per_minute
+      .saturating_sub(self.used_since_last_refresh)
   }
 }
